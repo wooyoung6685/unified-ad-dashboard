@@ -4,6 +4,16 @@ import {
   toggleMetaAccount,
   toggleTiktokAccount,
 } from '@/app/dashboard/admin/actions'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
   TableBody,
@@ -107,7 +118,7 @@ function CountrySelect({
 
 export function AccountManager({ brands }: AccountManagerProps) {
   const [selectedBrandId, setSelectedBrandId] = useState<string | null>(
-    brands[0]?.id ?? null,
+    brands[0]?.id ?? null
   )
   const [pendingRows, setPendingRows] = useState<PendingRow[]>([])
   const [registered, setRegistered] = useState<RegisteredAccount[]>([])
@@ -120,6 +131,10 @@ export function AccountManager({ brands }: AccountManagerProps) {
     country: '',
   })
   const [saveErrors, setSaveErrors] = useState<Record<string, string>>({})
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string
+    platform: PlatformType
+  } | null>(null)
 
   // 브랜드별 등록 계정 수
   const countByBrand = (brandId: string) =>
@@ -130,7 +145,7 @@ export function AccountManager({ brands }: AccountManagerProps) {
 
   // 선택된 브랜드의 계정만 필터링
   const filteredAccounts = registered.filter(
-    (a) => a.brand_id === selectedBrandId,
+    (a) => a.brand_id === selectedBrandId
   )
 
   // 마운트 시 Meta + TikTok 계정 병렬 로드
@@ -141,14 +156,23 @@ export function AccountManager({ brands }: AccountManagerProps) {
         fetch('/api/admin/accounts/meta'),
         fetch('/api/admin/accounts/tiktok'),
       ])
-      const [metaJson, tiktokJson] = await Promise.all([metaRes.json(), tiktokRes.json()])
+      const [metaJson, tiktokJson] = await Promise.all([
+        metaRes.json(),
+        tiktokRes.json(),
+      ])
 
       const metaAccounts: RegisteredAccount[] = (metaJson.accounts ?? []).map(
-        (a: Omit<RegisteredAccount, 'platform'>) => ({ ...a, platform: 'meta' as PlatformType }),
+        (a: Omit<RegisteredAccount, 'platform'>) => ({
+          ...a,
+          platform: 'meta' as PlatformType,
+        })
       )
-      const tiktokAccounts: RegisteredAccount[] = (tiktokJson.accounts ?? []).map(
-        (a: Omit<RegisteredAccount, 'platform'>) => ({ ...a, platform: 'tiktok' as PlatformType }),
-      )
+      const tiktokAccounts: RegisteredAccount[] = (
+        tiktokJson.accounts ?? []
+      ).map((a: Omit<RegisteredAccount, 'platform'>) => ({
+        ...a,
+        platform: 'tiktok' as PlatformType,
+      }))
       setRegistered([...metaAccounts, ...tiktokAccounts])
     } finally {
       setLoading(false)
@@ -178,7 +202,9 @@ export function AccountManager({ brands }: AccountManagerProps) {
 
   // pending 행 필드 업데이트
   function updatePending(key: string, fields: Partial<PendingRow>) {
-    setPendingRows((prev) => prev.map((r) => (r._key === key ? { ...r, ...fields } : r)))
+    setPendingRows((prev) =>
+      prev.map((r) => (r._key === key ? { ...r, ...fields } : r))
+    )
   }
 
   // pending 행 삭제
@@ -219,7 +245,9 @@ export function AccountManager({ brands }: AccountManagerProps) {
 
   // 등록 계정 삭제
   async function deleteRegistered(id: string, platform: PlatformType) {
-    const res = await fetch(`/api/admin/accounts/${platform}?id=${id}`, { method: 'DELETE' })
+    const res = await fetch(`/api/admin/accounts/${platform}?id=${id}`, {
+      method: 'DELETE',
+    })
     const json = await res.json()
     if (!json.error) {
       setRegistered((prev) => prev.filter((a) => a.id !== id))
@@ -267,11 +295,14 @@ export function AccountManager({ brands }: AccountManagerProps) {
       await toggleTiktokAccount(account.id, !account.is_active)
     }
     setRegistered((prev) =>
-      prev.map((a) => (a.id === account.id ? { ...a, is_active: !account.is_active } : a)),
+      prev.map((a) =>
+        a.id === account.id ? { ...a, is_active: !account.is_active } : a
+      )
     )
   }
 
-  const canSavePending = (row: PendingRow) => !!row.brand_id && !!row.platform && !!row.account_id
+  const canSavePending = (row: PendingRow) =>
+    !!row.brand_id && !!row.platform && !!row.account_id
 
   // 브랜드가 없는 경우
   if (brands.length === 0) {
@@ -283,20 +314,27 @@ export function AccountManager({ brands }: AccountManagerProps) {
   return (
     <div className="flex gap-6">
       {/* 왼쪽 — 브랜드 목록 */}
-      <div className="w-48 flex-shrink-0 rounded-md border">
+      <div className="w-48 overflow-hidden rounded-md border">
+        <div className="bg-muted/30 border-b px-3 py-2">
+          <p className="text-muted-foreground text-xs font-medium">브랜드</p>
+        </div>
         {brands.map((b) => (
           <button
             key={b.id}
             onClick={() => setSelectedBrandId(b.id)}
             className={cn(
-              'w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-muted/50',
-              selectedBrandId === b.id && 'bg-muted font-medium',
+              'hover:bg-muted/50 flex w-full items-center justify-between px-3 py-2 text-left text-sm',
+              selectedBrandId === b.id && 'bg-muted font-medium'
             )}
           >
             <span className="truncate">{b.name}</span>
-            <Badge variant="secondary" className="ml-1 text-xs">
-              {countByBrand(b.id)}
-            </Badge>
+            {loading ? (
+              <Skeleton className="h-4 w-5 rounded-sm" />
+            ) : (
+              <Badge variant="secondary" className="ml-1 text-xs">
+                {countByBrand(b.id)}
+              </Badge>
+            )}
           </button>
         ))}
       </div>
@@ -333,7 +371,9 @@ export function AccountManager({ brands }: AccountManagerProps) {
                       <Select
                         value={row.platform}
                         onValueChange={(v) =>
-                          updatePending(row._key, { platform: v as PlatformType })
+                          updatePending(row._key, {
+                            platform: v as PlatformType,
+                          })
                         }
                       >
                         <SelectTrigger className="w-32">
@@ -350,13 +390,17 @@ export function AccountManager({ brands }: AccountManagerProps) {
                         className="w-28"
                         placeholder="서브 브랜드 (선택)"
                         value={row.sub_brand}
-                        onChange={(e) => updatePending(row._key, { sub_brand: e.target.value })}
+                        onChange={(e) =>
+                          updatePending(row._key, { sub_brand: e.target.value })
+                        }
                       />
                     </TableCell>
                     <TableCell>
                       <CountrySelect
                         value={row.country}
-                        onValueChange={(v) => updatePending(row._key, { country: v })}
+                        onValueChange={(v) =>
+                          updatePending(row._key, { country: v })
+                        }
                       />
                     </TableCell>
                     <TableCell>
@@ -364,7 +408,11 @@ export function AccountManager({ brands }: AccountManagerProps) {
                         className="w-44"
                         placeholder="act_xxxxxxxx"
                         value={row.account_id}
-                        onChange={(e) => updatePending(row._key, { account_id: e.target.value })}
+                        onChange={(e) =>
+                          updatePending(row._key, {
+                            account_id: e.target.value,
+                          })
+                        }
                       />
                     </TableCell>
                     <TableCell>
@@ -372,16 +420,22 @@ export function AccountManager({ brands }: AccountManagerProps) {
                         className="w-36"
                         placeholder="비고 (선택)"
                         value={row.note}
-                        onChange={(e) => updatePending(row._key, { note: e.target.value })}
+                        onChange={(e) =>
+                          updatePending(row._key, { note: e.target.value })
+                        }
                       />
                     </TableCell>
                     <TableCell>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => updatePending(row._key, { is_active: !row.is_active })}
+                        onClick={() =>
+                          updatePending(row._key, { is_active: !row.is_active })
+                        }
                       >
-                        <Badge variant={row.is_active ? 'default' : 'secondary'}>
+                        <Badge
+                          variant={row.is_active ? 'default' : 'secondary'}
+                        >
                           {row.is_active ? '활성' : '비활성'}
                         </Badge>
                       </Button>
@@ -403,7 +457,9 @@ export function AccountManager({ brands }: AccountManagerProps) {
                           취소
                         </Button>
                         {saveErrors[row._key] && (
-                          <span className="text-xs text-red-600">{saveErrors[row._key]}</span>
+                          <span className="text-xs text-red-600">
+                            {saveErrors[row._key]}
+                          </span>
                         )}
                       </div>
                     </TableCell>
@@ -416,9 +472,15 @@ export function AccountManager({ brands }: AccountManagerProps) {
 
         {/* 등록된 광고계정 목록 */}
         {loading ? (
-          <p className="text-muted-foreground text-sm">불러오는 중...</p>
+          <div className="space-y-2">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
         ) : filteredAccounts.length === 0 ? (
-          <p className="text-muted-foreground text-sm">이 브랜드에 등록된 계정이 없습니다.</p>
+          <p className="text-muted-foreground text-sm">
+            이 브랜드에 등록된 계정이 없습니다.
+          </p>
         ) : (
           <div className="rounded-md border">
             <Table>
@@ -436,7 +498,9 @@ export function AccountManager({ brands }: AccountManagerProps) {
               <TableBody>
                 {filteredAccounts.map((account) => {
                   const isEditing = editingId === account.id
-                  const countryOption = COUNTRY_OPTIONS.find((c) => c.code === account.country)
+                  const countryOption = COUNTRY_OPTIONS.find(
+                    (c) => c.code === account.country
+                  )
                   return (
                     <TableRow key={account.id}>
                       <TableCell>{PLATFORM_LABEL[account.platform]}</TableCell>
@@ -447,13 +511,18 @@ export function AccountManager({ brands }: AccountManagerProps) {
                             placeholder="서브 브랜드 (선택)"
                             value={editingValues.sub_brand}
                             onChange={(e) =>
-                              setEditingValues((prev) => ({ ...prev, sub_brand: e.target.value }))
+                              setEditingValues((prev) => ({
+                                ...prev,
+                                sub_brand: e.target.value,
+                              }))
                             }
                           />
                         ) : account.sub_brand ? (
                           account.sub_brand
                         ) : (
-                          <span className="text-muted-foreground text-xs">—</span>
+                          <span className="text-muted-foreground text-xs">
+                            —
+                          </span>
                         )}
                       </TableCell>
                       <TableCell>
@@ -461,13 +530,18 @@ export function AccountManager({ brands }: AccountManagerProps) {
                           <CountrySelect
                             value={editingValues.country}
                             onValueChange={(v) =>
-                              setEditingValues((prev) => ({ ...prev, country: v }))
+                              setEditingValues((prev) => ({
+                                ...prev,
+                                country: v,
+                              }))
                             }
                           />
                         ) : countryOption ? (
                           `${countryOption.flag} ${countryOption.code}`
                         ) : (
-                          <span className="text-muted-foreground text-xs">—</span>
+                          <span className="text-muted-foreground text-xs">
+                            —
+                          </span>
                         )}
                       </TableCell>
                       <TableCell>
@@ -477,13 +551,18 @@ export function AccountManager({ brands }: AccountManagerProps) {
                             placeholder="비고 (선택)"
                             value={editingValues.note}
                             onChange={(e) =>
-                              setEditingValues((prev) => ({ ...prev, note: e.target.value }))
+                              setEditingValues((prev) => ({
+                                ...prev,
+                                note: e.target.value,
+                              }))
                             }
                           />
                         ) : account.note ? (
                           account.note
                         ) : (
-                          <span className="text-muted-foreground text-xs">—</span>
+                          <span className="text-muted-foreground text-xs">
+                            —
+                          </span>
                         )}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-xs">
@@ -492,7 +571,10 @@ export function AccountManager({ brands }: AccountManagerProps) {
                             className="w-44"
                             value={editingValues.account_id}
                             onChange={(e) =>
-                              setEditingValues((prev) => ({ ...prev, account_id: e.target.value }))
+                              setEditingValues((prev) => ({
+                                ...prev,
+                                account_id: e.target.value,
+                              }))
                             }
                           />
                         ) : (
@@ -503,10 +585,14 @@ export function AccountManager({ brands }: AccountManagerProps) {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="p-0 h-auto"
+                          className="h-auto p-0"
                           onClick={() => handleToggle(account)}
                         >
-                          <Badge variant={account.is_active ? 'default' : 'secondary'}>
+                          <Badge
+                            variant={
+                              account.is_active ? 'default' : 'secondary'
+                            }
+                          >
                             {account.is_active ? '활성' : '비활성'}
                           </Badge>
                         </Button>
@@ -515,7 +601,10 @@ export function AccountManager({ brands }: AccountManagerProps) {
                         <div className="flex items-center gap-2">
                           {isEditing ? (
                             <>
-                              <Button size="sm" onClick={() => saveEditing(account)}>
+                              <Button
+                                size="sm"
+                                onClick={() => saveEditing(account)}
+                              >
                                 저장
                               </Button>
                               <Button
@@ -536,10 +625,14 @@ export function AccountManager({ brands }: AccountManagerProps) {
                                 수정
                               </Button>
                               <Button
-                                variant="ghost"
+                                variant="destructive"
                                 size="sm"
-                                className="text-red-600 hover:text-red-700"
-                                onClick={() => deleteRegistered(account.id, account.platform)}
+                                onClick={() =>
+                                  setDeleteTarget({
+                                    id: account.id,
+                                    platform: account.platform,
+                                  })
+                                }
                               >
                                 삭제
                               </Button>
@@ -555,6 +648,35 @@ export function AccountManager({ brands }: AccountManagerProps) {
           </div>
         )}
       </div>
+
+      {/* 삭제 확인 다이얼로그 */}
+      <AlertDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>광고계정 삭제</AlertDialogTitle>
+            <AlertDialogDescription>
+              이 광고계정을 삭제하면 관련 통계 데이터도 함께 삭제될 수 있습니다.
+              정말 삭제하시겠습니까?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deleteTarget)
+                  deleteRegistered(deleteTarget.id, deleteTarget.platform)
+                setDeleteTarget(null)
+              }}
+            >
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

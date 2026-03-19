@@ -3,21 +3,18 @@ import { NextRequest, NextResponse } from 'next/server'
 
 // users + brands JOIN + auth email 매핑
 export async function GET() {
-  // Auth 유저 목록으로 id → email 맵 생성
-  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.listUsers()
+  // Auth 유저 목록과 users 테이블을 병렬 조회
+  const [{ data: authData, error: authError }, { data, error }] = await Promise.all([
+    supabaseAdmin.auth.admin.listUsers(),
+    supabaseAdmin.from('users').select('*, brands(name)').order('created_at', { ascending: true }),
+  ])
+
   if (authError) return NextResponse.json({ error: authError.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   const emailMap = new Map<string, string>(
     authData.users.map((u) => [u.id, u.email ?? '']),
   )
-
-  // users 테이블과 brands JOIN
-  const { data, error } = await supabaseAdmin
-    .from('users')
-    .select('*, brands(name)')
-    .order('created_at', { ascending: true })
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   const users = (data ?? []).map((row) => ({
     id: row.id,

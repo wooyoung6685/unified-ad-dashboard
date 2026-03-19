@@ -8,5 +8,15 @@ interface AccountsTabProps {
 }
 
 export function AccountsTab({ brands }: AccountsTabProps) {
-  return <AccountManager brands={brands} />
+  return (
+    <div>
+      <div className="mb-6">
+        <h2 className="text-lg font-semibold">광고계정 관리</h2>
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          브랜드별 Meta/TikTok 광고 계정을 등록하고 관리합니다.
+        </p>
+      </div>
+      <AccountManager brands={brands} />
+    </div>
+  )
 }

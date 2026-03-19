@@ -1,9 +1,27 @@
 'use client'
 
 import { createBrand, deleteBrand, updateBrand } from '@/app/dashboard/admin/actions'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Table,
   TableBody,
@@ -13,7 +31,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import type { Brand } from '@/types/database'
-import { useRef, useState } from 'react'
+import { Plus } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 
 interface BrandsTabProps {
   brands: Brand[]
@@ -23,17 +42,28 @@ export function BrandsTab({ brands: initialBrands }: BrandsTabProps) {
   const [brands, setBrands] = useState(initialBrands)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [isError, setIsError] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const [addOpen, setAddOpen] = useState(false)
+  const [addError, setAddError] = useState<string | null>(null)
   const formRef = useRef<HTMLFormElement>(null)
 
+  // 성공 메시지 3초 후 자동 소멸
+  useEffect(() => {
+    if (!message || isError) return
+    const t = setTimeout(() => setMessage(null), 3000)
+    return () => clearTimeout(t)
+  }, [message, isError])
+
   async function handleCreate(formData: FormData) {
-    setMessage(null)
+    setAddError(null)
     const result = await createBrand(formData)
     if ('error' in result) {
-      setMessage(`오류: ${result.error}`)
+      setAddError(result.error ?? '알 수 없는 오류가 발생했습니다.')
     } else {
-      setMessage('브랜드가 생성되었습니다.')
       setBrands((prev) => [...prev, result.brand])
       formRef.current?.reset()
+      setAddOpen(false)
     }
   }
 
@@ -42,8 +72,10 @@ export function BrandsTab({ brands: initialBrands }: BrandsTabProps) {
     const id = formData.get('id') as string
     const result = await updateBrand(formData)
     if ('error' in result) {
+      setIsError(true)
       setMessage(`오류: ${result.error}`)
     } else {
+      setIsError(false)
       setMessage('브랜드가 수정되었습니다.')
       const name = formData.get('name') as string
       const manager = (formData.get('manager') as string) || null
@@ -58,6 +90,7 @@ export function BrandsTab({ brands: initialBrands }: BrandsTabProps) {
     setMessage(null)
     const result = await deleteBrand(id)
     if ('error' in result) {
+      setIsError(true)
       setMessage(`오류: ${result.error}`)
     } else {
       setBrands((prev) => prev.filter((b) => b.id !== id))
@@ -65,8 +98,32 @@ export function BrandsTab({ brands: initialBrands }: BrandsTabProps) {
   }
 
   return (
-    <div className="space-y-8">
-      {/* 브랜드 목록 */}
+    <div>
+      {/* 헤더 */}
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold">브랜드 관리</h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            브랜드를 추가하고 담당자 정보를 관리합니다.
+          </p>
+        </div>
+        <Button onClick={() => { setAddError(null); setAddOpen(true) }}>
+          <Plus className="mr-1.5 size-4" />
+          브랜드 추가
+        </Button>
+      </div>
+
+      {/* 수정 성공/오류 메시지 */}
+      {message && (
+        <Alert
+          variant={isError ? 'destructive' : 'default'}
+          className="mb-4"
+        >
+          <AlertDescription>{message}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* 브랜드 목록 테이블 */}
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -74,13 +131,16 @@ export function BrandsTab({ brands: initialBrands }: BrandsTabProps) {
               <TableHead>브랜드명</TableHead>
               <TableHead>담당자</TableHead>
               <TableHead>생성일</TableHead>
-              <TableHead>액션</TableHead>
+              <TableHead className="w-px whitespace-nowrap">액션</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {brands.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4} className="text-muted-foreground text-center text-sm">
+                <TableCell
+                  colSpan={4}
+                  className="text-center text-sm text-muted-foreground"
+                >
                   브랜드가 없습니다.
                 </TableCell>
               </TableRow>
@@ -99,7 +159,9 @@ export function BrandsTab({ brands: initialBrands }: BrandsTabProps) {
                         placeholder="담당자 (선택)"
                         className="w-40"
                       />
-                      <Button type="submit" size="sm">저장</Button>
+                      <Button type="submit" size="sm">
+                        저장
+                      </Button>
                       <Button
                         type="button"
                         variant="ghost"
@@ -113,13 +175,13 @@ export function BrandsTab({ brands: initialBrands }: BrandsTabProps) {
                 ) : (
                   <>
                     <TableCell>{b.name}</TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
+                    <TableCell className="text-xs text-muted-foreground">
                       {b.manager ?? '-'}
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
+                    <TableCell className="text-xs text-muted-foreground">
                       {b.created_at.slice(0, 10)}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="w-px whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <Button
                           variant="outline"
@@ -131,7 +193,8 @@ export function BrandsTab({ brands: initialBrands }: BrandsTabProps) {
                         <Button
                           variant="destructive"
                           size="sm"
-                          onClick={() => handleDelete(b.id)}
+                          aria-label={`${b.name} 삭제`}
+                          onClick={() => setDeleteTarget(b.id)}
                         >
                           삭제
                         </Button>
@@ -145,28 +208,76 @@ export function BrandsTab({ brands: initialBrands }: BrandsTabProps) {
         </Table>
       </div>
 
-      {/* 브랜드 생성 */}
-      <Card className="max-w-md">
-        <CardHeader>
-          <CardTitle className="text-base">브랜드 추가</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form ref={formRef} action={handleCreate} className="space-y-3">
+      {/* 브랜드 추가 Dialog */}
+      <Dialog
+        open={addOpen}
+        onOpenChange={(open) => {
+          setAddOpen(open)
+          if (!open) {
+            setAddError(null)
+            formRef.current?.reset()
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>브랜드 추가</DialogTitle>
+          </DialogHeader>
+          <form ref={formRef} action={handleCreate} className="space-y-4">
             <div className="space-y-1">
-              <label className="text-sm font-medium">브랜드명</label>
-              <Input name="name" placeholder="브랜드 이름" required />
+              <Label htmlFor="brand-name">브랜드명</Label>
+              <Input id="brand-name" name="name" placeholder="브랜드 이름" required />
             </div>
             <div className="space-y-1">
-              <label className="text-sm font-medium">담당자 (선택)</label>
-              <Input name="manager" placeholder="담당자 이름" />
+              <Label htmlFor="brand-manager">담당자 (선택)</Label>
+              <Input id="brand-manager" name="manager" placeholder="담당자 이름" />
             </div>
-            {message && (
-              <p className="text-sm text-green-600">{message}</p>
+            {addError && (
+              <Alert variant="destructive">
+                <AlertDescription>{addError}</AlertDescription>
+              </Alert>
             )}
-            <Button type="submit">추가</Button>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setAddOpen(false)}
+              >
+                취소
+              </Button>
+              <Button type="submit">추가</Button>
+            </DialogFooter>
           </form>
-        </CardContent>
-      </Card>
+        </DialogContent>
+      </Dialog>
+
+      {/* 삭제 확인 AlertDialog */}
+      <AlertDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>브랜드 삭제</AlertDialogTitle>
+            <AlertDialogDescription>
+              이 브랜드를 삭제하면 관련 광고계정 데이터도 함께 삭제될 수 있습니다.
+              정말 삭제하시겠습니까?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deleteTarget) handleDelete(deleteTarget)
+                setDeleteTarget(null)
+              }}
+            >
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

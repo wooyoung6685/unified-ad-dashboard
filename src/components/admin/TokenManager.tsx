@@ -4,9 +4,12 @@ import {
   updateAccessToken,
   updateGlobalSetting,
 } from '@/app/dashboard/admin/actions'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import type { GlobalSetting } from '@/types/database'
 import { useState } from 'react'
 
@@ -18,6 +21,7 @@ interface TokenManagerProps {
 function MetaTokenForm({ setting }: { setting: GlobalSetting }) {
   const [message, setMessage] = useState<string | null>(null)
   const [isError, setIsError] = useState(false)
+  const isSet = !!setting.access_token
 
   async function handleSubmit(formData: FormData) {
     setMessage(null)
@@ -33,16 +37,20 @@ function MetaTokenForm({ setting }: { setting: GlobalSetting }) {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-base">Meta 액세스 토큰</CardTitle>
+        <Badge variant={isSet ? 'default' : 'secondary'}>
+          {isSet ? '설정됨' : '미설정'}
+        </Badge>
       </CardHeader>
       <CardContent>
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="id" value={setting.id} />
 
           <div className="space-y-1">
-            <label className="text-sm font-medium">Access Token</label>
+            <Label htmlFor="meta-access-token">Access Token</Label>
             <Input
+              id="meta-access-token"
               type="password"
               name="access_token"
               defaultValue={setting.access_token ?? ''}
@@ -51,9 +59,9 @@ function MetaTokenForm({ setting }: { setting: GlobalSetting }) {
           </div>
 
           {message && (
-            <p className={`text-sm ${isError ? 'text-red-600' : 'text-green-600'}`}>
-              {message}
-            </p>
+            <Alert variant={isError ? 'destructive' : 'default'}>
+              <AlertDescription>{message}</AlertDescription>
+            </Alert>
           )}
 
           <Button type="submit">저장</Button>
@@ -67,6 +75,7 @@ function MetaTokenForm({ setting }: { setting: GlobalSetting }) {
 function TikTokTokenForm({ setting }: { setting: GlobalSetting }) {
   const [message, setMessage] = useState<string | null>(null)
   const [isError, setIsError] = useState(false)
+  const isSet = !!setting.access_token
 
   async function handleSubmit(formData: FormData) {
     setMessage(null)
@@ -82,16 +91,20 @@ function TikTokTokenForm({ setting }: { setting: GlobalSetting }) {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-base">TikTok 액세스 토큰</CardTitle>
+        <Badge variant={isSet ? 'default' : 'secondary'}>
+          {isSet ? '설정됨' : '미설정'}
+        </Badge>
       </CardHeader>
       <CardContent>
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="id" value={setting.id} />
 
           <div className="space-y-1">
-            <label className="text-sm font-medium">Access Token</label>
+            <Label htmlFor="tiktok-access-token">Access Token</Label>
             <Input
+              id="tiktok-access-token"
               type="password"
               name="access_token"
               defaultValue={setting.access_token ?? ''}
@@ -100,8 +113,9 @@ function TikTokTokenForm({ setting }: { setting: GlobalSetting }) {
           </div>
 
           <div className="space-y-1">
-            <label className="text-sm font-medium">App ID</label>
+            <Label htmlFor="tiktok-app-id">App ID</Label>
             <Input
+              id="tiktok-app-id"
               type="password"
               name="app_id"
               defaultValue={setting.app_id ?? ''}
@@ -110,8 +124,9 @@ function TikTokTokenForm({ setting }: { setting: GlobalSetting }) {
           </div>
 
           <div className="space-y-1">
-            <label className="text-sm font-medium">Secret</label>
+            <Label htmlFor="tiktok-secret">Secret</Label>
             <Input
+              id="tiktok-secret"
               type="password"
               name="secret"
               defaultValue={setting.secret ?? ''}
@@ -120,9 +135,9 @@ function TikTokTokenForm({ setting }: { setting: GlobalSetting }) {
           </div>
 
           {message && (
-            <p className={`text-sm ${isError ? 'text-red-600' : 'text-green-600'}`}>
-              {message}
-            </p>
+            <Alert variant={isError ? 'destructive' : 'default'}>
+              <AlertDescription>{message}</AlertDescription>
+            </Alert>
           )}
 
           <Button type="submit">저장</Button>
@@ -135,7 +150,7 @@ function TikTokTokenForm({ setting }: { setting: GlobalSetting }) {
 export function TokenManager({ settings }: TokenManagerProps) {
   if (settings.length === 0) {
     return (
-      <p className="text-muted-foreground text-sm">설정 데이터가 없습니다.</p>
+      <p className="text-sm text-muted-foreground">설정 데이터가 없습니다.</p>
     )
   }
 
