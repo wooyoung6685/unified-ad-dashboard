@@ -1,27 +1,21 @@
 'use client'
 
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
-import { AppSidebar } from './app-sidebar'
 
 interface DashboardLayoutClientProps {
   children: React.ReactNode
-  role: 'admin' | 'viewer'
-  userEmail: string
+  sidebar: React.ReactNode
 }
 
-export function DashboardLayoutClient({
-  children,
-  role,
-  userEmail,
-}: DashboardLayoutClientProps) {
+export function DashboardLayoutClient({ children, sidebar }: DashboardLayoutClientProps) {
   return (
     <SidebarProvider>
-      <AppSidebar role={role} userEmail={userEmail} />
-      <SidebarInset>
+      {sidebar}
+      <SidebarInset className="min-w-0">
         <header className="flex h-16 items-center gap-2 border-b px-4">
           <SidebarTrigger />
         </header>
-        <main className="p-6">{children}</main>
+        <main className="min-w-0 overflow-hidden p-6">{children}</main>
       </SidebarInset>
     </SidebarProvider>
   )

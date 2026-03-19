@@ -1,30 +1,26 @@
 import { DashboardLayoutClient } from '@/components/layout/dashboard-layout-client'
-import { createClient } from '@/lib/supabase/server'
+import { AppSidebarLoader } from '@/components/layout/app-sidebar-loader'
+import { AppSidebarSkeleton } from '@/components/layout/app-sidebar-skeleton'
+import { getCachedUser } from '@/lib/supabase/auth-cache'
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
+  const user = await getCachedUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  const sidebar = (
+    <Suspense fallback={<AppSidebarSkeleton />}>
+      <AppSidebarLoader userId={user.id} userEmail={user.email ?? ''} />
+    </Suspense>
+  )
 
   return (
-    <DashboardLayoutClient
-      role={profile?.role ?? 'viewer'}
-      userEmail={user.email ?? ''}
-    >
+    <DashboardLayoutClient sidebar={sidebar}>
       {children}
     </DashboardLayoutClient>
   )

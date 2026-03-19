@@ -11,25 +11,44 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
 } from '@/components/ui/sidebar'
-import { BarChart2, LogOut, Settings } from 'lucide-react'
+import {
+  BarChart2,
+  Building2,
+  ChevronDown,
+  CreditCard,
+  DatabaseBackup,
+  KeyRound,
+  LogOut,
+  Settings,
+  TableProperties,
+  Users,
+} from 'lucide-react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
+import { Collapsible } from 'radix-ui'
 
 interface AppSidebarProps {
   role: 'admin' | 'viewer'
   userEmail: string
 }
 
+const ADMIN_SUB_ITEMS = [
+  { label: '토큰 관리', tab: 'tokens', icon: KeyRound },
+  { label: '광고계정 관리', tab: 'accounts', icon: CreditCard },
+  { label: '브랜드 관리', tab: 'brands', icon: Building2 },
+  { label: '유저 관리', tab: 'users', icon: Users },
+  { label: '과거 데이터 수집', tab: 'backfill', icon: DatabaseBackup },
+]
+
 export function AppSidebar({ role, userEmail }: AppSidebarProps) {
   const pathname = usePathname()
-
-  const navItems = [
-    { label: '대시보드', href: '/dashboard', icon: BarChart2 },
-    ...(role === 'admin'
-      ? [{ label: '관리자 설정', href: '/dashboard/admin', icon: Settings }]
-      : []),
-  ]
+  const searchParams = useSearchParams()
+  const currentTab = searchParams.get('tab') ?? 'tokens'
+  const isAdminPage = pathname.startsWith('/dashboard/admin')
 
   return (
     <Sidebar>
@@ -41,19 +60,58 @@ export function AppSidebar({ role, userEmail }: AppSidebarProps) {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={pathname === item.href}
-                  >
-                    <Link href={item.href}>
-                      <item.icon className="size-4" />
-                      <span>{item.label}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {/* 대시보드 메뉴 */}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === '/dashboard'}>
+                  <Link href="/dashboard">
+                    <BarChart2 className="size-4" />
+                    <span>대시보드</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              {/* 일별 데이터 메뉴 */}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === '/dashboard/daily'}>
+                  <Link href="/dashboard/daily">
+                    <TableProperties className="size-4" />
+                    <span>일별 데이터</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              {/* 관리자 설정 — Collapsible 서브메뉴 */}
+              {role === 'admin' && (
+                <Collapsible.Root defaultOpen={isAdminPage} className="group/collapsible">
+                  <SidebarMenuItem>
+                    <Collapsible.Trigger asChild>
+                      <SidebarMenuButton isActive={isAdminPage}>
+                        <Settings className="size-4" />
+                        <span>관리자 설정</span>
+                        <ChevronDown className="ml-auto size-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                      </SidebarMenuButton>
+                    </Collapsible.Trigger>
+
+                    <Collapsible.Content>
+                      <SidebarMenuSub>
+                        {ADMIN_SUB_ITEMS.map(({ label, tab, icon: Icon }) => {
+                          const isActive = isAdminPage && currentTab === tab
+                          return (
+                            <SidebarMenuSubItem key={tab}>
+                              <SidebarMenuSubButton asChild isActive={isActive}>
+                                <Link href={`/dashboard/admin?tab=${tab}`}>
+                                  <Icon className="size-3.5" />
+                                  <span>{label}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          )
+                        })}
+                      </SidebarMenuSub>
+                    </Collapsible.Content>
+                  </SidebarMenuItem>
+                </Collapsible.Root>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
