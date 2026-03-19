@@ -25,6 +25,7 @@ export type TiktokStatPayload = {
 // 값이 null/undefined/"" 이면 null, 아니면 반올림 정수
 function roundOrNull(value: string | null | undefined): number | null {
   if (value === null || value === undefined || value === '') return null
+  if (value === '-') return 0 // TikTok은 값이 없을 때 숫자 대신 "-" 반환
   const parsed = parseFloat(value)
   return isNaN(parsed) ? null : Math.round(parsed)
 }
@@ -32,6 +33,7 @@ function roundOrNull(value: string | null | undefined): number | null {
 // 소수점 유지 파싱 (spend, revenue, avg_play_time 등)
 function floatOrNull(value: string | null | undefined): number | null {
   if (value === null || value === undefined || value === '') return null
+  if (value === '-') return 0 // TikTok은 값이 없을 때 숫자 대신 "-" 반환
   const parsed = parseFloat(value)
   return isNaN(parsed) ? null : parsed
 }
@@ -45,20 +47,20 @@ export async function fetchStats(params: {
 
   const dimensions = ['stat_time_day']
   const metrics = [
-    'stat_cost',        // spend
-    'impression',       // impressions
-    'reach',            // reach
-    'click_cnt',        // clicks
-    'video_play_actions',  // video_views
-    'video_watched_2s',    // views_2s
-    'video_watched_6s',    // views_6s
-    'video_views_p25',     // views_25pct
-    'video_views_p100',    // views_100pct
-    'average_play_time',   // avg_play_time
-    'follows',             // followers
-    'likes',               // likes
-    'total_purchase_value',  // revenue
-    'conversion',            // purchases
+    'spend',                  // spend
+    'impressions',            // impressions
+    'reach',                  // reach
+    'clicks',                 // clicks
+    'video_play_actions',     // video_views
+    'video_watched_2s',       // views_2s
+    'video_watched_6s',       // views_6s
+    'video_views_p25',        // views_25pct
+    'video_views_p100',       // views_100pct
+    'average_video_play',     // avg_play_time (AUCTION_ADVERTISER 레벨 지원 필드)
+    'follows',                // followers
+    'likes',                  // likes
+    'total_purchase_value',   // revenue
+    'conversion',             // purchases
   ]
 
   const searchParams = new URLSearchParams({
@@ -104,16 +106,16 @@ export async function fetchStats(params: {
   const m = row.metrics ?? {}
 
   // 기본 지표 파싱
-  const spend = floatOrNull(m['stat_cost'])
-  const impressions = roundOrNull(m['impression'])
+  const spend = floatOrNull(m['spend'])          // TikTok 응답키: 'spend' (요청시 'stat_cost')
+  const impressions = roundOrNull(m['impressions'])
   const reach = roundOrNull(m['reach'])
-  const clicks = roundOrNull(m['click_cnt'])
+  const clicks = roundOrNull(m['clicks'])         // TikTok 응답키: 'clicks' (요청시 'click_cnt')
   const video_views = roundOrNull(m['video_play_actions'])
   const views_2s = roundOrNull(m['video_watched_2s'])
   const views_6s = roundOrNull(m['video_watched_6s'])
   const views_25pct = roundOrNull(m['video_views_p25'])
   const views_100pct = roundOrNull(m['video_views_p100'])
-  const avg_play_time = floatOrNull(m['average_play_time'])
+  const avg_play_time = floatOrNull(m['average_video_play'])
   const followers = roundOrNull(m['follows'])
   const likes = roundOrNull(m['likes'])
   const purchases = roundOrNull(m['conversion'])

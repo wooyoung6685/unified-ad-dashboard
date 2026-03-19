@@ -105,35 +105,28 @@ export async function fetchDashboardStats(filters: DashboardFilters) {
   const supabase = createClient()
   const { from, to } = resolveDateRange(filters)
 
-  let metaQuery = supabase
-    .from('meta_daily_stats')
-    .select('*')
-    .gte('date', from)
-    .lte('date', to)
+  // 선택된 플랫폼만 쿼리 실행 (불필요한 요청 제거)
+  const runMeta = filters.platform !== 'tiktok'
+  const runTiktok = filters.platform !== 'meta'
 
-  let tiktokQuery = supabase
-    .from('tiktok_daily_stats')
-    .select('*')
-    .gte('date', from)
-    .lte('date', to)
+  let metaQuery = runMeta
+    ? supabase.from('meta_daily_stats').select('*').gte('date', from).lte('date', to)
+    : null
+  let tiktokQuery = runTiktok
+    ? supabase.from('tiktok_daily_stats').select('*').gte('date', from).lte('date', to)
+    : null
 
   // 특정 계정 필터 (플랫폼별)
-  if (filters.platform === 'meta' && filters.accountId !== 'all') {
+  if (filters.platform === 'meta' && filters.accountId !== 'all' && metaQuery) {
     metaQuery = metaQuery.eq('meta_account_id', filters.accountId)
-    // TikTok 쿼리는 빈 결과 반환을 위해 불가능한 조건 추가
-    tiktokQuery = tiktokQuery.eq('id', 'none')
-  } else if (filters.platform === 'tiktok' && filters.accountId !== 'all') {
+  } else if (filters.platform === 'tiktok' && filters.accountId !== 'all' && tiktokQuery) {
     tiktokQuery = tiktokQuery.eq('tiktok_account_id', filters.accountId)
-    metaQuery = metaQuery.eq('id', 'none')
-  } else if (filters.platform === 'meta') {
-    // 플랫폼이 meta인 경우 tiktok 데이터 제외
-    tiktokQuery = tiktokQuery.eq('id', 'none')
-  } else if (filters.platform === 'tiktok') {
-    // 플랫폼이 tiktok인 경우 meta 데이터 제외
-    metaQuery = metaQuery.eq('id', 'none')
   }
 
-  const [metaResult, tiktokResult] = await Promise.all([metaQuery, tiktokQuery])
+  const [metaResult, tiktokResult] = await Promise.all([
+    metaQuery ?? Promise.resolve({ data: [] as MetaDailyStat[] }),
+    tiktokQuery ?? Promise.resolve({ data: [] as TiktokDailyStat[] }),
+  ])
 
   const metaStats = (metaResult.data ?? []) as MetaDailyStat[]
   const tiktokStats = (tiktokResult.data ?? []) as TiktokDailyStat[]
