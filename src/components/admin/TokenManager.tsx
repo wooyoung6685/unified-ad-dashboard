@@ -1,9 +1,6 @@
 'use client'
 
-import {
-  updateAccessToken,
-  updateGlobalSetting,
-} from '@/app/dashboard/admin/actions'
+import { updateAccessToken } from '@/app/dashboard/admin/actions'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -71,7 +68,7 @@ function MetaTokenForm({ setting }: { setting: GlobalSetting }) {
   )
 }
 
-// TikTok 전용 폼 — access_token + app_id + secret 3개 일괄 업데이트
+// TikTok 전용 폼 — access_token만 업데이트
 function TikTokTokenForm({ setting }: { setting: GlobalSetting }) {
   const [message, setMessage] = useState<string | null>(null)
   const [isError, setIsError] = useState(false)
@@ -79,7 +76,7 @@ function TikTokTokenForm({ setting }: { setting: GlobalSetting }) {
 
   async function handleSubmit(formData: FormData) {
     setMessage(null)
-    const result = await updateGlobalSetting(formData)
+    const result = await updateAccessToken(formData)
     if ('error' in result) {
       setIsError(true)
       setMessage(`오류: ${result.error}`)
@@ -109,28 +106,6 @@ function TikTokTokenForm({ setting }: { setting: GlobalSetting }) {
               name="access_token"
               defaultValue={setting.access_token ?? ''}
               placeholder="액세스 토큰 입력"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <Label htmlFor="tiktok-app-id">App ID</Label>
-            <Input
-              id="tiktok-app-id"
-              type="password"
-              name="app_id"
-              defaultValue={setting.app_id ?? ''}
-              placeholder="App ID 입력"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <Label htmlFor="tiktok-secret">Secret</Label>
-            <Input
-              id="tiktok-secret"
-              type="password"
-              name="secret"
-              defaultValue={setting.secret ?? ''}
-              placeholder="Secret 입력"
             />
           </div>
 

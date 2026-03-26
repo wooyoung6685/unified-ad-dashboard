@@ -20,6 +20,8 @@ export type TiktokStatPayload = {
   purchases: number | null
   revenue: number | null
   roas: number | null
+  add_to_cart: number | null
+  add_to_cart_value: number | null
 }
 
 // 값이 null/undefined/"" 이면 null, 아니면 반올림 정수
@@ -97,11 +99,17 @@ export async function fetchStats(params: {
   }
 
   if (data.code !== 0) {
+    console.error(`[TikTok] API 오류 advertiser_id=${advertiser_id} date=${date}`, JSON.stringify(data))
     throw new Error(`TikTok API 응답 오류: ${data.message ?? data.code}`)
   }
 
-  const row = data.data?.list?.[0]
+  const list = data.data?.list ?? []
+  console.log(`[TikTok] advertiser_id=${advertiser_id} date=${date} → code=${data.code}, list_length=${list.length}`)
+
+  const row = list[0]
   if (!row) return null
+
+  console.log(`[TikTok] 원본 응답 구조:`, JSON.stringify(row, null, 2))
 
   const m = row.metrics ?? {}
 
@@ -120,6 +128,8 @@ export async function fetchStats(params: {
   const likes = roundOrNull(m['likes'])
   const purchases = roundOrNull(m['conversion'])
   const revenue = floatOrNull(m['total_purchase_value'])
+  const add_to_cart = null
+  const add_to_cart_value = null
 
   // 계산 지표 (분모 0 체크)
   const frequency =
@@ -163,5 +173,7 @@ export async function fetchStats(params: {
     purchases,
     revenue,
     roas,
+    add_to_cart,
+    add_to_cart_value,
   }
 }

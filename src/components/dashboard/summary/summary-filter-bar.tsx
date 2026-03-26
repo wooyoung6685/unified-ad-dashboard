@@ -10,8 +10,9 @@ import {
 } from '@/components/ui/select'
 import type {
   Brand,
-  SummaryFilters,
   MetaAccount,
+  ShopeeAccount,
+  SummaryFilters,
   TiktokAccount,
 } from '@/types/database'
 import React from 'react'
@@ -20,7 +21,7 @@ import { DateRangePicker } from '../daily/date-range-picker'
 interface AccountOption {
   id: string
   label: string
-  type: 'meta' | 'tiktok'
+  type: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp'
   brandId: string
 }
 
@@ -30,6 +31,7 @@ interface SummaryFilterBarProps {
   brands: Brand[]
   metaAccounts: (MetaAccount & { brands: { name: string } | null })[]
   tiktokAccounts: (TiktokAccount & { brands: { name: string } | null })[]
+  shopeeAccounts: (ShopeeAccount & { brands: { name: string } | null })[]
   isFetching: boolean
   onChange: (filters: SummaryFilters) => void
   onSearch: () => void
@@ -41,34 +43,46 @@ export function SummaryFilterBar({
   brands,
   metaAccounts,
   tiktokAccounts,
+  shopeeAccounts,
   isFetching,
   onChange,
   onSearch,
 }: SummaryFilterBarProps) {
+  const brandFilter = (a: { brand_id: string }) =>
+    a.brand_id === filters.brandId
+
   // 선택된 브랜드에 속한 계정 목록 생성
   const accountOptions: AccountOption[] = [
-    ...metaAccounts
-      .filter(
-        (a) => filters.brandId === 'all' || a.brand_id === filters.brandId
-      )
+    ...metaAccounts.filter(brandFilter).map((a) => ({
+      id: a.id,
+      label: a.sub_brand
+        ? [a.sub_brand, '페북/인스타', a.country].filter(Boolean).join('_')
+        : ['페북/인스타', a.country].filter(Boolean).join('_'),
+      type: 'meta' as const,
+      brandId: a.brand_id,
+    })),
+    ...tiktokAccounts.filter(brandFilter).map((a) => ({
+      id: a.id,
+      label: a.sub_brand
+        ? [a.sub_brand, '틱톡', a.country].filter(Boolean).join('_')
+        : ['틱톡', a.country].filter(Boolean).join('_'),
+      type: 'tiktok' as const,
+      brandId: a.brand_id,
+    })),
+    ...shopeeAccounts
+      .filter((a) => a.account_type === 'shopping' && brandFilter(a))
       .map((a) => ({
         id: a.id,
-        label: a.sub_brand
-          ? [a.sub_brand, '페북/인스타', a.country].filter(Boolean).join('_')
-          : ['페북/인스타', a.country].filter(Boolean).join('_'),
-        type: 'meta' as const,
+        label: [a.sub_brand, '쇼핑몰', a.country].filter(Boolean).join('_'),
+        type: 'shopee_shopping' as const,
         brandId: a.brand_id,
       })),
-    ...tiktokAccounts
-      .filter(
-        (a) => filters.brandId === 'all' || a.brand_id === filters.brandId
-      )
+    ...shopeeAccounts
+      .filter((a) => a.account_type === 'inapp' && brandFilter(a))
       .map((a) => ({
         id: a.id,
-        label: a.sub_brand
-          ? [a.sub_brand, '틱톡', a.country].filter(Boolean).join('_')
-          : ['틱톡', a.country].filter(Boolean).join('_'),
-        type: 'tiktok' as const,
+        label: [a.sub_brand, '인앱', a.country].filter(Boolean).join('_'),
+        type: 'shopee_inapp' as const,
         brandId: a.brand_id,
       })),
   ]
@@ -106,7 +120,6 @@ export function SummaryFilterBar({
               <SelectValue placeholder="브랜드 선택" />
             </SelectTrigger>
             <SelectContent>
-              {role === 'admin' && <SelectItem value="all">전체</SelectItem>}
               {brands.map((b) => (
                 <SelectItem key={b.id} value={b.id}>
                   {b.name}
@@ -124,7 +137,7 @@ export function SummaryFilterBar({
           <Select
             value={filters.accountId}
             onValueChange={handleAccountChange}
-            disabled={isFetching}
+            disabled={isFetching || !filters.brandId}
           >
             <SelectTrigger className="h-9 w-72">
               <SelectValue placeholder="계정을 선택하세요" />

@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { addDays, format, parseISO } from 'date-fns'
+import { addDays, differenceInDays, format, parseISO } from 'date-fns'
 import { useState } from 'react'
 
 interface DailyFetchButtonProps {
@@ -48,13 +48,14 @@ export function DailyFetchButton({
   const [status, setStatus] = useState<'idle' | 'loading' | 'done'>('idle')
   const [chunkProgress, setChunkProgress] = useState({ current: 0, total: 0 })
   const [dayProgress, setDayProgress] = useState({ current: 0, total: 0 })
+  const [cumulativeDays, setCumulativeDays] = useState(0)
 
-  // SSE 스트림 소비
+  // SSE 스트림 소비 — 실제 처리된 청크 일수를 반환
   async function consumeSSEStream(
     chunk: Chunk,
     chunkIndex: number,
     totalChunks: number
-  ) {
+  ): Promise<number> {
     const res = await fetch('/api/admin/backfill', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -74,6 +75,7 @@ export function DailyFetchButton({
     const reader = res.body!.getReader()
     const decoder = new TextDecoder()
     let buffer = ''
+    let actualChunkDays = 0
 
     while (true) {
       const { done, value } = await reader.read()
@@ -89,6 +91,8 @@ export function DailyFetchButton({
           const event = JSON.parse(line.slice(6))
           if (event.type !== 'complete') {
             setDayProgress({ current: event.current, total: event.total })
+            // 서버가 보내는 total이 이 청크의 실제 일수
+            actualChunkDays = event.total
           }
           setChunkProgress({ current: chunkIndex + 1, total: totalChunks })
         } catch {
@@ -96,20 +100,26 @@ export function DailyFetchButton({
         }
       }
     }
+
+    return actualChunkDays
   }
 
   async function handleFetch() {
     setStatus('loading')
     setChunkProgress({ current: 0, total: 0 })
     setDayProgress({ current: 0, total: 0 })
+    setCumulativeDays(0)
 
     try {
       const chunkSize = accountType === 'meta' ? 28 : 30
       const chunks = splitChunks(startDate, endDate, chunkSize)
       setChunkProgress({ current: 0, total: chunks.length })
 
+      let cumulative = 0
       for (let i = 0; i < chunks.length; i++) {
-        await consumeSSEStream(chunks[i], i, chunks.length)
+        const chunkDays = await consumeSSEStream(chunks[i], i, chunks.length)
+        cumulative += chunkDays
+        setCumulativeDays(cumulative)
         if (i < chunks.length - 1) {
           await delay(500)
         }
@@ -123,19 +133,11 @@ export function DailyFetchButton({
     }
   }
 
-  // 전체 진행률 계산
-  const totalDays =
-    chunkProgress.total > 0
-      ? chunkProgress.total * (accountType === 'meta' ? 28 : 30)
-      : 0
-  const completedChunkDays =
-    chunkProgress.current > 0
-      ? (chunkProgress.current - 1) * (accountType === 'meta' ? 28 : 30)
-      : 0
-  const currentDays = completedChunkDays + dayProgress.current
+  // 전체 진행률 계산 — props의 실제 날짜 범위 기반
+  const actualTotalDays = differenceInDays(parseISO(endDate), parseISO(startDate)) + 1
   const percent =
-    totalDays > 0
-      ? Math.min(Math.round((currentDays / totalDays) * 100), 100)
+    actualTotalDays > 0
+      ? Math.min(Math.round(((cumulativeDays + dayProgress.current) / actualTotalDays) * 100), 100)
       : 0
 
   return (

@@ -20,7 +20,8 @@ import {
   Building2,
   ChevronDown,
   CreditCard,
-  DatabaseBackup,
+  DollarSign,
+  FileText,
   KeyRound,
   LogOut,
   Settings,
@@ -30,6 +31,7 @@ import {
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { Collapsible } from 'radix-ui'
+import { Suspense } from 'react'
 
 interface AppSidebarProps {
   role: 'admin' | 'viewer'
@@ -41,13 +43,35 @@ const ADMIN_SUB_ITEMS = [
   { label: '광고계정 관리', tab: 'accounts', icon: CreditCard },
   { label: '브랜드 관리', tab: 'brands', icon: Building2 },
   { label: '유저 관리', tab: 'users', icon: Users },
-  { label: '과거 데이터 수집', tab: 'backfill', icon: DatabaseBackup },
+  { label: '환율 설정', tab: 'exchange-rates', icon: DollarSign },
 ]
+
+// useSearchParams를 별도 컴포넌트로 분리하여 SSR deoptimization 범위를 최소화
+function AdminSubMenuItems({ isAdminPage }: { isAdminPage: boolean }) {
+  const searchParams = useSearchParams()
+  const currentTab = searchParams.get('tab') ?? 'tokens'
+
+  return (
+    <SidebarMenuSub>
+      {ADMIN_SUB_ITEMS.map(({ label, tab, icon: Icon }) => {
+        const isActive = isAdminPage && currentTab === tab
+        return (
+          <SidebarMenuSubItem key={tab}>
+            <SidebarMenuSubButton asChild isActive={isActive}>
+              <Link href={`/dashboard/admin?tab=${tab}`}>
+                <Icon className="size-3.5" />
+                <span>{label}</span>
+              </Link>
+            </SidebarMenuSubButton>
+          </SidebarMenuSubItem>
+        )
+      })}
+    </SidebarMenuSub>
+  )
+}
 
 export function AppSidebar({ role, userEmail }: AppSidebarProps) {
   const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const currentTab = searchParams.get('tab') ?? 'tokens'
   const isAdminPage = pathname.startsWith('/dashboard/admin')
 
   return (
@@ -80,6 +104,19 @@ export function AppSidebar({ role, userEmail }: AppSidebarProps) {
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
+              {/* 리포트 메뉴 */}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname.startsWith('/dashboard/report')}
+                >
+                  <Link href="/dashboard/report">
+                    <FileText className="size-4" />
+                    <span>광고 성과 리포트</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
               {/* 관리자 설정 — Collapsible 서브메뉴 */}
               {role === 'admin' && (
                 <Collapsible.Root defaultOpen={isAdminPage} className="group/collapsible">
@@ -93,21 +130,10 @@ export function AppSidebar({ role, userEmail }: AppSidebarProps) {
                     </Collapsible.Trigger>
 
                     <Collapsible.Content>
-                      <SidebarMenuSub>
-                        {ADMIN_SUB_ITEMS.map(({ label, tab, icon: Icon }) => {
-                          const isActive = isAdminPage && currentTab === tab
-                          return (
-                            <SidebarMenuSubItem key={tab}>
-                              <SidebarMenuSubButton asChild isActive={isActive}>
-                                <Link href={`/dashboard/admin?tab=${tab}`}>
-                                  <Icon className="size-3.5" />
-                                  <span>{label}</span>
-                                </Link>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                          )
-                        })}
-                      </SidebarMenuSub>
+                      {/* Suspense로 감싸 useSearchParams 의 SSR deoptimization을 이 레벨로 제한 */}
+                      <Suspense fallback={null}>
+                        <AdminSubMenuItems isAdminPage={isAdminPage} />
+                      </Suspense>
                     </Collapsible.Content>
                   </SidebarMenuItem>
                 </Collapsible.Root>

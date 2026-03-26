@@ -1,10 +1,10 @@
 'use client'
 
+import { ExchangeRateManager } from '@/components/admin/ExchangeRateManager'
 import { Tabs, TabsContent } from '@/components/ui/tabs'
 import type { Brand, GlobalSetting } from '@/types/database'
 import { useSearchParams } from 'next/navigation'
 import { AccountsTab } from './accounts-tab'
-import { BackfillTab } from './backfill-tab'
 import { BrandsTab } from './brands-tab'
 import { TokenTab } from './token-tab'
 import { UsersTab } from './users-tab'
@@ -39,8 +39,8 @@ export function AdminShell({ settings, brands }: AdminShellProps) {
           <UsersTab brands={brands} />
         </TabsContent>
 
-        <TabsContent value="backfill" className="mt-0">
-          <BackfillTab />
+        <TabsContent value="exchange-rates" className="mt-0">
+          <ExchangeRateManager />
         </TabsContent>
       </Tabs>
     </div>

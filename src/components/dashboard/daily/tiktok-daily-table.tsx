@@ -8,7 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { fmtDec, fmtKRW, fmtKRWDec, fmtNum, fmtPct } from '@/lib/format'
+import { fmtDec, fmtKRW, fmtNum, fmtPct } from '@/lib/format'
 import type { TiktokDailyStatFull } from '@/types/database'
 
 interface TiktokDailyTableProps {
@@ -69,7 +69,7 @@ export function TiktokDailyTable({ rows }: TiktokDailyTableProps) {
   return (
     <div>
       <Table
-        className="min-w-[3000px]"
+        className="min-w-800"
         containerClassName="overflow-auto max-h-[calc(100vh-280px)]"
       >
         <TableHeader className="sticky top-0 z-20 bg-background">
@@ -102,7 +102,7 @@ export function TiktokDailyTable({ rows }: TiktokDailyTableProps) {
               key={row.id}
               className={
                 i === 0
-                  ? 'sticky top-[41px] z-10 font-bold [&_td]:bg-muted'
+                  ? 'sticky top-10.25 z-10 font-bold [&_td]:bg-muted'
                   : undefined
               }
             >
@@ -110,7 +110,7 @@ export function TiktokDailyTable({ rows }: TiktokDailyTableProps) {
                 className={
                   i === 0
                     ? 'sticky left-0 z-20 bg-muted'
-                    : 'sticky left-0 z-[1] bg-background'
+                    : 'sticky left-0 z-1 bg-background'
                 }
               >
                 {row.date}
@@ -120,9 +120,9 @@ export function TiktokDailyTable({ rows }: TiktokDailyTableProps) {
               <TableCell className="text-right">{fmtNum(row.reach)}</TableCell>
               <TableCell className="text-right">{fmtNum(row.clicks)}</TableCell>
               <TableCell className="text-right">{fmtDec(row.frequency)}</TableCell>
-              <TableCell className="text-right">{fmtKRWDec(row.cpc)}</TableCell>
+              <TableCell className="text-right">{fmtKRW(row.cpc)}</TableCell>
               <TableCell className="text-right">{fmtPct(row.ctr)}</TableCell>
-              <TableCell className="text-right">{fmtKRWDec(row.cpm)}</TableCell>
+              <TableCell className="text-right">{fmtKRW(row.cpm)}</TableCell>
               <TableCell className="text-right">{fmtNum(row.video_views)}</TableCell>
               <TableCell className="text-right">{fmtNum(row.views_2s)}</TableCell>
               <TableCell className="text-right">{fmtNum(row.views_6s)}</TableCell>
@@ -133,7 +133,7 @@ export function TiktokDailyTable({ rows }: TiktokDailyTableProps) {
               <TableCell className="text-right">{fmtNum(row.likes)}</TableCell>
               <TableCell className="text-right">{fmtNum(row.purchases)}</TableCell>
               <TableCell className="text-right">{fmtKRW(row.revenue)}</TableCell>
-              <TableCell className="text-right">{fmtDec(row.roas)}</TableCell>
+              <TableCell className="text-right">{fmtPct(row.roas != null ? row.roas * 100 : null)}</TableCell>
             </TableRow>
           ))}
         </TableBody>

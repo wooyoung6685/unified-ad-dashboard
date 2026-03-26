@@ -2,6 +2,7 @@
 
 import {
   toggleMetaAccount,
+  toggleShopeeAccount,
   toggleTiktokAccount,
 } from '@/app/dashboard/admin/actions'
 import {
@@ -37,7 +38,7 @@ import { cn } from '@/lib/utils'
 import type { Brand } from '@/types/database'
 import { useCallback, useEffect, useState } from 'react'
 
-type PlatformType = 'meta' | 'tiktok'
+type PlatformType = 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp'
 
 interface PendingRow {
   _key: string
@@ -60,6 +61,7 @@ interface RegisteredAccount {
   note: string | null
   country: string | null
   is_active: boolean
+  store_id?: string | null  // TikTok GMV Max용 Store ID (자동 감지)
 }
 
 interface EditingValues {
@@ -76,6 +78,8 @@ interface AccountManagerProps {
 const PLATFORM_LABEL: Record<PlatformType, string> = {
   meta: '페북/인스타',
   tiktok: '틱톡',
+  shopee_shopping: '쇼핑몰',
+  shopee_inapp: '인앱',
 }
 
 const COUNTRY_OPTIONS = [
@@ -90,6 +94,15 @@ const COUNTRY_OPTIONS = [
   { code: 'TH', flag: '🇹🇭' },
   { code: 'ID', flag: '🇮🇩' },
 ]
+
+function isShopee(platform: PlatformType | ''): boolean {
+  return platform === 'shopee_shopping' || platform === 'shopee_inapp'
+}
+
+function getApiEndpoint(platform: PlatformType): string {
+  if (isShopee(platform)) return '/api/admin/accounts/shopee'
+  return `/api/admin/accounts/${platform}`
+}
 
 function CountrySelect({
   value,
@@ -148,17 +161,19 @@ export function AccountManager({ brands }: AccountManagerProps) {
     (a) => a.brand_id === selectedBrandId
   )
 
-  // 마운트 시 Meta + TikTok 계정 병렬 로드
+  // 마운트 시 Meta + TikTok + Shopee 계정 병렬 로드
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [metaRes, tiktokRes] = await Promise.all([
+      const [metaRes, tiktokRes, shopeeRes] = await Promise.all([
         fetch('/api/admin/accounts/meta'),
         fetch('/api/admin/accounts/tiktok'),
+        fetch('/api/admin/accounts/shopee'),
       ])
-      const [metaJson, tiktokJson] = await Promise.all([
+      const [metaJson, tiktokJson, shopeeJson] = await Promise.all([
         metaRes.json(),
         tiktokRes.json(),
+        shopeeRes.json(),
       ])
 
       const metaAccounts: RegisteredAccount[] = (metaJson.accounts ?? []).map(
@@ -172,8 +187,20 @@ export function AccountManager({ brands }: AccountManagerProps) {
       ).map((a: Omit<RegisteredAccount, 'platform'>) => ({
         ...a,
         platform: 'tiktok' as PlatformType,
+        store_id: (a as RegisteredAccount).store_id ?? null,
       }))
-      setRegistered([...metaAccounts, ...tiktokAccounts])
+      const shopeeAccountsMapped: RegisteredAccount[] = (
+        shopeeJson.accounts ?? []
+      ).map(
+        (a: Omit<RegisteredAccount, 'platform'> & { account_type: string }) => ({
+          ...a,
+          platform: (
+            a.account_type === 'shopping' ? 'shopee_shopping' : 'shopee_inapp'
+          ) as PlatformType,
+        })
+      )
+
+      setRegistered([...metaAccounts, ...tiktokAccounts, ...shopeeAccountsMapped])
     } finally {
       setLoading(false)
     }
@@ -216,18 +243,23 @@ export function AccountManager({ brands }: AccountManagerProps) {
   async function savePending(row: PendingRow) {
     if (!row.brand_id || !row.platform || !row.account_id) return
 
-    const endpoint = `/api/admin/accounts/${row.platform}`
+    const endpoint = getApiEndpoint(row.platform as PlatformType)
+    const body: Record<string, unknown> = {
+      brand_id: row.brand_id,
+      account_id: row.account_id,
+      sub_brand: row.sub_brand || null,
+      note: row.note || null,
+      country: row.country || null,
+      is_active: row.is_active,
+    }
+    if (isShopee(row.platform)) {
+      body.account_type = row.platform === 'shopee_shopping' ? 'shopping' : 'inapp'
+    }
+
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        brand_id: row.brand_id,
-        account_id: row.account_id,
-        sub_brand: row.sub_brand || null,
-        note: row.note || null,
-        country: row.country || null,
-        is_active: row.is_active,
-      }),
+      body: JSON.stringify(body),
     })
     const json = await res.json()
     if (json.error) {
@@ -245,9 +277,8 @@ export function AccountManager({ brands }: AccountManagerProps) {
 
   // 등록 계정 삭제
   async function deleteRegistered(id: string, platform: PlatformType) {
-    const res = await fetch(`/api/admin/accounts/${platform}?id=${id}`, {
-      method: 'DELETE',
-    })
+    const endpoint = getApiEndpoint(platform)
+    const res = await fetch(`${endpoint}?id=${id}`, { method: 'DELETE' })
     const json = await res.json()
     if (!json.error) {
       setRegistered((prev) => prev.filter((a) => a.id !== id))
@@ -267,18 +298,23 @@ export function AccountManager({ brands }: AccountManagerProps) {
 
   // 인라인 수정 저장
   async function saveEditing(account: RegisteredAccount) {
-    const endpoint = `/api/admin/accounts/${account.platform}`
+    const endpoint = getApiEndpoint(account.platform)
+    const body: Record<string, unknown> = {
+      brand_id: account.brand_id,
+      account_id: editingValues.account_id,
+      sub_brand: editingValues.sub_brand || null,
+      note: editingValues.note || null,
+      country: editingValues.country || null,
+      is_active: account.is_active,
+    }
+    if (isShopee(account.platform)) {
+      body.account_type = account.platform === 'shopee_shopping' ? 'shopping' : 'inapp'
+    }
+
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        brand_id: account.brand_id,
-        account_id: editingValues.account_id,
-        sub_brand: editingValues.sub_brand || null,
-        note: editingValues.note || null,
-        country: editingValues.country || null,
-        is_active: account.is_active,
-      }),
+      body: JSON.stringify(body),
     })
     const json = await res.json()
     if (!json.error) {
@@ -291,8 +327,10 @@ export function AccountManager({ brands }: AccountManagerProps) {
   async function handleToggle(account: RegisteredAccount) {
     if (account.platform === 'meta') {
       await toggleMetaAccount(account.id, !account.is_active)
-    } else {
+    } else if (account.platform === 'tiktok') {
       await toggleTiktokAccount(account.id, !account.is_active)
+    } else {
+      await toggleShopeeAccount(account.id, !account.is_active)
     }
     setRegistered((prev) =>
       prev.map((a) =>
@@ -382,6 +420,8 @@ export function AccountManager({ brands }: AccountManagerProps) {
                         <SelectContent>
                           <SelectItem value="meta">페북/인스타</SelectItem>
                           <SelectItem value="tiktok">틱톡</SelectItem>
+                          <SelectItem value="shopee_shopping">쇼핑몰</SelectItem>
+                          <SelectItem value="shopee_inapp">인앱</SelectItem>
                         </SelectContent>
                       </Select>
                     </TableCell>
@@ -503,7 +543,16 @@ export function AccountManager({ brands }: AccountManagerProps) {
                   )
                   return (
                     <TableRow key={account.id}>
-                      <TableCell>{PLATFORM_LABEL[account.platform]}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          <span>{PLATFORM_LABEL[account.platform]}</span>
+                          {account.platform === 'tiktok' && account.store_id && (
+                            <Badge variant="secondary" className="w-fit text-xs">
+                              GMV Max
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         {isEditing ? (
                           <Input

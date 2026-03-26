@@ -8,7 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { fmtDec, fmtKRW, fmtKRWDec, fmtNum, fmtPct } from '@/lib/format'
+import { fmtDec, fmtKRW, fmtNum, fmtPct } from '@/lib/format'
 import type { MetaDailyStatFull } from '@/types/database'
 
 interface MetaDailyTableProps {
@@ -147,7 +147,7 @@ export function MetaDailyTable({ rows }: MetaDailyTableProps) {
               <TableCell className="text-right">
                 {fmtKRW(row.revenue)}
               </TableCell>
-              <TableCell className="text-right">{fmtDec(row.roas)}</TableCell>
+              <TableCell className="text-right">{fmtPct(row.roas != null ? row.roas * 100 : null)}</TableCell>
               <TableCell className="text-right">{fmtKRW(row.cpa)}</TableCell>
               <TableCell className="text-right">
                 {fmtPct(row.conversion_rate)}
@@ -162,21 +162,21 @@ export function MetaDailyTable({ rows }: MetaDailyTableProps) {
               <TableCell className="text-right">
                 {fmtDec(row.frequency)}
               </TableCell>
-              <TableCell className="text-right">{fmtKRWDec(row.cpm)}</TableCell>
+              <TableCell className="text-right">{fmtKRW(row.cpm)}</TableCell>
               <TableCell className="text-right">{fmtNum(row.clicks)}</TableCell>
-              <TableCell className="text-right">{fmtKRWDec(row.cpc)}</TableCell>
+              <TableCell className="text-right">{fmtKRW(row.cpc)}</TableCell>
               <TableCell className="text-right">{fmtPct(row.ctr)}</TableCell>
               <TableCell className="text-right">
                 {fmtNum(row.content_views)}
               </TableCell>
               <TableCell className="text-right">
-                {fmtKRWDec(row.cost_per_content_view)}
+                {fmtKRW(row.cost_per_content_view)}
               </TableCell>
               <TableCell className="text-right">
                 {fmtNum(row.add_to_cart)}
               </TableCell>
               <TableCell className="text-right">
-                {fmtKRWDec(row.cost_per_add_to_cart)}
+                {fmtKRW(row.cost_per_add_to_cart)}
               </TableCell>
               <TableCell className="text-right">
                 {fmtKRW(row.add_to_cart_value)}
@@ -185,7 +185,7 @@ export function MetaDailyTable({ rows }: MetaDailyTableProps) {
                 {fmtNum(row.outbound_clicks)}
               </TableCell>
               <TableCell className="text-right">
-                {fmtKRWDec(row.cost_per_outbound_click)}
+                {fmtKRW(row.cost_per_outbound_click)}
               </TableCell>
             </TableRow>
           ))}

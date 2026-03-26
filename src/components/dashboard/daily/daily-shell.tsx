@@ -1,15 +1,35 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { CalendarIcon } from 'lucide-react'
+import { CalendarIcon, Upload } from 'lucide-react'
 import { useState } from 'react'
-import type { Brand, DailyFilters, MetaAccount, TiktokAccount } from '@/types/database'
-import type { MetaDailyStatFull } from '@/types/database'
-import type { TiktokDailyStatFull } from '@/types/database'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import type {
+  Brand,
+  DailyFilters,
+  GmvMaxDailyRow,
+  MetaAccount,
+  MetaDailyStatFull,
+  ShopeeAccount,
+  ShopeeInappDayRow,
+  ShopeeShoppingStat,
+  TiktokAccount,
+  TiktokDailyStatFull,
+} from '@/types/database'
 import { DailyFilterBar } from './daily-filter-bar'
 import { DailyFetchButton } from './daily-fetch-button'
 import { MetaDailyTable } from './meta-daily-table'
+import { ShopeeInappTable } from './shopee-inapp-table'
+import { ShopeeShoppingTable } from './shopee-shopping-table'
+import { ShopeeUploadArea } from './shopee-upload-area'
 import { TiktokDailyTable } from './tiktok-daily-table'
+import { TiktokGmvMaxDailyTable } from './tiktok-gmvmax-daily-table'
 
 interface DailyShellProps {
   role: 'admin' | 'viewer'
@@ -17,9 +37,16 @@ interface DailyShellProps {
   brands: Brand[]
   metaAccounts: (MetaAccount & { brands: { name: string } | null })[]
   tiktokAccounts: (TiktokAccount & { brands: { name: string } | null })[]
+  shopeeAccounts: (ShopeeAccount & { brands: { name: string } | null })[]
 }
 
-async function fetchDailyStats(filters: DailyFilters) {
+type DailyApiResponse =
+  | { platform: 'meta'; rows: MetaDailyStatFull[] }
+  | { platform: 'tiktok'; rows: TiktokDailyStatFull[]; gmvMaxRows: GmvMaxDailyRow[] | null }
+  | { platform: 'shopee_shopping'; rows: ShopeeShoppingStat[] }
+  | { platform: 'shopee_inapp'; rows: ShopeeInappDayRow[] }
+
+async function fetchDailyStats(filters: DailyFilters): Promise<DailyApiResponse> {
   const params = new URLSearchParams({
     brand_id: filters.brandId,
     account_id: filters.accountId,
@@ -29,10 +56,7 @@ async function fetchDailyStats(filters: DailyFilters) {
   })
   const res = await fetch(`/api/dashboard/daily?${params.toString()}`)
   if (!res.ok) throw new Error('데이터 조회에 실패했습니다.')
-  return res.json() as Promise<{
-    platform: 'meta' | 'tiktok'
-    rows: MetaDailyStatFull[] | TiktokDailyStatFull[]
-  }>
+  return res.json()
 }
 
 export function DailyShell({
@@ -41,6 +65,7 @@ export function DailyShell({
   brands,
   metaAccounts,
   tiktokAccounts,
+  shopeeAccounts,
 }: DailyShellProps) {
   const today = new Date().toISOString().slice(0, 10)
 
@@ -52,6 +77,8 @@ export function DailyShell({
     endDate: today,
   })
 
+  const [showUpload, setShowUpload] = useState(false)
+
   const { data, isFetching, refetch } = useQuery({
     queryKey: ['daily-stats', filters],
     queryFn: () => fetchDailyStats(filters),
@@ -60,6 +87,54 @@ export function DailyShell({
 
   function handleSearch() {
     refetch()
+  }
+
+  function handleFiltersChange(newFilters: DailyFilters) {
+    setFilters(newFilters)
+    // 계정이 변경되면 업로드 영역 숨김
+    if (newFilters.accountId !== filters.accountId) {
+      setShowUpload(false)
+    }
+  }
+
+  const isShopee =
+    filters.accountType === 'shopee_shopping' || filters.accountType === 'shopee_inapp'
+
+  // 선택된 shopee 계정 정보
+  const selectedShopeeAccount = isShopee
+    ? shopeeAccounts.find((a) => a.id === filters.accountId)
+    : null
+
+  // fetchButton 슬롯
+  let fetchButtonSlot: React.ReactNode = undefined
+  if (filters.accountId) {
+    if (isShopee) {
+      if (role === 'admin') {
+        fetchButtonSlot = (
+          <Button
+            variant={showUpload ? 'secondary' : 'outline'}
+            size="sm"
+            className="h-9"
+            onClick={() => setShowUpload((v) => !v)}
+          >
+            <Upload className="mr-1.5 size-4" />
+            파일 업로드
+          </Button>
+        )
+      }
+    } else {
+      if (role === 'admin') {
+        fetchButtonSlot = (
+          <DailyFetchButton
+            accountId={filters.accountId}
+            accountType={filters.accountType as 'meta' | 'tiktok'}
+            startDate={filters.startDate}
+            endDate={filters.endDate}
+            onComplete={handleSearch}
+          />
+        )
+      }
+    }
   }
 
   return (
@@ -82,29 +157,57 @@ export function DailyShell({
         brands={brands}
         metaAccounts={metaAccounts}
         tiktokAccounts={tiktokAccounts}
+        shopeeAccounts={shopeeAccounts}
         isFetching={isFetching}
-        onChange={setFilters}
+        onChange={handleFiltersChange}
         onSearch={handleSearch}
-        fetchButton={
-          role === 'admin' ? (
-            <DailyFetchButton
-              accountId={filters.accountId}
-              accountType={filters.accountType}
-              startDate={filters.startDate}
-              endDate={filters.endDate}
-              onComplete={handleSearch}
-            />
-          ) : undefined
-        }
+        fetchButton={fetchButtonSlot}
       />
+
+      {/* Shopee 파일 업로드 Dialog */}
+      <Dialog open={showUpload && !!selectedShopeeAccount} onOpenChange={setShowUpload}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>파일 업로드</DialogTitle>
+          </DialogHeader>
+          {selectedShopeeAccount && (
+            <ShopeeUploadArea
+              shopeeAccountId={selectedShopeeAccount.id}
+              accountExternalId={selectedShopeeAccount.account_id}
+              accountType={filters.accountType as 'shopee_shopping' | 'shopee_inapp'}
+              onUploadSuccess={() => {
+                setShowUpload(false)
+                handleSearch()
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* 테이블 */}
       {data && (
-        <div className="rounded-lg border">
+        <div className="space-y-6">
           {data.platform === 'meta' ? (
-            <MetaDailyTable rows={data.rows as MetaDailyStatFull[]} />
+            <div className="rounded-lg border">
+              <MetaDailyTable rows={data.rows as MetaDailyStatFull[]} />
+            </div>
+          ) : data.platform === 'tiktok' ? (
+            <>
+              <div className="rounded-lg border">
+                <TiktokDailyTable rows={data.rows as TiktokDailyStatFull[]} />
+              </div>
+              {data.gmvMaxRows && data.gmvMaxRows.length > 0 && (
+                <TiktokGmvMaxDailyTable rows={data.gmvMaxRows} />
+              )}
+            </>
+          ) : data.platform === 'shopee_shopping' ? (
+            <div className="rounded-lg border">
+              <ShopeeShoppingTable rows={data.rows as ShopeeShoppingStat[]} />
+            </div>
           ) : (
-            <TiktokDailyTable rows={data.rows as TiktokDailyStatFull[]} />
+            <div className="rounded-lg border">
+              <ShopeeInappTable rows={data.rows as ShopeeInappDayRow[]} />
+            </div>
           )}
         </div>
       )}

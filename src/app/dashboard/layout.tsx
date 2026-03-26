@@ -1,9 +1,7 @@
+import { AppSidebar } from '@/components/layout/app-sidebar'
 import { DashboardLayoutClient } from '@/components/layout/dashboard-layout-client'
-import { AppSidebarLoader } from '@/components/layout/app-sidebar-loader'
-import { AppSidebarSkeleton } from '@/components/layout/app-sidebar-skeleton'
-import { getCachedUser } from '@/lib/supabase/auth-cache'
+import { getCachedProfile, getCachedUser } from '@/lib/supabase/auth-cache'
 import { redirect } from 'next/navigation'
-import { Suspense } from 'react'
 
 export default async function DashboardLayout({
   children,
@@ -13,14 +11,19 @@ export default async function DashboardLayout({
   const user = await getCachedUser()
   if (!user) redirect('/login')
 
-  const sidebar = (
-    <Suspense fallback={<AppSidebarSkeleton />}>
-      <AppSidebarLoader userId={user.id} userEmail={user.email ?? ''} />
-    </Suspense>
-  )
+  // Suspense + fallback을 제거하여 SSR/클라이언트 Radix useId 카운터 일치 보장
+  // getCachedProfile은 React cache()로 메모이제이션되므로 추가 DB 호출 없음
+  const profile = await getCachedProfile(user.id)
 
   return (
-    <DashboardLayoutClient sidebar={sidebar}>
+    <DashboardLayoutClient
+      sidebar={
+        <AppSidebar
+          role={(profile?.role ?? 'viewer') as 'admin' | 'viewer'}
+          userEmail={user.email ?? ''}
+        />
+      }
+    >
       {children}
     </DashboardLayoutClient>
   )

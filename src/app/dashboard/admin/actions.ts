@@ -63,6 +63,19 @@ export async function toggleTiktokAccount(id: string, isActive: boolean) {
   return { success: true }
 }
 
+// ShopeeAccount 활성화 토글
+export async function toggleShopeeAccount(id: string, isActive: boolean) {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('shopee_accounts')
+    .update({ is_active: isActive })
+    .eq('id', id)
+
+  if (error) return { error: error.message }
+  revalidatePath('/dashboard/admin')
+  return { success: true }
+}
+
 // Brand 생성
 export async function createBrand(formData: FormData) {
   const supabase = await createClient()

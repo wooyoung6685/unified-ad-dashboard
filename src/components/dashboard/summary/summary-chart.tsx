@@ -1,7 +1,7 @@
 'use client'
 
 import { fmtDec, fmtKRW, fmtNum, fmtPct } from '@/lib/format'
-import type { SummaryDayData } from '@/types/database'
+import type { GmvMaxSummaryDayData, SummaryDayData } from '@/types/database'
 import {
   CartesianGrid,
   Legend,
@@ -15,7 +15,7 @@ import {
 
 // 지표 메타 (라벨 + 포맷)
 const METRIC_META: Record<string, { label: string; format: string }> = {
-  roas: { label: 'ROAS', format: 'percent' },
+  roas: { label: 'ROAS', format: 'ratio_pct' },
   frequency: { label: '빈도', format: 'decimal' },
   ctr: { label: 'CTR', format: 'percent' },
   cpc: { label: 'CPC', format: 'currency' },
@@ -27,12 +27,40 @@ const METRIC_META: Record<string, { label: string; format: string }> = {
   clicks: { label: '클릭수', format: 'number' },
   purchases: { label: '구매(전환)수', format: 'number' },
   add_to_cart: { label: '장바구니 담기', format: 'number' },
+  video_views: { label: '영상조회수', format: 'number' },
+  aov: { label: '객단가 (KRW)', format: 'currency' },
+  // GMV Max 전용 지표
+  cost: { label: '비용', format: 'currency' },
+  gross_revenue: { label: '매출', format: 'currency' },
+  roi: { label: 'ROI', format: 'ratio_pct' },
+  orders: { label: '주문수', format: 'number' },
+  cost_per_order: { label: '주문당 비용', format: 'currency' },
+}
+
+// 플랫폼별 라벨 오버라이드
+const PLATFORM_LABEL_OVERRIDES: Record<string, Record<string, string>> = {
+  shopee_shopping: {
+    ctr: '전환율',
+    impressions: '방문자수',
+    clicks: '페이지뷰',
+    purchases: '결제건수',
+    spend: '지출금액 (KRW)',
+    revenue: '매출 (KRW)',
+    aov: '객단가 (KRW)',
+  },
+  shopee_inapp: {
+    spend: '지출 (KRW)',
+    revenue: '매출 GMV (KRW)',
+    purchases: '구매(전환)수',
+  },
 }
 
 function formatTick(value: number, key: string): string {
   switch (METRIC_META[key]?.format) {
     case 'percent':
       return fmtPct(value)
+    case 'ratio_pct':
+      return fmtPct(value * 100)
     case 'decimal':
       return fmtDec(value)
     case 'currency':
@@ -78,14 +106,14 @@ function CustomTooltip({
 }
 
 interface SummaryChartProps {
-  data: SummaryDayData[]
+  data: SummaryDayData[] | GmvMaxSummaryDayData[]
   selectedMetrics: string[]
-  platform: 'meta' | 'tiktok' | null
+  platform: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp' | null
 }
 
 const COLORS = ['#F59E0B', '#6366F1']
 
-export function SummaryChart({ data, selectedMetrics }: SummaryChartProps) {
+export function SummaryChart({ data, selectedMetrics, platform }: SummaryChartProps) {
   if (!data.length || !selectedMetrics.length) {
     return (
       <div className="text-muted-foreground rounded-lg border py-12 text-center text-sm">
@@ -134,9 +162,10 @@ export function SummaryChart({ data, selectedMetrics }: SummaryChartProps) {
 
         <Tooltip content={<CustomTooltip />} />
         <Legend
-          formatter={(value: string) =>
-            METRIC_META[value]?.label ?? value
-          }
+          formatter={(value: string) => {
+            const overrides = platform ? PLATFORM_LABEL_OVERRIDES[platform] : undefined
+            return overrides?.[value] ?? METRIC_META[value]?.label ?? value
+          }}
         />
 
         {/* 첫 번째 라인 */}
