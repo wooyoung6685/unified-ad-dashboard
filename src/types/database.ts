@@ -3,6 +3,7 @@ export type UserProfile = {
   id: string
   brand_id: string | null
   role: 'admin' | 'viewer'
+  created_by: string | null
   created_at: string
 }
 
@@ -12,6 +13,7 @@ export type Brand = {
   slug: string
   manager: string | null
   created_at: string
+  owner_user_id: string | null
 }
 
 export type GlobalSetting = {
@@ -23,6 +25,17 @@ export type GlobalSetting = {
   updated_at: string
 }
 
+export type AdminPlatformToken = {
+  id: string
+  user_id: string
+  platform: 'meta' | 'tiktok'
+  access_token: string | null
+  app_id: string | null
+  secret: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type MetaAccount = {
   id: string
   brand_id: string
@@ -31,6 +44,7 @@ export type MetaAccount = {
   note: string | null
   country: string | null
   is_active: boolean
+  owner_user_id: string | null
 }
 
 export type TiktokAccount = {
@@ -42,6 +56,7 @@ export type TiktokAccount = {
   country: string | null
   is_active: boolean
   store_id: string | null  // GMV Max 리포트 API용 TikTok Shop Store ID
+  owner_user_id: string | null
 }
 
 export type MetaDailyStat = {
@@ -308,6 +323,7 @@ export type ExchangeRate = {
   rate: number
   created_at: string
   updated_at: string
+  owner_user_id: string | null
 }
 
 // 필터 타입
