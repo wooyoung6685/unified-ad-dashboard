@@ -1,18 +1,12 @@
 import { getDaysInMonth } from 'date-fns'
 import type { GmvMaxWeeklyData, MetaWeeklyData, ShopeeWeeklyData, TiktokWeeklyData } from '@/types/database'
-import { divOrNull, sumRows, type ShopeeInappRow, type TiktokDailyRow } from './aggregators'
-
-type MetaDailyRow = {
-  date: string
-  spend: number | null
-  revenue: number | null
-  impressions: number | null
-  reach: number | null
-  clicks: number | null
-  purchases: number | null
-  add_to_cart: number | null
-  add_to_cart_value: number | null
-}
+import {
+  divOrNull,
+  sumRows,
+  type MetaDailyRow,
+  type ShopeeInappRow,
+  type TiktokDailyRow,
+} from './aggregators'
 
 type WeekRange = {
   week: number

@@ -193,9 +193,7 @@ export function DailyShell({
             </div>
           ) : data.platform === 'tiktok' ? (
             <>
-              <div className="rounded-lg border">
-                <TiktokDailyTable rows={data.rows as TiktokDailyStatFull[]} />
-              </div>
+              <TiktokDailyTable rows={data.rows as TiktokDailyStatFull[]} />
               {data.gmvMaxRows && data.gmvMaxRows.length > 0 && (
                 <TiktokGmvMaxDailyTable rows={data.gmvMaxRows} />
               )}

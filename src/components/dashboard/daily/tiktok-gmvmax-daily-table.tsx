@@ -54,10 +54,9 @@ export function TiktokGmvMaxDailyTable({ rows }: Props) {
     <div className="space-y-2">
       <h3 className="text-sm font-semibold">GMV Max 캠페인</h3>
       <div className="rounded-md border">
-        <div className="max-h-[600px] overflow-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
+          <Table containerClassName="overflow-auto max-h-[600px]">
+            <TableHeader className="sticky top-0 z-20">
+              <TableRow className="[&_th]:bg-background">
                 <TableHead className="sticky left-0 z-20 bg-background min-w-[100px]">날짜</TableHead>
                 <TableHead className="text-right min-w-[120px]">비용</TableHead>
                 <TableHead className="text-right min-w-[120px]">매출</TableHead>
@@ -65,22 +64,21 @@ export function TiktokGmvMaxDailyTable({ rows }: Props) {
                 <TableHead className="text-right min-w-[90px]">주문수</TableHead>
                 <TableHead className="text-right min-w-[120px]">주문당 비용</TableHead>
               </TableRow>
+              {/* 합계행 - 헤더 안에 배치해서 sticky 블록으로 묶음 */}
+              <TableRow className="font-bold [&_th]:bg-muted">
+                <TableHead className="sticky left-0 z-20 bg-muted min-w-[100px]">합계</TableHead>
+                <TableHead className="text-right min-w-[120px]">{fmtKRW(total.cost)}</TableHead>
+                <TableHead className="text-right min-w-[120px]">{fmtKRW(total.gross_revenue)}</TableHead>
+                <TableHead className="text-right min-w-[90px]">{fmtDec(total.roi)}</TableHead>
+                <TableHead className="text-right min-w-[90px]">{fmtNum(total.orders)}</TableHead>
+                <TableHead className="text-right min-w-[120px]">{fmtKRW(total.cost_per_order)}</TableHead>
+              </TableRow>
             </TableHeader>
             <TableBody>
-              {/* 합계행 */}
-              <TableRow className="bg-muted/50 font-semibold sticky top-0 z-10">
-                <TableCell className="sticky left-0 z-20 bg-muted/50 font-semibold">합계</TableCell>
-                <TableCell className="text-right">{fmtKRW(total.cost)}</TableCell>
-                <TableCell className="text-right">{fmtKRW(total.gross_revenue)}</TableCell>
-                <TableCell className="text-right">{fmtDec(total.roi)}</TableCell>
-                <TableCell className="text-right">{fmtNum(total.orders)}</TableCell>
-                <TableCell className="text-right">{fmtKRW(total.cost_per_order)}</TableCell>
-              </TableRow>
-
               {/* 날짜별 데이터 행 */}
               {dateRows.map((row) => (
                 <TableRow key={row.date}>
-                  <TableCell className="sticky left-0 z-10 bg-background">{row.date.slice(0, 10)}</TableCell>
+                  <TableCell className="sticky left-0 z-1 bg-background">{row.date.slice(0, 10)}</TableCell>
                   <TableCell className="text-right">{fmtKRW(row.cost)}</TableCell>
                   <TableCell className="text-right">{fmtKRW(row.gross_revenue)}</TableCell>
                   <TableCell className="text-right">{fmtDec(row.roi)}</TableCell>
@@ -90,7 +88,6 @@ export function TiktokGmvMaxDailyTable({ rows }: Props) {
               ))}
             </TableBody>
           </Table>
-        </div>
       </div>
     </div>
   )

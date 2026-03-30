@@ -1,12 +1,17 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
-// meta_accounts + brands JOIN 조회
+// meta_accounts + brands JOIN 조회 (자기 소유 + 레거시 계정만)
 export async function GET() {
   const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
   const { data, error } = await supabase
     .from('meta_accounts')
     .select('*, brands(name)')
+    .or(`owner_user_id.eq.${user?.id},owner_user_id.is.null`)
     .order('created_at', { ascending: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -31,9 +36,24 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const { brand_id, account_id, sub_brand, note, country, is_active } = body
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
   const { data, error } = await supabase
     .from('meta_accounts')
-    .upsert({ brand_id, account_id, sub_brand: sub_brand ?? null, note, country, is_active: is_active ?? true }, { onConflict: 'account_id' })
+    .upsert(
+      {
+        brand_id,
+        account_id,
+        sub_brand: sub_brand ?? null,
+        note,
+        country,
+        is_active: is_active ?? true,
+        owner_user_id: user?.id ?? null,
+      },
+      { onConflict: 'account_id' },
+    )
     .select()
     .single()
 

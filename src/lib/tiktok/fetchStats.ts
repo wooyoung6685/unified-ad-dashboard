@@ -1,5 +1,7 @@
 // TikTok Business API Report 엔드포인트 호출 → tiktok_daily_stats 컬럼과 1:1 매핑
 
+import { floatOrNull, roundOrNull } from './utils'
+
 export type TiktokStatPayload = {
   spend: number | null
   impressions: number | null
@@ -22,22 +24,6 @@ export type TiktokStatPayload = {
   roas: number | null
   add_to_cart: number | null
   add_to_cart_value: number | null
-}
-
-// 값이 null/undefined/"" 이면 null, 아니면 반올림 정수
-function roundOrNull(value: string | null | undefined): number | null {
-  if (value === null || value === undefined || value === '') return null
-  if (value === '-') return 0 // TikTok은 값이 없을 때 숫자 대신 "-" 반환
-  const parsed = parseFloat(value)
-  return isNaN(parsed) ? null : Math.round(parsed)
-}
-
-// 소수점 유지 파싱 (spend, revenue, avg_play_time 등)
-function floatOrNull(value: string | null | undefined): number | null {
-  if (value === null || value === undefined || value === '') return null
-  if (value === '-') return 0 // TikTok은 값이 없을 때 숫자 대신 "-" 반환
-  const parsed = parseFloat(value)
-  return isNaN(parsed) ? null : parsed
 }
 
 export async function fetchStats(params: {

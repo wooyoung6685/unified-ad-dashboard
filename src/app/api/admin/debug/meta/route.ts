@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '@/lib/supabase/admin'
+import { getTokenForCurrentUser } from '@/lib/tokens'
 import { NextRequest, NextResponse } from 'next/server'
 
 // 임시 디버그용 — Meta API 원본 JSON 확인
@@ -21,14 +21,8 @@ export async function GET(req: NextRequest) {
     )
   }
 
-  // global_settings에서 meta 토큰 조회
-  const { data: settings } = await supabaseAdmin
-    .from('global_settings')
-    .select('access_token')
-    .eq('platform', 'meta')
-    .single()
-
-  const access_token = settings?.access_token
+  // 현재 로그인한 어드민의 meta 토큰 조회
+  const access_token = await getTokenForCurrentUser('meta')
   if (!access_token) {
     return NextResponse.json({ error: 'Meta 토큰이 없습니다.' }, { status: 400 })
   }
@@ -77,14 +71,8 @@ async function handleCreativeDebug(req: NextRequest, account_id: string | null) 
     )
   }
 
-  // global_settings에서 meta 토큰 조회
-  const { data: settings } = await supabaseAdmin
-    .from('global_settings')
-    .select('access_token')
-    .eq('platform', 'meta')
-    .single()
-
-  const access_token = settings?.access_token
+  // 현재 로그인한 어드민의 meta 토큰 조회
+  const access_token = await getTokenForCurrentUser('meta')
   if (!access_token) {
     return NextResponse.json({ error: 'Meta 토큰이 없습니다.' }, { status: 400 })
   }

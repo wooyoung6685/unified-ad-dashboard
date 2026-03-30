@@ -1,22 +1,7 @@
 import type { TiktokCampaignRow, TiktokAdRow } from '@/types/database'
+import { floatOrNull, roundOrNull } from '@/lib/tiktok/utils'
 
 const TIKTOK_API_BASE = 'https://business-api.tiktok.com/open_api/v1.3'
-
-// ── 파싱 유틸 ──────────────────────────────────────────────────────────────
-
-function floatOrNull(value: string | null | undefined): number | null {
-  if (value == null || value === '') return null
-  if (value === '-') return 0
-  const n = parseFloat(value)
-  return isNaN(n) ? null : n
-}
-
-function roundOrNull(value: string | null | undefined): number | null {
-  if (value == null || value === '') return null
-  if (value === '-') return 0
-  const n = parseFloat(value)
-  return isNaN(n) ? null : Math.round(n)
-}
 
 // ── 공통 fetch 헬퍼 ────────────────────────────────────────────────────────
 
@@ -202,7 +187,9 @@ async function fetchTiktokAdThumbnails(
         itemId: ad.tiktok_item_id ?? null,
       })
     }
-    console.log(`[TikTok] /ad/get/ 응답: ${data.list?.length ?? 0}개, itemId 보유: ${[...adCreativeMap.values()].filter(v => v.itemId).length}개`)
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[TikTok] /ad/get/ 응답: ${data.list?.length ?? 0}개, itemId 보유: ${[...adCreativeMap.values()].filter((v) => v.itemId).length}개`)
+    }
   }
 
   // 2단계-A: 일반 광고 — video_id 로 /file/video/ad/info/ 호출
@@ -259,7 +246,9 @@ async function fetchTiktokAdThumbnails(
         }
       }
     }
-    console.log(`[TikTok] oEmbed 썸네일 획득: ${itemThumbMap.size}/${uniqueItemIds.length}개`)
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[TikTok] oEmbed 썸네일 획득: ${itemThumbMap.size}/${uniqueItemIds.length}개`)
+    }
   }
 
   // 3단계: ad_id → thumbnail_url 최종 맵 생성
@@ -316,7 +305,9 @@ export async function fetchTiktokAds(
   let thumbnailMap = new Map<string, string>()
   try {
     thumbnailMap = await fetchTiktokAdThumbnails(advertiserId, accessToken, adIds)
-    console.log(`[TikTok] 썸네일 조회 완료: ${thumbnailMap.size}/${adIds.length}개`)
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[TikTok] 썸네일 조회 완료: ${thumbnailMap.size}/${adIds.length}개`)
+    }
   } catch (err) {
     console.error('[TikTok] 썸네일 조회 실패:', err)
     // ad.read 스코프 없거나 API 오류 시 썸네일 없이 진행

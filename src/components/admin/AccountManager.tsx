@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Switch } from '@/components/ui/switch'
 import {
   Table,
   TableBody,
@@ -393,18 +394,26 @@ export function AccountManager({ brands }: AccountManagerProps) {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>활성</TableHead>
                   <TableHead>매체</TableHead>
                   <TableHead>서브 브랜드</TableHead>
                   <TableHead>국가</TableHead>
                   <TableHead>광고계정 ID</TableHead>
                   <TableHead>비고</TableHead>
-                  <TableHead>활성</TableHead>
                   <TableHead>액션</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {pendingRows.map((row) => (
                   <TableRow key={row._key}>
+                    <TableCell>
+                      <Switch
+                        checked={row.is_active}
+                        onCheckedChange={() =>
+                          updatePending(row._key, { is_active: !row.is_active })
+                        }
+                      />
+                    </TableCell>
                     <TableCell>
                       <Select
                         value={row.platform}
@@ -466,21 +475,6 @@ export function AccountManager({ brands }: AccountManagerProps) {
                       />
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          updatePending(row._key, { is_active: !row.is_active })
-                        }
-                      >
-                        <Badge
-                          variant={row.is_active ? 'default' : 'secondary'}
-                        >
-                          {row.is_active ? '활성' : '비활성'}
-                        </Badge>
-                      </Button>
-                    </TableCell>
-                    <TableCell>
                       <div className="flex items-center gap-2">
                         <Button
                           size="sm"
@@ -526,12 +520,12 @@ export function AccountManager({ brands }: AccountManagerProps) {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>상태</TableHead>
                   <TableHead>매체</TableHead>
                   <TableHead>서브 브랜드</TableHead>
                   <TableHead>국가</TableHead>
-                  <TableHead>비고</TableHead>
                   <TableHead>광고계정 ID</TableHead>
-                  <TableHead>상태</TableHead>
+                  <TableHead>비고</TableHead>
                   <TableHead>액션</TableHead>
                 </TableRow>
               </TableHeader>
@@ -544,7 +538,13 @@ export function AccountManager({ brands }: AccountManagerProps) {
                   return (
                     <TableRow key={account.id}>
                       <TableCell>
-                        <div className="flex flex-col gap-1">
+                        <Switch
+                          checked={account.is_active}
+                          onCheckedChange={() => handleToggle(account)}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
                           <span>{PLATFORM_LABEL[account.platform]}</span>
                           {account.platform === 'tiktok' && account.store_id && (
                             <Badge variant="secondary" className="w-fit text-xs">
@@ -593,6 +593,22 @@ export function AccountManager({ brands }: AccountManagerProps) {
                           </span>
                         )}
                       </TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {isEditing ? (
+                          <Input
+                            className="w-44"
+                            value={editingValues.account_id}
+                            onChange={(e) =>
+                              setEditingValues((prev) => ({
+                                ...prev,
+                                account_id: e.target.value,
+                              }))
+                            }
+                          />
+                        ) : (
+                          account.account_id
+                        )}
+                      </TableCell>
                       <TableCell>
                         {isEditing ? (
                           <Input
@@ -613,38 +629,6 @@ export function AccountManager({ brands }: AccountManagerProps) {
                             —
                           </span>
                         )}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-xs">
-                        {isEditing ? (
-                          <Input
-                            className="w-44"
-                            value={editingValues.account_id}
-                            onChange={(e) =>
-                              setEditingValues((prev) => ({
-                                ...prev,
-                                account_id: e.target.value,
-                              }))
-                            }
-                          />
-                        ) : (
-                          account.account_id
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-auto p-0"
-                          onClick={() => handleToggle(account)}
-                        >
-                          <Badge
-                            variant={
-                              account.is_active ? 'default' : 'secondary'
-                            }
-                          >
-                            {account.is_active ? '활성' : '비활성'}
-                          </Badge>
-                        </Button>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">

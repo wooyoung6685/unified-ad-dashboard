@@ -264,21 +264,10 @@ export function UserManager({ brands, openAddRef }: UserManagerProps) {
               </Select>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="user-role">역할</Label>
-              <Select
-                value={form.role}
-                onValueChange={(v) =>
-                  setForm((prev) => ({ ...prev, role: v as 'admin' | 'viewer' }))
-                }
-              >
-                <SelectTrigger id="user-role">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="admin">admin</SelectItem>
-                  <SelectItem value="viewer">viewer</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>역할</Label>
+              <div className="border-input bg-muted text-muted-foreground flex h-9 w-full items-center rounded-md border px-3 py-1 text-sm">
+                viewer
+              </div>
             </div>
             {addError && (
               <Alert variant="destructive">

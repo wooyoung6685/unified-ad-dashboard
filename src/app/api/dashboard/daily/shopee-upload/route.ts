@@ -1,26 +1,14 @@
 import { parseInappStat } from '@/lib/shopee/parseInappStat'
 import { parseShoppingStat } from '@/lib/shopee/parseShoppingStat'
+import { requireAdmin } from '@/lib/supabase/auth'
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
+  const { error: authError } = await requireAdmin()
+  if (authError) return authError
+
   const supabase = await createClient()
-
-  // 인증 및 admin 권한 확인
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 })
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role !== 'admin') {
-    return NextResponse.json({ error: '관리자 권한이 필요합니다.' }, { status: 403 })
-  }
 
   // multipart/form-data 파싱
   const formData = await req.formData()

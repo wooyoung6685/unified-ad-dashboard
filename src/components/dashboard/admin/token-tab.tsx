@@ -1,8 +1,8 @@
 import { TokenManager } from '@/components/admin/TokenManager'
-import type { GlobalSetting } from '@/types/database'
+import type { AdminPlatformToken } from '@/types/database'
 
 interface TokenTabProps {
-  settings: GlobalSetting[]
+  settings: AdminPlatformToken[]
 }
 
 export function TokenTab({ settings }: TokenTabProps) {

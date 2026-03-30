@@ -25,6 +25,14 @@ function calcTotal(rows: TiktokDailyStatFull[]): TiktokDailyStatFull {
   const totalPurchases = sum('purchases')
   const totalRevenue = sum('revenue')
   const totalReach = sum('reach')
+  const totalVideoViews = sum('video_views')
+
+  // 평균 재생시간: video_views 기반 가중 평균
+  const weightedPlayTimeSum = rows.reduce(
+    (s, r) => s + (r.avg_play_time ?? 0) * (r.video_views ?? 0),
+    0
+  )
+  const avgPlayTime = totalVideoViews > 0 ? weightedPlayTimeSum / totalVideoViews : null
 
   return {
     id: '__total__',
@@ -43,12 +51,12 @@ function calcTotal(rows: TiktokDailyStatFull[]): TiktokDailyStatFull {
     reach: totalReach,
     frequency: totalReach > 0 ? totalImpressions / totalReach : null,
     cpm: totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : null,
-    video_views: sum('video_views'),
+    video_views: totalVideoViews,
     views_2s: sum('views_2s'),
     views_6s: sum('views_6s'),
     views_25pct: sum('views_25pct'),
     views_100pct: sum('views_100pct'),
-    avg_play_time: null,
+    avg_play_time: avgPlayTime,
     followers: sum('followers'),
     likes: sum('likes'),
   }
@@ -64,15 +72,16 @@ export function TiktokDailyTable({ rows }: TiktokDailyTableProps) {
   }
 
   const totalRow = calcTotal(rows)
-  const displayRows = [totalRow, ...rows]
 
   return (
-    <div>
+    <div className="space-y-2">
+      <h3 className="text-sm font-semibold">일반 캠페인</h3>
+      <div className="rounded-lg border">
       <Table
         className="min-w-800"
         containerClassName="overflow-auto max-h-[calc(100vh-280px)]"
       >
-        <TableHeader className="sticky top-0 z-20 bg-background">
+        <TableHeader className="sticky top-0 z-20">
           <TableRow className="[&_th]:bg-background">
             <TableHead className="sticky left-0 z-30 w-28 min-w-28 bg-background">날짜</TableHead>
             <TableHead className="min-w-28 text-right">지출 (KRW)</TableHead>
@@ -95,26 +104,34 @@ export function TiktokDailyTable({ rows }: TiktokDailyTableProps) {
             <TableHead className="min-w-28 text-right">매출 (KRW)</TableHead>
             <TableHead className="min-w-20 text-right">ROAS(%)</TableHead>
           </TableRow>
+          {/* 합계행 - 헤더 안에 배치해서 sticky 블록으로 묶음 */}
+          <TableRow className="font-bold [&_th]:bg-muted">
+            <TableHead className="sticky left-0 z-30 w-28 min-w-28 bg-muted">합계</TableHead>
+            <TableHead className="min-w-28 text-right">{fmtKRW(totalRow.spend)}</TableHead>
+            <TableHead className="min-w-24 text-right">{fmtNum(totalRow.impressions)}</TableHead>
+            <TableHead className="min-w-24 text-right">{fmtNum(totalRow.reach)}</TableHead>
+            <TableHead className="min-w-24 text-right">{fmtNum(totalRow.clicks)}</TableHead>
+            <TableHead className="min-w-20 text-right">{fmtDec(totalRow.frequency)}</TableHead>
+            <TableHead className="min-w-28 text-right">{fmtKRW(totalRow.cpc)}</TableHead>
+            <TableHead className="min-w-28 text-right">{fmtPct(totalRow.ctr)}</TableHead>
+            <TableHead className="min-w-24 text-right">{fmtKRW(totalRow.cpm)}</TableHead>
+            <TableHead className="min-w-28 text-right">{fmtNum(totalRow.video_views)}</TableHead>
+            <TableHead className="min-w-24 text-right">{fmtNum(totalRow.views_2s)}</TableHead>
+            <TableHead className="min-w-24 text-right">{fmtNum(totalRow.views_6s)}</TableHead>
+            <TableHead className="min-w-24 text-right">{fmtNum(totalRow.views_25pct)}</TableHead>
+            <TableHead className="min-w-24 text-right">{fmtNum(totalRow.views_100pct)}</TableHead>
+            <TableHead className="min-w-32 text-right">{fmtDec(totalRow.avg_play_time)}</TableHead>
+            <TableHead className="min-w-24 text-right">{fmtNum(totalRow.followers)}</TableHead>
+            <TableHead className="min-w-24 text-right">{fmtNum(totalRow.likes)}</TableHead>
+            <TableHead className="min-w-28 text-right">{fmtNum(totalRow.purchases)}</TableHead>
+            <TableHead className="min-w-28 text-right">{fmtKRW(totalRow.revenue)}</TableHead>
+            <TableHead className="min-w-20 text-right">{fmtPct(totalRow.roas != null ? totalRow.roas * 100 : null)}</TableHead>
+          </TableRow>
         </TableHeader>
         <TableBody>
-          {displayRows.map((row, i) => (
-            <TableRow
-              key={row.id}
-              className={
-                i === 0
-                  ? 'sticky top-10.25 z-10 font-bold [&_td]:bg-muted'
-                  : undefined
-              }
-            >
-              <TableCell
-                className={
-                  i === 0
-                    ? 'sticky left-0 z-20 bg-muted'
-                    : 'sticky left-0 z-1 bg-background'
-                }
-              >
-                {row.date}
-              </TableCell>
+          {rows.map((row) => (
+            <TableRow key={row.id}>
+              <TableCell className="sticky left-0 z-1 bg-background w-28 min-w-28">{row.date}</TableCell>
               <TableCell className="text-right">{fmtKRW(row.spend)}</TableCell>
               <TableCell className="text-right">{fmtNum(row.impressions)}</TableCell>
               <TableCell className="text-right">{fmtNum(row.reach)}</TableCell>
@@ -138,6 +155,7 @@ export function TiktokDailyTable({ rows }: TiktokDailyTableProps) {
           ))}
         </TableBody>
       </Table>
+      </div>
     </div>
   )
 }

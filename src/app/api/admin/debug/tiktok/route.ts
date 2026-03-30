@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '@/lib/supabase/admin'
+import { getTokenForCurrentUser } from '@/lib/tokens'
 import { NextRequest, NextResponse } from 'next/server'
 
 // 임시 디버그용 — TikTok API 원본 JSON 확인
@@ -21,14 +21,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'advertiser_id 파라미터가 필요합니다.' }, { status: 400 })
   }
 
-  // global_settings에서 tiktok 토큰 조회
-  const { data: settings } = await supabaseAdmin
-    .from('global_settings')
-    .select('access_token')
-    .eq('platform', 'tiktok')
-    .single()
-
-  const access_token = settings?.access_token
+  // 현재 로그인한 어드민의 tiktok 토큰 조회
+  const access_token = await getTokenForCurrentUser('tiktok')
   if (!access_token) {
     return NextResponse.json({ error: 'TikTok 토큰이 없습니다.' }, { status: 400 })
   }

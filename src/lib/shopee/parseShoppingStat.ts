@@ -144,14 +144,22 @@ export async function parseShoppingStat(
 
     const supabase = await createClient()
 
-    // 첫 번째 레코드의 날짜에서 연월 추출 후 환율 조회
+    // 첫 번째 레코드의 날짜에서 연월 추출 후 현재 어드민 환율 조회 (없으면 레거시 사용)
     const yearMonth = (records[0].date as string).substring(0, 7)
-    const { data: rateRow } = await supabase
+    const {
+      data: { user: currentUser },
+    } = await supabase.auth.getUser()
+    const { data: rateRows } = await supabase
       .from('exchange_rates')
-      .select('rate')
+      .select('rate, owner_user_id')
       .eq('year_month', yearMonth)
       .eq('country', country.toLowerCase())
-      .maybeSingle()
+      .or(`owner_user_id.eq.${currentUser?.id},owner_user_id.is.null`)
+
+    // 소유자 있는 환율 우선, 없으면 레거시(null) 사용
+    const rateRow =
+      (rateRows ?? []).find((r) => r.owner_user_id === currentUser?.id) ??
+      (rateRows ?? []).find((r) => r.owner_user_id === null)
 
     const rate: number | null = (rateRow?.rate as number) ?? null
 

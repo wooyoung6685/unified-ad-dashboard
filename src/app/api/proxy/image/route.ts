@@ -4,10 +4,30 @@ export async function GET(req: NextRequest) {
   const url = req.nextUrl.searchParams.get('url')
   if (!url) return new NextResponse('url 파라미터 없음', { status: 400 })
 
+  // URL 파싱 및 hostname 기반 도메인 검증 (SSRF 방지)
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return new NextResponse('유효하지 않은 URL', { status: 400 })
+  }
+
+  if (parsed.protocol !== 'https:')
+    return new NextResponse('HTTPS만 허용됩니다.', { status: 403 })
+
   // Facebook CDN 및 TikTok CDN 허용 (보안)
   // tiktokcdn.com: 기본 CDN / tiktokcdn-us.com: 미국 CDN (poster_url에서 사용)
-  const allowed = ['fbcdn.net', 'cdninstagram.com', 'ibyteimg.com', 'tiktokcdn.com', 'tiktokcdn-us.com', 'tiktokcdn-eu.com']
-  const isAllowed = allowed.some((domain) => url.includes(domain))
+  const allowedDomains = [
+    'fbcdn.net',
+    'cdninstagram.com',
+    'ibyteimg.com',
+    'tiktokcdn.com',
+    'tiktokcdn-us.com',
+    'tiktokcdn-eu.com',
+  ]
+  const isAllowed = allowedDomains.some(
+    (domain) => parsed.hostname === domain || parsed.hostname.endsWith(`.${domain}`),
+  )
   if (!isAllowed) return new NextResponse('허용되지 않은 도메인', { status: 403 })
 
   try {

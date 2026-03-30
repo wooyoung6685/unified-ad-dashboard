@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { fetchStats as fetchMetaStats } from '@/lib/meta/fetchStats'
 import { fetchStats as fetchTiktokStats } from '@/lib/tiktok/fetchStats'
+import { getTokenForCurrentUser } from '@/lib/tokens'
 import { eachDayOfInterval, format, differenceInDays, parseISO } from 'date-fns'
 import { NextRequest } from 'next/server'
 
@@ -35,16 +36,11 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // global_settings 조회
-  const { data: settings } = await supabaseAdmin
-    .from('global_settings')
-    .select('platform, access_token')
-    .in('platform', ['meta', 'tiktok'])
-
-  const metaToken =
-    settings?.find((s) => s.platform === 'meta')?.access_token ?? null
-  const tiktokToken =
-    settings?.find((s) => s.platform === 'tiktok')?.access_token ?? null
+  // 현재 로그인한 어드민의 토큰 조회
+  const [metaToken, tiktokToken] = await Promise.all([
+    getTokenForCurrentUser('meta'),
+    getTokenForCurrentUser('tiktok'),
+  ])
 
   // 대상 계정 목록 조회
   type MetaAccount = { id: string; brand_id: string; account_id: string }

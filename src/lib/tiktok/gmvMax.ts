@@ -4,22 +4,9 @@
 // - 리포트:     GET /open_api/v1.3/gmv_max/report/get/
 
 import type { GmvMaxCampaignRow, GmvMaxDailyRow, GmvMaxItemRow } from '@/types/database'
+import { floatOrNull, roundOrNull } from './utils'
 
 const TIKTOK_API_BASE = 'https://business-api.tiktok.com/open_api/v1.3'
-
-function floatOrNull(value: string | number | null | undefined): number | null {
-  if (value == null || value === '') return null
-  if (value === '-') return 0
-  const n = typeof value === 'number' ? value : parseFloat(value)
-  return isNaN(n) ? null : n
-}
-
-function roundOrNull(value: string | number | null | undefined): number | null {
-  if (value == null || value === '') return null
-  if (value === '-') return 0
-  const n = typeof value === 'number' ? value : parseFloat(value)
-  return isNaN(n) ? null : Math.round(n)
-}
 
 async function gmvMaxGet(
   path: string,

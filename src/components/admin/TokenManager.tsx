@@ -7,15 +7,15 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import type { GlobalSetting } from '@/types/database'
+import type { AdminPlatformToken } from '@/types/database'
 import { useState } from 'react'
 
 interface TokenManagerProps {
-  settings: GlobalSetting[]
+  settings: AdminPlatformToken[]
 }
 
 // Meta 전용 폼 — access_token 1개만 업데이트
-function MetaTokenForm({ setting }: { setting: GlobalSetting }) {
+function MetaTokenForm({ setting }: { setting: AdminPlatformToken }) {
   const [message, setMessage] = useState<string | null>(null)
   const [isError, setIsError] = useState(false)
   const isSet = !!setting.access_token
@@ -42,7 +42,7 @@ function MetaTokenForm({ setting }: { setting: GlobalSetting }) {
       </CardHeader>
       <CardContent>
         <form action={handleSubmit} className="space-y-4">
-          <input type="hidden" name="id" value={setting.id} />
+          <input type="hidden" name="platform" value={setting.platform} />
 
           <div className="space-y-1">
             <Label htmlFor="meta-access-token">Access Token</Label>
@@ -69,7 +69,7 @@ function MetaTokenForm({ setting }: { setting: GlobalSetting }) {
 }
 
 // TikTok 전용 폼 — access_token만 업데이트
-function TikTokTokenForm({ setting }: { setting: GlobalSetting }) {
+function TikTokTokenForm({ setting }: { setting: AdminPlatformToken }) {
   const [message, setMessage] = useState<string | null>(null)
   const [isError, setIsError] = useState(false)
   const isSet = !!setting.access_token
@@ -96,7 +96,7 @@ function TikTokTokenForm({ setting }: { setting: GlobalSetting }) {
       </CardHeader>
       <CardContent>
         <form action={handleSubmit} className="space-y-4">
-          <input type="hidden" name="id" value={setting.id} />
+          <input type="hidden" name="platform" value={setting.platform} />
 
           <div className="space-y-1">
             <Label htmlFor="tiktok-access-token">Access Token</Label>
@@ -133,9 +133,9 @@ export function TokenManager({ settings }: TokenManagerProps) {
     <div className="grid gap-6 md:grid-cols-2">
       {settings.map((s) =>
         s.platform === 'meta' ? (
-          <MetaTokenForm key={s.id} setting={s} />
+          <MetaTokenForm key={s.platform} setting={s} />
         ) : (
-          <TikTokTokenForm key={s.id} setting={s} />
+          <TikTokTokenForm key={s.platform} setting={s} />
         ),
       )}
     </div>

@@ -3,34 +3,26 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-// GlobalSetting access_token만 업데이트 (app_id, secret 보존)
+// 어드민별 플랫폼 토큰 저장 (upsert)
 export async function updateAccessToken(formData: FormData) {
   const supabase = await createClient()
-  const id = formData.get('id') as string
+  const platform = formData.get('platform') as string
   const access_token = formData.get('access_token') as string
 
-  const { error } = await supabase
-    .from('global_settings')
-    .update({ access_token, updated_at: new Date().toISOString() })
-    .eq('id', id)
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: '인증이 필요합니다.' }
 
-  if (error) return { error: error.message }
-  revalidatePath('/dashboard/admin')
-  return { success: true }
-}
-
-// GlobalSetting 업데이트 (토큰 관리)
-export async function updateGlobalSetting(formData: FormData) {
-  const supabase = await createClient()
-  const id = formData.get('id') as string
-  const access_token = formData.get('access_token') as string
-  const app_id = formData.get('app_id') as string | null
-  const secret = formData.get('secret') as string | null
-
-  const { error } = await supabase
-    .from('global_settings')
-    .update({ access_token, app_id, secret, updated_at: new Date().toISOString() })
-    .eq('id', id)
+  const { error } = await supabase.from('admin_platform_tokens').upsert(
+    {
+      user_id: user.id,
+      platform,
+      access_token,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id,platform' },
+  )
 
   if (error) return { error: error.message }
   revalidatePath('/dashboard/admin')
@@ -84,9 +76,13 @@ export async function createBrand(formData: FormData) {
   // slug는 자동 생성 (timestamp base36)
   const slug = Date.now().toString(36)
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
   const { data, error } = await supabase
     .from('brands')
-    .insert({ name, slug, manager })
+    .insert({ name, slug, manager, owner_user_id: user?.id ?? null })
     .select()
     .single()
 

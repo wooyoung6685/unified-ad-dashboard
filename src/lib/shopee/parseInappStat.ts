@@ -126,12 +126,16 @@ export async function parseInappStat(
     const yearMonth = date.substring(0, 7)
 
     // currency 설정
-    const currency =
-      country.toLowerCase() === 'sg'
-        ? 'SGD'
-        : country.toUpperCase() === 'PH'
-          ? 'PHP'
-          : country.toUpperCase()
+    const CURRENCY_MAP: Record<string, string> = {
+      sg: 'SGD',
+      ph: 'PHP',
+      my: 'MYR',
+      th: 'THB',
+      id: 'IDR',
+      vn: 'VND',
+      tw: 'TWD',
+    }
+    const currency = CURRENCY_MAP[country.toLowerCase()] ?? country.toUpperCase()
 
     // Line 8 (index 7): 헤더 행 - CSV 파싱으로 컬럼 인덱스 확정
     const headerCols = parseCsvLine(lines[7] ?? '')
@@ -202,13 +206,21 @@ export async function parseInappStat(
 
     const supabase = await createClient()
 
-    // 환율 조회
-    const { data: rateRow } = await supabase
+    // 현재 어드민의 환율 우선 조회 (없으면 레거시 null 환율 사용)
+    const {
+      data: { user: currentUser },
+    } = await supabase.auth.getUser()
+    const { data: rateRows } = await supabase
       .from('exchange_rates')
-      .select('rate')
+      .select('rate, owner_user_id')
       .eq('year_month', yearMonth)
       .eq('country', country.toLowerCase())
-      .maybeSingle()
+      .or(`owner_user_id.eq.${currentUser?.id},owner_user_id.is.null`)
+
+    // 소유자 있는 환율 우선, 없으면 레거시(null) 사용
+    const rateRow =
+      (rateRows ?? []).find((r) => r.owner_user_id === currentUser?.id) ??
+      (rateRows ?? []).find((r) => r.owner_user_id === null)
 
     const rate: number | null = (rateRow?.rate as number) ?? null
 

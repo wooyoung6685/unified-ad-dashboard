@@ -882,7 +882,11 @@ export function TiktokReportDetail({ data, title }: Props) {
   if (!showGmvMaxTab) {
     return (
       <div className="flex flex-col gap-6">
-        <h2 className="text-2xl font-bold">{title}</h2>
+        <Card>
+          <CardContent className="py-8 text-center">
+            <h1 className="text-2xl font-bold">{title}</h1>
+          </CardContent>
+        </Card>
         <MonthlyKpi m={monthly} />
         <WeeklyCharts weekly={weekly} />
         <WeeklyTable weekly={weekly} />
@@ -894,7 +898,11 @@ export function TiktokReportDetail({ data, title }: Props) {
 
   return (
     <div className="flex flex-col gap-6">
-      <h2 className="text-2xl font-bold">{title}</h2>
+      <Card>
+        <CardContent className="py-8 text-center">
+          <h1 className="text-2xl font-bold">{title}</h1>
+        </CardContent>
+      </Card>
 
       <Tabs defaultValue="normal">
         <TabsList className="mb-2">

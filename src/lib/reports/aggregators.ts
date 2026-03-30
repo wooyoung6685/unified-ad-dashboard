@@ -17,7 +17,7 @@ export function sumRows(arr: (number | null | undefined)[]): number {
 
 // ── Meta ───────────────────────────────────────────────────────────────────
 
-type MetaDailyRow = {
+export type MetaDailyRow = {
   date: string
   spend: number | null
   revenue: number | null

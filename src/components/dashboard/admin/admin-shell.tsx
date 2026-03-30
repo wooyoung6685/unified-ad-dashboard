@@ -2,7 +2,7 @@
 
 import { ExchangeRateManager } from '@/components/admin/ExchangeRateManager'
 import { Tabs, TabsContent } from '@/components/ui/tabs'
-import type { Brand, GlobalSetting } from '@/types/database'
+import type { AdminPlatformToken, Brand } from '@/types/database'
 import { useSearchParams } from 'next/navigation'
 import { AccountsTab } from './accounts-tab'
 import { BrandsTab } from './brands-tab'
@@ -10,7 +10,7 @@ import { TokenTab } from './token-tab'
 import { UsersTab } from './users-tab'
 
 interface AdminShellProps {
-  settings: GlobalSetting[]
+  settings: AdminPlatformToken[]
   brands: Brand[]
 }
 

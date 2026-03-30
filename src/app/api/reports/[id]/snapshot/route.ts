@@ -1,5 +1,6 @@
-import { createClient } from '@/lib/supabase/server'
+import { requireAdmin } from '@/lib/supabase/auth'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { getTokenForCurrentUser } from '@/lib/tokens'
 import { NextRequest, NextResponse } from 'next/server'
 import { format, endOfMonth, startOfMonth, subMonths } from 'date-fns'
 import {
@@ -22,7 +23,7 @@ import { fetchTiktokCampaigns, fetchTiktokAds } from '@/lib/reports/tiktokApi'
 import { fetchGmvMaxCampaignReport, fetchGmvMaxItems } from '@/lib/tiktok/gmvMax'
 import type { ReportSnapshot, ShopeeAdsBreakdownData } from '@/types/database'
 
-export const maxDuration = 60
+export const maxDuration = 300
 
 // Facebook CDN 이미지를 Supabase Storage에 업로드하고 퍼블릭 URL 반환
 // (Storage URL은 만료 없음 — fbcdn.net URL은 24시간 내 만료됨)
@@ -95,20 +96,8 @@ export async function POST(_req: NextRequest, { params }: RouteContext) {
   const { id } = await params
 
   // 인증 + admin 체크
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 })
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-  if (profile?.role !== 'admin') {
-    return NextResponse.json({ error: '관리자 권한이 필요합니다.' }, { status: 403 })
-  }
+  const { error: authError } = await requireAdmin()
+  if (authError) return authError
 
   // report 조회 (supabaseAdmin → RLS 우회)
   const { data: report, error: reportError } = await supabaseAdmin
@@ -251,14 +240,8 @@ async function buildMetaSnapshot(args: {
   const monthly = aggregateMetaMonthly(curRows, prevRows)
   const weekly = groupMetaByWeek(curRows, year, month)
 
-  // Meta API 토큰 조회
-  const { data: settings } = await supabaseAdmin
-    .from('global_settings')
-    .select('access_token')
-    .eq('platform', 'meta')
-    .single()
-
-  const accessToken = settings?.access_token
+  // 현재 로그인한 어드민의 Meta 토큰 조회
+  const accessToken = await getTokenForCurrentUser('meta')
 
   let campaigns: ReturnType<typeof mergeMetaCampaignPrev> = []
   let creatives: Awaited<ReturnType<typeof fetchMetaCreatives>> = []
@@ -474,14 +457,8 @@ async function buildTiktokSnapshot(args: {
     ? groupGmvMaxByWeek(gmvCurRows, year, month)
     : undefined
 
-  // TikTok API 토큰 조회
-  const { data: settings } = await supabaseAdmin
-    .from('global_settings')
-    .select('access_token')
-    .eq('platform', 'tiktok')
-    .single()
-
-  const accessToken = settings?.access_token
+  // 현재 로그인한 어드민의 TikTok 토큰 조회
+  const accessToken = await getTokenForCurrentUser('tiktok')
 
   let campaigns: Awaited<ReturnType<typeof fetchTiktokCampaigns>> = []
   let ads: Awaited<ReturnType<typeof fetchTiktokAds>> = []

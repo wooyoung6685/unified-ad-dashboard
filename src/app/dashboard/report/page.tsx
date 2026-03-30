@@ -8,36 +8,65 @@ export default async function ReportPage() {
   const user = await getCachedUser()
   if (!user) redirect('/login')
 
-  const [profile, { data: brandsData }, { data: reportsData }] = await Promise.all([
-    getCachedProfile(user.id),
-    (async () => {
-      const supabase = await createClient()
-      return supabase.from('brands').select('*').order('name')
-    })(),
-    (async () => {
-      const supabase = await createClient()
-      return supabase
+  const profile = await getCachedProfile(user.id)
+  const role = profile?.role ?? 'viewer'
+
+  const supabase = await createClient()
+
+  let brandsData: Brand[] = []
+  let initialReports: ReportListItem[] = []
+
+  if (role === 'admin') {
+    // admin: 자기 소유 브랜드만 조회 후 해당 브랜드의 리포트만 표시
+    const { data: brands } = await supabase
+      .from('brands')
+      .select('*')
+      .or(`owner_user_id.eq.${user.id},owner_user_id.is.null`)
+      .order('name')
+
+    brandsData = (brands ?? []) as Brand[]
+
+    const myBrandIds = brandsData.map((b) => b.id)
+    if (myBrandIds.length > 0) {
+      const { data: reportsData } = await supabase
         .from('reports')
         .select(
           'id, brand_id, title, platform, country, internal_account_id, year, month, status, created_by, created_at, updated_at, brands(name)',
         )
+        .in('brand_id', myBrandIds)
         .order('created_at', { ascending: false })
-    })(),
-  ])
 
-  const role = profile?.role ?? 'viewer'
+      initialReports = (reportsData ?? []).map((row) => ({
+        ...row,
+        brands: undefined,
+        brand_name: (row.brands as unknown as { name: string } | null)?.name ?? '',
+      }))
+    }
+  } else {
+    // viewer: RLS가 자동으로 자기 brand_id 기준으로 필터링
+    const [{ data: brands }, { data: reportsData }] = await Promise.all([
+      supabase.from('brands').select('*').order('name'),
+      supabase
+        .from('reports')
+        .select(
+          'id, brand_id, title, platform, country, internal_account_id, year, month, status, created_by, created_at, updated_at, brands(name)',
+        )
+        .order('created_at', { ascending: false }),
+    ])
 
-  const initialReports: ReportListItem[] = (reportsData ?? []).map((row) => ({
-    ...row,
-    brands: undefined,
-    brand_name: (row.brands as unknown as { name: string } | null)?.name ?? '',
-  }))
+    brandsData = (brands ?? []) as Brand[]
+    initialReports = (reportsData ?? []).map((row) => ({
+      ...row,
+      brands: undefined,
+      brand_name: (row.brands as unknown as { name: string } | null)?.name ?? '',
+    }))
+  }
 
   return (
     <ReportShell
       initialReports={initialReports}
       role={role as 'admin' | 'viewer'}
-      brands={(brandsData ?? []) as Brand[]}
+      brands={brandsData}
     />
   )
 }

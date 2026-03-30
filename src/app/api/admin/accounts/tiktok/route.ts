@@ -1,24 +1,19 @@
 import { fetchGmvMaxStoreId } from '@/lib/tiktok/gmvMax'
 import { createClient } from '@/lib/supabase/server'
+import { getTokenForCurrentUser } from '@/lib/tokens'
 import { NextRequest, NextResponse } from 'next/server'
 
-// TikTok 액세스 토큰 조회
-async function getTiktokAccessToken(): Promise<string | null> {
-  const supabase = await createClient()
-  const { data } = await supabase
-    .from('global_settings')
-    .select('access_token')
-    .eq('platform', 'tiktok')
-    .single()
-  return data?.access_token ?? null
-}
-
-// tiktok_accounts + brands JOIN 조회
+// tiktok_accounts + brands JOIN 조회 (자기 소유 + 레거시 계정만)
 export async function GET() {
   const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
   const { data, error } = await supabase
     .from('tiktok_accounts')
     .select('*, brands(name)')
+    .or(`owner_user_id.eq.${user?.id},owner_user_id.is.null`)
     .order('created_at', { ascending: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -45,9 +40,13 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const { brand_id, account_id, sub_brand, note, country, is_active } = body
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
   // GMV Max store_id 자동 감지 (실패 시 null로 저장)
   let store_id: string | null = null
-  const accessToken = await getTiktokAccessToken()
+  const accessToken = await getTokenForCurrentUser('tiktok')
   if (accessToken && account_id) {
     store_id = await fetchGmvMaxStoreId(account_id, accessToken)
     if (store_id) {
@@ -66,6 +65,7 @@ export async function POST(req: NextRequest) {
         country,
         is_active: is_active ?? true,
         store_id,
+        owner_user_id: user?.id ?? null,
       },
       { onConflict: 'advertiser_id' },
     )

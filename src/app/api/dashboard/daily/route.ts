@@ -1,6 +1,7 @@
 import { fetchGmvMaxDailyReport } from '@/lib/tiktok/gmvMax'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { getTokenForCurrentUser } from '@/lib/tokens'
 import type { ShopeeInappStat, ShopeeInappDayRow } from '@/types/database'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -161,11 +162,7 @@ export async function GET(req: NextRequest) {
           }))
         } else {
           // 2. 캐시 미스: TikTok API 호출
-          const { data: settings } = await supabase
-            .from('global_settings')
-            .select('access_token')
-            .eq('platform', 'tiktok')
-            .single()
+          const tiktokToken = await getTokenForCurrentUser('tiktok')
 
           const { data: acctInfo } = await supabase
             .from('tiktok_accounts')
@@ -173,10 +170,10 @@ export async function GET(req: NextRequest) {
             .eq('id', accountId)
             .single()
 
-          if (settings?.access_token && acctInfo?.advertiser_id) {
+          if (tiktokToken && acctInfo?.advertiser_id) {
             const apiRows = await fetchGmvMaxDailyReport({
               advertiser_id: acctInfo.advertiser_id,
-              access_token: settings.access_token,
+              access_token: tiktokToken,
               store_ids: [storeId],
               start_date: startDate,
               end_date: endDate,
