@@ -112,6 +112,42 @@ export async function updateBrand(formData: FormData) {
 export async function deleteBrand(id: string) {
   const supabase = await createClient()
 
+  // 연결된 사용자 확인
+  const { count: userCount } = await supabase
+    .from('users')
+    .select('*', { count: 'exact', head: true })
+    .eq('brand_id', id)
+
+  if (userCount && userCount > 0) {
+    return {
+      error: `해당 브랜드에 연결된 사용자가 ${userCount}명 있어 삭제할 수 없습니다. 먼저 사용자의 브랜드 배정을 변경해주세요.`,
+    }
+  }
+
+  // 연결된 광고 계정 확인 (병렬 조회)
+  const [{ count: metaCount }, { count: tiktokCount }, { count: shopeeCount }] =
+    await Promise.all([
+      supabase
+        .from('meta_accounts')
+        .select('*', { count: 'exact', head: true })
+        .eq('brand_id', id),
+      supabase
+        .from('tiktok_accounts')
+        .select('*', { count: 'exact', head: true })
+        .eq('brand_id', id),
+      supabase
+        .from('shopee_accounts')
+        .select('*', { count: 'exact', head: true })
+        .eq('brand_id', id),
+    ])
+
+  const totalAccounts = (metaCount || 0) + (tiktokCount || 0) + (shopeeCount || 0)
+  if (totalAccounts > 0) {
+    return {
+      error: `해당 브랜드에 연결된 광고 계정이 ${totalAccounts}개 있어 삭제할 수 없습니다. 먼저 광고 계정을 삭제해주세요.`,
+    }
+  }
+
   const { error } = await supabase.from('brands').delete().eq('id', id)
 
   if (error) return { error: error.message }
