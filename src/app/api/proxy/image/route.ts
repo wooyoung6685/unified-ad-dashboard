@@ -30,14 +30,23 @@ export async function GET(req: NextRequest) {
   )
   if (!isAllowed) return new NextResponse('허용되지 않은 도메인', { status: 403 })
 
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 8_000)
+
   try {
     const res = await fetch(url, {
       headers: {
-        // 서버에서 직접 요청 (Referer 없이)
-        'User-Agent': 'Mozilla/5.0',
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
       },
+      signal: controller.signal,
     })
-    if (!res.ok) return new NextResponse('이미지 로드 실패', { status: res.status })
+    if (!res.ok) {
+      console.error(`[proxy/image] CDN 응답 실패 status=${res.status} url=${url}`)
+      return new NextResponse('이미지 로드 실패', { status: res.status })
+    }
 
     const buffer = await res.arrayBuffer()
     const contentType = res.headers.get('content-type') ?? 'image/jpeg'
@@ -48,7 +57,11 @@ export async function GET(req: NextRequest) {
         'Cache-Control': 'public, max-age=86400', // 24시간 캐시
       },
     })
-  } catch {
-    return new NextResponse('서버 오류', { status: 500 })
+  } catch (err) {
+    const isAbort = err instanceof Error && err.name === 'AbortError'
+    console.error(`[proxy/image] ${isAbort ? '타임아웃' : '서버 오류'} url=${url}`, err)
+    return new NextResponse(isAbort ? '이미지 로드 타임아웃' : '서버 오류', { status: 500 })
+  } finally {
+    clearTimeout(timer)
   }
 }

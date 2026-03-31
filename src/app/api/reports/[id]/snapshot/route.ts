@@ -23,7 +23,35 @@ import { fetchTiktokCampaigns, fetchTiktokAds } from '@/lib/reports/tiktokApi'
 import { fetchGmvMaxCampaignReport, fetchGmvMaxItems } from '@/lib/tiktok/gmvMax'
 import type { ReportSnapshot, ShopeeAdsBreakdownData } from '@/types/database'
 
-export const maxDuration = 300
+// Hobby 플랜 최대 60초 (Pro 플랜으로 업그레이드 시 300으로 늘릴 수 있음)
+export const maxDuration = 60
+
+const CDN_FETCH_HEADERS = {
+  'User-Agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.9',
+  'Cache-Control': 'no-cache',
+}
+
+// CDN fetch with AbortController 타임아웃
+async function fetchCdnImage(url: string): Promise<Response | null> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 15_000)
+  try {
+    const res = await fetch(url, { headers: CDN_FETCH_HEADERS, signal: controller.signal })
+    if (!res.ok) {
+      console.error(`[thumb] CDN fetch 실패 status=${res.status} url=${url}`)
+      return null
+    }
+    return res
+  } catch (err) {
+    console.error(`[thumb] CDN fetch 예외 url=${url}`, err)
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
 
 // Facebook CDN 이미지를 Supabase Storage에 업로드하고 퍼블릭 URL 반환
 // (Storage URL은 만료 없음 — fbcdn.net URL은 24시간 내 만료됨)
@@ -32,12 +60,6 @@ async function uploadThumb(
   url: string,
   accessToken?: string,
 ): Promise<string | null> {
-  const tryFetch = async (targetUrl: string) => {
-    const res = await fetch(targetUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } })
-    if (!res.ok) return null
-    return res
-  }
-
   // facebook.com/ads/image/ URL은 access_token 파라미터 필요
   let targetUrl = url
   if (url.includes('facebook.com/ads/image/') && accessToken) {
@@ -47,7 +69,7 @@ async function uploadThumb(
   }
 
   try {
-    const res = await tryFetch(targetUrl)
+    const res = await fetchCdnImage(targetUrl)
     if (!res) return null
 
     const buffer = await res.arrayBuffer()
@@ -58,11 +80,15 @@ async function uploadThumb(
     const { error } = await supabaseAdmin.storage
       .from('report-thumbnails')
       .upload(path, buffer, { contentType, upsert: true })
-    if (error) return null
+    if (error) {
+      console.error(`[thumb] Supabase upload 실패 path=${path}`, error.message)
+      return null
+    }
 
     const { data } = supabaseAdmin.storage.from('report-thumbnails').getPublicUrl(path)
     return data.publicUrl
-  } catch {
+  } catch (err) {
+    console.error(`[thumb] uploadThumb 예외 adId=${adId}`, err)
     return null
   }
 }
@@ -70,8 +96,8 @@ async function uploadThumb(
 // TikTok CDN 이미지를 Supabase Storage에 영구 저장 (CDN URL 만료 방지)
 async function uploadTiktokThumb(adId: string, url: string): Promise<string | null> {
   try {
-    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } })
-    if (!res.ok) return null
+    const res = await fetchCdnImage(url)
+    if (!res) return null
 
     const buffer = await res.arrayBuffer()
     const contentType = res.headers.get('content-type') ?? 'image/jpeg'
@@ -81,11 +107,15 @@ async function uploadTiktokThumb(adId: string, url: string): Promise<string | nu
     const { error } = await supabaseAdmin.storage
       .from('report-thumbnails')
       .upload(path, buffer, { contentType, upsert: true })
-    if (error) return null
+    if (error) {
+      console.error(`[thumb] Supabase upload 실패 path=${path}`, error.message)
+      return null
+    }
 
     const { data } = supabaseAdmin.storage.from('report-thumbnails').getPublicUrl(path)
     return data.publicUrl
-  } catch {
+  } catch (err) {
+    console.error(`[thumb] uploadTiktokThumb 예외 adId=${adId}`, err)
     return null
   }
 }
