@@ -212,14 +212,14 @@ export async function fetchMetaCreatives(
   // Step 2: Facebook Batch API로 크리에이티브 정보 일괄 조회 (50개 단위 청크)
   const creativeInfoMap = new Map<
     string,
-    { imageUrl: string | null; videoId: string | null; isFbAdsImage: boolean }
+    { imageUrl: string | null; imageHash: string | null; videoId: string | null; isFbAdsImage: boolean }
   >()
 
   for (let i = 0; i < adRows.length; i += BATCH_SIZE) {
     const chunk = adRows.slice(i, i + BATCH_SIZE)
     const batch = chunk.map((row) => ({
       method: 'GET',
-      relative_url: `${row.ad_id}?fields=creative{thumbnail_url,image_url,video_id,object_story_spec{video_data{image_url},link_data{full_picture,picture,child_attachments{picture}},photo_data{picture}},asset_feed_spec{images{url}}}`,
+      relative_url: `${row.ad_id}?fields=creative{thumbnail_url,image_url,image_hash,video_id,object_story_spec{video_data{image_url},link_data{full_picture,picture,child_attachments{picture}},photo_data{picture}},asset_feed_spec{images{url,hash}}}`,
     }))
 
     try {
@@ -234,7 +234,7 @@ export async function fetchMetaCreatives(
 
       if (!batchRes.ok) {
         chunk.forEach((row) =>
-          creativeInfoMap.set(row.ad_id, { imageUrl: null, videoId: null, isFbAdsImage: false }),
+          creativeInfoMap.set(row.ad_id, { imageUrl: null, imageHash: null, videoId: null, isFbAdsImage: false }),
         )
         continue
       }
@@ -246,7 +246,7 @@ export async function fetchMetaCreatives(
         const result = batchJson[j]
 
         if (!result || result.code !== 200) {
-          creativeInfoMap.set(adId, { imageUrl: null, videoId: null, isFbAdsImage: false })
+          creativeInfoMap.set(adId, { imageUrl: null, imageHash: null, videoId: null, isFbAdsImage: false })
           continue
         }
 
@@ -256,6 +256,7 @@ export async function fetchMetaCreatives(
 
           // 이미지 URL 우선순위 결정
           let imageUrl: string | null = null
+          let imageHash: string | null = null
           let isFbAdsImage = false
 
           if (creative?.image_url) {
@@ -275,20 +276,65 @@ export async function fetchMetaCreatives(
             imageUrl = creative.thumbnail_url // 최후 fallback (64x64)
           }
 
+          // imageUrl이 없으면 image_hash로 나중에 URL 조회 시도
+          if (!imageUrl) {
+            imageHash =
+              creative?.image_hash ??
+              creative?.asset_feed_spec?.images?.[0]?.hash ??
+              null
+          }
+
           creativeInfoMap.set(adId, {
             imageUrl,
+            imageHash,
             videoId: creative?.video_id ?? null,
             isFbAdsImage,
           })
         } catch {
-          creativeInfoMap.set(adId, { imageUrl: null, videoId: null, isFbAdsImage: false })
+          creativeInfoMap.set(adId, { imageUrl: null, imageHash: null, videoId: null, isFbAdsImage: false })
         }
       }
     } catch {
       // 배치 실패 시 해당 청크 null 처리
       chunk.forEach((row) =>
-        creativeInfoMap.set(row.ad_id, { imageUrl: null, videoId: null, isFbAdsImage: false }),
+        creativeInfoMap.set(row.ad_id, { imageUrl: null, imageHash: null, videoId: null, isFbAdsImage: false }),
       )
+    }
+  }
+
+  // Step 2.5: imageUrl이 없고 imageHash가 있는 소재 → 해시로 이미지 URL 일괄 조회
+  const hashToAdIds = new Map<string, string[]>()
+  for (const [adId, info] of creativeInfoMap.entries()) {
+    if (!info.imageUrl && info.imageHash) {
+      const ids = hashToAdIds.get(info.imageHash) ?? []
+      ids.push(adId)
+      hashToAdIds.set(info.imageHash, ids)
+    }
+  }
+
+  if (hashToAdIds.size > 0) {
+    try {
+      const hashes = Array.from(hashToAdIds.keys())
+      const hashParams = new URLSearchParams({
+        hashes: JSON.stringify(hashes),
+        fields: 'hash,url',
+        access_token: accessToken,
+      })
+      const hashRes = await fetch(`${META_GRAPH_BASE}/act_${accountId}/adimages?${hashParams}`)
+      if (hashRes.ok) {
+        const hashJson = await hashRes.json()
+        for (const item of hashJson.data ?? []) {
+          const adIds = hashToAdIds.get(item.hash) ?? []
+          for (const adId of adIds) {
+            const existing = creativeInfoMap.get(adId)
+            if (existing && item.url) {
+              creativeInfoMap.set(adId, { ...existing, imageUrl: item.url })
+            }
+          }
+        }
+      }
+    } catch {
+      // 해시 조회 실패 시 무시 (thumbnail_url은 null 유지)
     }
   }
 
