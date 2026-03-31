@@ -67,7 +67,7 @@ export function SummaryShell({
     'impressions',
   ])
 
-  const [activeTab, setActiveTab] = useState<'campaign' | 'gmv_max'>('campaign')
+  const [activeTab, setActiveTab] = useState<'campaign' | 'gmv_max'>('gmv_max')
 
   const { data, isFetching, refetch } = useQuery({
     queryKey: ['summary', filters],
@@ -82,21 +82,23 @@ export function SummaryShell({
   // 계정 타입 변경 시 선택 지표 초기화
   function handleFiltersChange(newFilters: SummaryFilters) {
     if (newFilters.accountType !== filters.accountType || newFilters.accountId !== filters.accountId) {
-      // shopee 계열은 지출금액 + 매출을 기본값으로
+      // shopee 계열은 지출금액 + 매출, tiktok은 GMV Max 탭 기본(ROI + 비용)
       const defaultMetrics =
         newFilters.accountType === 'shopee_shopping' ||
         newFilters.accountType === 'shopee_inapp'
           ? ['spend', 'revenue']
-          : ['ctr', 'impressions']
+          : newFilters.accountType === 'tiktok'
+            ? ['roi', 'cost']
+            : ['ctr', 'impressions']
       setSelectedMetrics(defaultMetrics)
-      setActiveTab('campaign')
+      setActiveTab('gmv_max')
     }
     setFilters(newFilters)
   }
 
   function handleTabChange(tab: 'campaign' | 'gmv_max') {
     setActiveTab(tab)
-    setSelectedMetrics(tab === 'gmv_max' ? ['roi', 'cost'] : ['ctr', 'impressions'])
+    setSelectedMetrics(tab === 'gmv_max' ? ['roi', 'cost'] : ['spend', 'impressions'])
   }
 
   // FIFO 선택 로직: 최대 2개, 초과 시 가장 오래된 것 제거
@@ -199,8 +201,8 @@ export function SummaryShell({
           return (
             <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as 'campaign' | 'gmv_max')}>
               <TabsList variant="line">
-                <TabsTrigger value="campaign">캠페인</TabsTrigger>
                 <TabsTrigger value="gmv_max">GMV Max</TabsTrigger>
+                <TabsTrigger value="campaign">캠페인</TabsTrigger>
               </TabsList>
               <TabsContent value="campaign" className="space-y-6 pt-4">
                 {campaignContent}
