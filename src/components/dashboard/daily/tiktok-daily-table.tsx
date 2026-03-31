@@ -47,7 +47,6 @@ function calcTotal(rows: TiktokDailyStatFull[]): TiktokDailyStatFull {
     roas: totalSpend > 0 ? totalRevenue / totalSpend : null,
     ctr: totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : null,
     cpc: totalClicks > 0 ? totalSpend / totalClicks : null,
-    cpp: totalPurchases > 0 ? totalSpend / totalPurchases : null,
     reach: totalReach,
     frequency: totalReach > 0 ? totalImpressions / totalReach : null,
     cpm: totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : null,
@@ -59,6 +58,8 @@ function calcTotal(rows: TiktokDailyStatFull[]): TiktokDailyStatFull {
     avg_play_time: avgPlayTime,
     followers: sum('followers'),
     likes: sum('likes'),
+    add_to_cart: sum('add_to_cart'),
+    add_to_cart_value: sum('add_to_cart_value'),
   }
 }
 

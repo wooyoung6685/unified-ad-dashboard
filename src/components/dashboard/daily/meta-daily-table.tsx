@@ -42,7 +42,6 @@ function calcTotal(rows: MetaDailyStatFull[]): MetaDailyStatFull {
     roas: totalSpend > 0 ? totalRevenue / totalSpend : null,
     ctr: totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : null,
     cpc: totalClicks > 0 ? totalSpend / totalClicks : null,
-    cpp: totalPurchases > 0 ? totalSpend / totalPurchases : null,
     cpa: totalPurchases > 0 ? totalSpend / totalPurchases : null,
     conversion_rate:
       totalClicks > 0 ? (totalPurchases / totalClicks) * 100 : null,

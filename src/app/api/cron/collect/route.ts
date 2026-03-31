@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { fetchMetaStats } from '@/lib/ads/meta'
 import { fetchTikTokStats } from '@/lib/ads/tiktok'
+import { fetchGmvMaxDailyReport } from '@/lib/tiktok/gmvMax'
 import { getTokenForUser } from '@/lib/tokens'
 import { format, subDays } from 'date-fns'
 import { NextRequest, NextResponse } from 'next/server'
@@ -75,7 +76,7 @@ export async function GET(req: NextRequest) {
   // 5. TikTok 수집 루프 (owner_user_id별 토큰 사용)
   const { data: tiktokAccounts } = await supabaseAdmin
     .from('tiktok_accounts')
-    .select('id, brand_id, advertiser_id, owner_user_id')
+    .select('id, brand_id, advertiser_id, owner_user_id, store_id')
     .eq('is_active', true)
 
   for (const account of tiktokAccounts ?? []) {
@@ -112,6 +113,56 @@ export async function GET(req: NextRequest) {
         }
       } catch (err) {
         console.error('[cron/collect] tiktok 수집 오류', { account: account.id, date, err })
+        failed++
+      }
+    }
+
+    // store_id가 있는 계정은 GMV Max 데이터도 수집
+    if (account.store_id) {
+      try {
+        const apiRows = await fetchGmvMaxDailyReport({
+          advertiser_id: account.advertiser_id,
+          access_token: tiktokToken,
+          store_ids: [account.store_id],
+          start_date: dates[dates.length - 1], // 7일 전
+          end_date: dates[0],                  // 어제
+        })
+
+        // 날짜별로 캠페인 행을 합산 (캠페인×날짜 → 날짜별 1행)
+        const byDate: Record<string, { cost: number; gross_revenue: number; orders: number }> = {}
+        for (const r of apiRows) {
+          if (!r.date) continue
+          if (!byDate[r.date]) byDate[r.date] = { cost: 0, gross_revenue: 0, orders: 0 }
+          byDate[r.date].cost += r.cost ?? 0
+          byDate[r.date].gross_revenue += r.gross_revenue ?? 0
+          byDate[r.date].orders += r.orders ?? 0
+        }
+
+        const upsertRows = Object.entries(byDate).map(([date, agg]) => ({
+          tiktok_account_id: account.id,
+          brand_id: account.brand_id,
+          date,
+          cost: agg.cost,
+          gross_revenue: agg.gross_revenue,
+          roi: agg.cost > 0 ? agg.gross_revenue / agg.cost : null,
+          orders: agg.orders,
+          cost_per_order: agg.orders > 0 ? agg.cost / agg.orders : null,
+        }))
+
+        if (upsertRows.length > 0) {
+          const { error } = await supabaseAdmin
+            .from('gmv_max_daily_stats')
+            .upsert(upsertRows, { onConflict: 'tiktok_account_id,date' })
+
+          if (error) {
+            console.error('[cron/collect] gmv_max upsert 오류', error)
+            failed++
+          } else {
+            success += upsertRows.length
+          }
+        }
+      } catch (err) {
+        console.error('[cron/collect] GMV Max 수집 오류', { account: account.id, err })
         failed++
       }
     }
