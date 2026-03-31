@@ -38,7 +38,7 @@ export function TiktokGmvMaxDailyTable({ rows }: Props) {
 
   // 날짜별 합산 행
   const dateRows = Object.entries(byDate)
-    .sort(([a], [b]) => b.localeCompare(a))
+    .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, dayRows]) => {
       const cost = dayRows.reduce((s, r) => s + (r.cost ?? 0), 0)
       const gross_revenue = dayRows.reduce((s, r) => s + (r.gross_revenue ?? 0), 0)

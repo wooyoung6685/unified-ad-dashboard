@@ -60,7 +60,7 @@ function aggregateInappByDate(rows: ShopeeInappStat[]): ShopeeInappDayRow[] {
         direct_acos: directGmv > 0 ? (expense / directGmv) * 100 : null,
       } satisfies ShopeeInappDayRow
     })
-    .sort((a, b) => b.date.localeCompare(a.date))
+    .sort((a, b) => a.date.localeCompare(b.date))
 }
 
 export async function GET(req: NextRequest) {
@@ -95,7 +95,7 @@ export async function GET(req: NextRequest) {
       .eq('meta_account_id', accountId)
       .gte('date', startDate)
       .lte('date', endDate)
-      .order('date', { ascending: false })
+      .order('date', { ascending: true })
 
     if (brandId && brandId !== 'all') {
       query = query.eq('brand_id', brandId)
@@ -112,7 +112,7 @@ export async function GET(req: NextRequest) {
       .eq('tiktok_account_id', accountId)
       .gte('date', startDate)
       .lte('date', endDate)
-      .order('date', { ascending: false })
+      .order('date', { ascending: true })
 
     if (brandId && brandId !== 'all') {
       query = query.eq('brand_id', brandId)
@@ -141,7 +141,7 @@ export async function GET(req: NextRequest) {
           .eq('tiktok_account_id', accountId)
           .gte('date', startDate)
           .lte('date', endDate)
-          .order('date', { ascending: false })
+          .order('date', { ascending: true })
 
         // 캐시된 데이터 중 최대 날짜가 요청 endDate 이상이어야 완전 캐시 히트
         const maxCachedDate =
@@ -223,7 +223,7 @@ export async function GET(req: NextRequest) {
       .eq('shopee_account_id', accountId)
       .gte('date', startDate)
       .lte('date', endDate)
-      .order('date', { ascending: false })
+      .order('date', { ascending: true })
 
     if (brandId && brandId !== 'all') {
       query = query.eq('brand_id', brandId)
