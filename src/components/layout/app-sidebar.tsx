@@ -28,6 +28,7 @@ import {
   TableProperties,
   Users,
 } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { Collapsible } from 'radix-ui'
@@ -73,6 +74,7 @@ function AdminSubMenuItems({ isAdminPage }: { isAdminPage: boolean }) {
 export function AppSidebar({ role, userEmail }: AppSidebarProps) {
   const pathname = usePathname()
   const isAdminPage = pathname.startsWith('/dashboard/admin')
+  const queryClient = useQueryClient()
 
   return (
     <Sidebar>
@@ -147,7 +149,7 @@ export function AppSidebar({ role, userEmail }: AppSidebarProps) {
         <p className="text-muted-foreground mb-2 truncate text-xs">
           {userEmail}
         </p>
-        <form action={logout}>
+        <form action={logout} onSubmit={() => queryClient.clear()}>
           <button
             type="submit"
             className="text-muted-foreground hover:text-foreground flex items-center gap-2 text-sm transition-colors"
