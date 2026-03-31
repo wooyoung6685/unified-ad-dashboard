@@ -11,6 +11,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         defaultOptions: {
           queries: {
             staleTime: 5 * 60 * 1000, // 5분
+            gcTime: 10 * 60 * 1000, // 10분 (기본 5분에서 확장)
             refetchOnWindowFocus: false,
           },
         },

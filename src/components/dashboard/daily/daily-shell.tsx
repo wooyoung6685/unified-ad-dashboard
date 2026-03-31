@@ -11,17 +11,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import type {
-  Brand,
   DailyFilters,
   GmvMaxDailyRow,
-  MetaAccount,
   MetaDailyStatFull,
-  ShopeeAccount,
   ShopeeInappDayRow,
   ShopeeShoppingStat,
-  TiktokAccount,
   TiktokDailyStatFull,
 } from '@/types/database'
+import { useDashboardData } from '@/components/layout/dashboard-data-provider'
 import { DailyFilterBar } from './daily-filter-bar'
 import { DailyFetchButton } from './daily-fetch-button'
 import { MetaDailyTable } from './meta-daily-table'
@@ -30,15 +27,6 @@ import { ShopeeShoppingTable } from './shopee-shopping-table'
 import { ShopeeUploadArea } from './shopee-upload-area'
 import { TiktokDailyTable } from './tiktok-daily-table'
 import { TiktokGmvMaxDailyTable } from './tiktok-gmvmax-daily-table'
-
-interface DailyShellProps {
-  role: 'admin' | 'viewer'
-  initialBrandId: string
-  brands: Brand[]
-  metaAccounts: (MetaAccount & { brands: { name: string } | null })[]
-  tiktokAccounts: (TiktokAccount & { brands: { name: string } | null })[]
-  shopeeAccounts: (ShopeeAccount & { brands: { name: string } | null })[]
-}
 
 type DailyApiResponse =
   | { platform: 'meta'; rows: MetaDailyStatFull[] }
@@ -59,14 +47,9 @@ async function fetchDailyStats(filters: DailyFilters): Promise<DailyApiResponse>
   return res.json()
 }
 
-export function DailyShell({
-  role,
-  initialBrandId,
-  brands,
-  metaAccounts,
-  tiktokAccounts,
-  shopeeAccounts,
-}: DailyShellProps) {
+export function DailyShell() {
+  const { role, initialBrandId, brands, metaAccounts, tiktokAccounts, shopeeAccounts } =
+    useDashboardData()
   const today = new Date().toISOString().slice(0, 10)
 
   const [filters, setFilters] = useState<DailyFilters>({

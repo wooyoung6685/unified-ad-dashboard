@@ -4,13 +4,10 @@ import { useQuery } from '@tanstack/react-query'
 import { BarChart2 } from 'lucide-react'
 import { useState } from 'react'
 import type {
-  Brand,
-  MetaAccount,
-  ShopeeAccount,
   SummaryFilters,
   SummaryResponse,
-  TiktokAccount,
 } from '@/types/database'
+import { useDashboardData } from '@/components/layout/dashboard-data-provider'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { MetaAnalyticsCharts } from './analysis-charts'
 import { GmvMaxAnalyticsCharts } from './gmvmax-analytics-charts'
@@ -20,15 +17,6 @@ import { TiktokAnalyticsCharts } from './tiktok-analytics-charts'
 import { KpiSection } from './kpi-section'
 import { SummaryChart } from './summary-chart'
 import { SummaryFilterBar } from './summary-filter-bar'
-
-interface SummaryShellProps {
-  role: 'admin' | 'viewer'
-  initialBrandId: string
-  brands: Brand[]
-  metaAccounts: (MetaAccount & { brands: { name: string } | null })[]
-  tiktokAccounts: (TiktokAccount & { brands: { name: string } | null })[]
-  shopeeAccounts: (ShopeeAccount & { brands: { name: string } | null })[]
-}
 
 async function fetchSummaryStats(filters: SummaryFilters): Promise<SummaryResponse> {
   const params = new URLSearchParams({
@@ -43,14 +31,9 @@ async function fetchSummaryStats(filters: SummaryFilters): Promise<SummaryRespon
   return res.json()
 }
 
-export function SummaryShell({
-  role,
-  initialBrandId,
-  brands,
-  metaAccounts,
-  tiktokAccounts,
-  shopeeAccounts,
-}: SummaryShellProps) {
+export function SummaryShell() {
+  const { role, initialBrandId, brands, metaAccounts, tiktokAccounts, shopeeAccounts } =
+    useDashboardData()
   const today = new Date().toISOString().slice(0, 10)
 
   const [filters, setFilters] = useState<SummaryFilters>({
