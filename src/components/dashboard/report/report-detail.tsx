@@ -7,6 +7,7 @@ import type { Report } from '@/types/database'
 import { ArrowLeft, Check, Download, Pencil, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { InsightMemoCard } from './insight-memo-card'
 import { MetaReportDetail } from './meta-report-detail'
 import { ShopeeReportDetail } from './shopee-report-detail'
 import { TiktokReportDetail } from './tiktok-report-detail'
@@ -151,11 +152,27 @@ export function ReportDetail({ report, role, creatorEmail }: Props) {
         ) : snapshot.platform === 'meta' ? (
           <MetaReportDetail data={snapshot.data} title={title} />
         ) : snapshot.platform === 'tiktok' ? (
-          <TiktokReportDetail data={snapshot.data} title={title} />
+          <TiktokReportDetail
+            data={snapshot.data}
+            title={title}
+            reportId={report.id}
+            role={role}
+            insightMemo={report.insight_memo}
+            insightMemoGmvMax={report.insight_memo_gmv_max}
+          />
         ) : snapshot.platform === 'shopee_inapp' ? (
           <ShopeeReportDetail data={snapshot.data} title={title} />
         ) : null}
       </div>
+
+      {/* 인사이트 & 메모 - TikTok은 각 탭 내부에 포함, 나머지 플랫폼만 여기서 렌더링 */}
+      {snapshot?.platform !== 'tiktok' && (
+        <InsightMemoCard
+          reportId={report.id}
+          initialContent={report.insight_memo}
+          role={role}
+        />
+      )}
     </div>
   )
 }

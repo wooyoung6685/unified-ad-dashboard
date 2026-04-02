@@ -1,5 +1,6 @@
 'use client'
 
+import { InsightMemoCard } from './insight-memo-card'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
@@ -37,6 +38,10 @@ import {
 interface Props {
   data: TiktokReportData
   title: string
+  reportId: string
+  role: 'admin' | 'viewer'
+  insightMemo: string | null
+  insightMemoGmvMax: string | null
 }
 
 // ── 헬퍼 ─────────────────────────────────────────
@@ -862,7 +867,7 @@ function GmvMaxCreativeSection({ items }: { items: GmvMaxItemRow[] }) {
 // 메인 컴포넌트
 // ══════════════════════════════════════════════════
 
-export function TiktokReportDetail({ data, title }: Props) {
+export function TiktokReportDetail({ data, title, reportId, role, insightMemo, insightMemoGmvMax }: Props) {
   const {
     monthly,
     weekly,
@@ -878,7 +883,7 @@ export function TiktokReportDetail({ data, title }: Props) {
   const normalCampaigns = campaigns.filter((c) => !c.isGmvMax)
   const showGmvMaxTab = hasGmvMax && gmvMaxMonthly != null
 
-  // GMV Max 데이터가 없으면 기존 레이아웃 유지
+  // GMV Max 데이터가 없으면 탭 없이 렌더링
   if (!showGmvMaxTab) {
     return (
       <div className="flex flex-col gap-6">
@@ -892,6 +897,12 @@ export function TiktokReportDetail({ data, title }: Props) {
         <WeeklyTable weekly={weekly} />
         <CampaignSection campaigns={normalCampaigns} title="🎯 캠페인 성과 분석 (TikTok)" />
         <CreativeSection ads={ads} />
+        <InsightMemoCard
+          reportId={reportId}
+          initialContent={insightMemo}
+          role={role}
+          fieldKey="insight_memo"
+        />
       </div>
     )
   }
@@ -917,6 +928,13 @@ export function TiktokReportDetail({ data, title }: Props) {
           <WeeklyTable weekly={weekly} />
           <CampaignSection campaigns={normalCampaigns} title="🎯 캠페인 성과 분석 (TikTok)" />
           <CreativeSection ads={ads} />
+          <InsightMemoCard
+            reportId={reportId}
+            initialContent={insightMemo}
+            role={role}
+            label="일반 캠페인 인사이트 & 메모"
+            fieldKey="insight_memo"
+          />
         </TabsContent>
 
         {/* GMV Max 탭 */}
@@ -926,6 +944,13 @@ export function TiktokReportDetail({ data, title }: Props) {
           <GmvMaxWeeklyTable weekly={gmvMaxWeekly ?? []} />
           <GmvMaxCampaignSection campaigns={gmvMaxCampaigns ?? []} />
           <GmvMaxCreativeSection items={gmvMaxItems ?? []} />
+          <InsightMemoCard
+            reportId={reportId}
+            initialContent={insightMemoGmvMax}
+            role={role}
+            label="GMV Max 인사이트 & 메모"
+            fieldKey="insight_memo_gmv_max"
+          />
         </TabsContent>
       </Tabs>
     </div>

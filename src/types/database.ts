@@ -348,6 +348,8 @@ export type Report = {
   month: number
   status: 'published'
   snapshot: ReportSnapshot | null
+  insight_memo: string | null
+  insight_memo_gmv_max: string | null
   created_by: string | null
   created_at: string
   updated_at: string

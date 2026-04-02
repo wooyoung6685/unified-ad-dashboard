@@ -124,3 +124,20 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* 인사이트 메모 Quill 에디터 스타일 */
+.insight-memo-quill .ql-container {
+  min-height: 120px;
+  font-size: 14px;
+}
+.insight-memo-quill .ql-editor {
+  min-height: 120px;
+}
+.insight-memo-quill .ql-toolbar.ql-snow {
+  border-radius: 6px 6px 0 0;
+  border-color: var(--border);
+}
+.insight-memo-quill .ql-container.ql-snow {
+  border-radius: 0 0 6px 6px;
+  border-color: var(--border);
+}

@@ -38,14 +38,38 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   if (authError) return authError
 
   const body = await req.json()
-  const { title } = body
-  if (!title || typeof title !== 'string') {
-    return NextResponse.json({ error: 'title이 필요합니다.' }, { status: 400 })
+  const { title, insight_memo, insight_memo_gmv_max } = body
+
+  const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }
+
+  if (title !== undefined) {
+    if (!title || typeof title !== 'string') {
+      return NextResponse.json({ error: 'title이 비어있습니다.' }, { status: 400 })
+    }
+    updateData.title = title.trim()
+  }
+
+  if (insight_memo !== undefined) {
+    if (insight_memo !== null && typeof insight_memo !== 'string') {
+      return NextResponse.json({ error: 'insight_memo 형식이 잘못되었습니다.' }, { status: 400 })
+    }
+    updateData.insight_memo = insight_memo
+  }
+
+  if (insight_memo_gmv_max !== undefined) {
+    if (insight_memo_gmv_max !== null && typeof insight_memo_gmv_max !== 'string') {
+      return NextResponse.json({ error: 'insight_memo_gmv_max 형식이 잘못되었습니다.' }, { status: 400 })
+    }
+    updateData.insight_memo_gmv_max = insight_memo_gmv_max
+  }
+
+  if (Object.keys(updateData).length === 1) {
+    return NextResponse.json({ error: '수정할 필드가 없습니다.' }, { status: 400 })
   }
 
   const { data, error } = await supabase
     .from('reports')
-    .update({ title, updated_at: new Date().toISOString() })
+    .update(updateData)
     .eq('id', id)
     .select()
     .single()
