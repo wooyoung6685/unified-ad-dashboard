@@ -219,7 +219,7 @@ export async function fetchMetaCreatives(
     const chunk = adRows.slice(i, i + BATCH_SIZE)
     const batch = chunk.map((row) => ({
       method: 'GET',
-      relative_url: `${row.ad_id}?fields=creative{thumbnail_url,image_url,image_hash,video_id,object_story_spec{video_data{image_url},link_data{full_picture,picture,child_attachments{picture}},photo_data{picture}},asset_feed_spec{images{url,hash}}}`,
+      relative_url: `${row.ad_id}?fields=creative{thumbnail_url,image_url,image_hash,video_id,object_story_spec{video_data{image_url},link_data{picture,child_attachments{picture}},photo_data{picture}},asset_feed_spec{images{url,hash}}}`,
     }))
 
     try {
@@ -246,6 +246,7 @@ export async function fetchMetaCreatives(
         const result = batchJson[j]
 
         if (!result || result.code !== 200) {
+          console.warn(`[meta:creative] adId=${adId} batch code=${result?.code ?? 'null'} body=${result?.body?.slice(0, 200) ?? ''}`)
           creativeInfoMap.set(adId, { imageUrl: null, imageHash: null, videoId: null, isFbAdsImage: false })
           continue
         }
@@ -253,6 +254,19 @@ export async function fetchMetaCreatives(
         try {
           const parsed = JSON.parse(result.body)
           const creative = parsed.creative
+
+          // [DEBUG] 크리에이티브 원본 구조 출력
+          console.log(`[meta:creative] adId=${adId}`, JSON.stringify({
+            image_url: creative?.image_url,
+            image_hash: creative?.image_hash,
+            thumbnail_url: creative?.thumbnail_url,
+            video_id: creative?.video_id,
+            oss_video_image: creative?.object_story_spec?.video_data?.image_url,
+            oss_link_full: creative?.object_story_spec?.link_data?.full_picture,
+            oss_link_pic: creative?.object_story_spec?.link_data?.picture,
+            oss_photo: creative?.object_story_spec?.photo_data?.picture,
+            asset_feed_img: creative?.asset_feed_spec?.images?.[0],
+          }))
 
           // 이미지 URL 우선순위 결정
           let imageUrl: string | null = null
@@ -262,19 +276,17 @@ export async function fetchMetaCreatives(
           if (creative?.image_url) {
             imageUrl = creative.image_url
           } else if (creative?.object_story_spec?.video_data?.image_url) {
+            // facebook.com/ads/image/ URL — access_token 필요 (서버에서 fetch 가능)
             imageUrl = creative.object_story_spec.video_data.image_url
             isFbAdsImage = imageUrl?.includes('facebook.com/ads/image/') ?? false
-          } else if (creative?.object_story_spec?.link_data?.full_picture) {
-            imageUrl = creative.object_story_spec.link_data.full_picture
           } else if (creative?.object_story_spec?.link_data?.picture) {
             imageUrl = creative.object_story_spec.link_data.picture
           } else if (creative?.object_story_spec?.photo_data?.picture) {
             imageUrl = creative.object_story_spec.photo_data.picture
           } else if (creative?.asset_feed_spec?.images?.[0]?.url) {
             imageUrl = creative.asset_feed_spec.images[0].url
-          } else if (creative?.thumbnail_url) {
-            imageUrl = creative.thumbnail_url // 최후 fallback (64x64)
           }
+          // fbcdn.net thumbnail_url은 세션/IP 묶임 → 서버에서 403 → 사용 안 함
 
           // imageUrl이 없으면 image_hash로 나중에 URL 조회 시도
           if (!imageUrl) {
@@ -282,6 +294,7 @@ export async function fetchMetaCreatives(
               creative?.image_hash ??
               creative?.asset_feed_spec?.images?.[0]?.hash ??
               null
+            console.log(`[meta:creative] adId=${adId} imageUrl=null → imageHash=${imageHash}`)
           }
 
           creativeInfoMap.set(adId, {
@@ -313,6 +326,7 @@ export async function fetchMetaCreatives(
   }
 
   if (hashToAdIds.size > 0) {
+    console.log(`[meta:adimages] image_hash로 URL 조회 시도: ${hashToAdIds.size}개 해시`)
     try {
       const hashes = Array.from(hashToAdIds.keys())
       const hashParams = new URLSearchParams({
@@ -321,8 +335,10 @@ export async function fetchMetaCreatives(
         access_token: accessToken,
       })
       const hashRes = await fetch(`${META_GRAPH_BASE}/act_${accountId}/adimages?${hashParams}`)
+      console.log(`[meta:adimages] 응답 status=${hashRes.status}`)
       if (hashRes.ok) {
         const hashJson = await hashRes.json()
+        console.log(`[meta:adimages] 응답 data=`, JSON.stringify(hashJson.data ?? []))
         for (const item of hashJson.data ?? []) {
           const adIds = hashToAdIds.get(item.hash) ?? []
           for (const adId of adIds) {
@@ -332,9 +348,12 @@ export async function fetchMetaCreatives(
             }
           }
         }
+      } else {
+        const errBody = await hashRes.text()
+        console.error(`[meta:adimages] 실패 body=${errBody}`)
       }
-    } catch {
-      // 해시 조회 실패 시 무시 (thumbnail_url은 null 유지)
+    } catch (err) {
+      console.error('[meta:adimages] 예외:', err)
     }
   }
 

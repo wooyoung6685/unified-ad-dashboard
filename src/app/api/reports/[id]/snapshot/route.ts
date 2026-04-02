@@ -34,10 +34,33 @@ const CDN_FETCH_HEADERS = {
   'Cache-Control': 'no-cache',
 }
 
+// 슬라이딩 윈도우 방식 동시 실행 헬퍼
+// 하나 완료되면 즉시 다음 작업 시작 (청크 배치 대비 슬롯 유휴 시간 없음)
+async function runConcurrent<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length)
+  let nextIndex = 0
+  async function worker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex++
+      results[index] = await fn(items[index])
+    }
+  }
+  const workers = Array.from(
+    { length: Math.min(concurrency, items.length) },
+    () => worker(),
+  )
+  await Promise.all(workers)
+  return results
+}
+
 // CDN fetch with AbortController 타임아웃
 async function fetchCdnImage(url: string): Promise<Response | null> {
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 15_000)
+  const timer = setTimeout(() => controller.abort(), 10_000)
   try {
     const res = await fetch(url, { headers: CDN_FETCH_HEADERS, signal: controller.signal })
     if (!res.ok) {
@@ -53,13 +76,44 @@ async function fetchCdnImage(url: string): Promise<Response | null> {
   }
 }
 
+// Storage에 이미 업로드된 파일 경로 목록 조회 (중복 업로드 스킵용)
+async function getExistingThumbs(prefix: 'meta' | 'tiktok'): Promise<Set<string>> {
+  const existing = new Set<string>()
+  let offset = 0
+  const limit = 1000
+  while (true) {
+    const { data } = await supabaseAdmin.storage
+      .from('report-thumbnails')
+      .list(prefix, { limit, offset })
+    if (!data || data.length === 0) break
+    for (const f of data) existing.add(`${prefix}/${f.name}`)
+    offset += data.length
+    if (data.length < limit) break
+  }
+  return existing
+}
+
 // Facebook CDN 이미지를 Supabase Storage에 업로드하고 퍼블릭 URL 반환
 // (Storage URL은 만료 없음 — fbcdn.net URL은 24시간 내 만료됨)
 async function uploadThumb(
   adId: string,
   url: string,
-  accessToken?: string,
+  accessToken: string | undefined,
+  existingPaths: Set<string>,
 ): Promise<string | null> {
+  // 이미 업로드된 경우 CDN fetch 없이 public URL 반환
+  const jpgPath = `meta/${adId}.jpg`
+  const pngPath = `meta/${adId}.png`
+  const existingPath = existingPaths.has(jpgPath)
+    ? jpgPath
+    : existingPaths.has(pngPath)
+      ? pngPath
+      : null
+  if (existingPath) {
+    const { data } = supabaseAdmin.storage.from('report-thumbnails').getPublicUrl(existingPath)
+    return data.publicUrl
+  }
+
   // facebook.com/ads/image/ URL은 access_token 파라미터 필요
   let targetUrl = url
   if (url.includes('facebook.com/ads/image/') && accessToken) {
@@ -94,7 +148,24 @@ async function uploadThumb(
 }
 
 // TikTok CDN 이미지를 Supabase Storage에 영구 저장 (CDN URL 만료 방지)
-async function uploadTiktokThumb(adId: string, url: string): Promise<string | null> {
+async function uploadTiktokThumb(
+  adId: string,
+  url: string,
+  existingPaths: Set<string>,
+): Promise<string | null> {
+  // 이미 업로드된 경우 CDN fetch 없이 public URL 반환
+  const jpgPath = `tiktok/${adId}.jpg`
+  const pngPath = `tiktok/${adId}.png`
+  const existingPath = existingPaths.has(jpgPath)
+    ? jpgPath
+    : existingPaths.has(pngPath)
+      ? pngPath
+      : null
+  if (existingPath) {
+    const { data } = supabaseAdmin.storage.from('report-thumbnails').getPublicUrl(existingPath)
+    return data.publicUrl
+  }
+
   try {
     const res = await fetchCdnImage(url)
     if (!res) return null
@@ -289,23 +360,20 @@ async function buildMetaSnapshot(args: {
     }
 
     try {
-      const raw = await fetchMetaCreatives(
-        metaAccount.account_id,
-        accessToken,
-        thisMonthStart,
-        thisMonthEnd,
-      )
-      creatives = await Promise.all(
-        raw.map(async (c) => {
-          if (!c.thumbnail_url) return c
-          const stored = await uploadThumb(
-            c.ad_id,
-            c.thumbnail_url,
-            c.is_fb_ads_image ? accessToken : undefined,
-          )
-          return { ...c, thumbnail_url: stored ?? c.thumbnail_url }
-        }),
-      )
+      const [raw, existingMetaThumbs] = await Promise.all([
+        fetchMetaCreatives(metaAccount.account_id, accessToken, thisMonthStart, thisMonthEnd),
+        getExistingThumbs('meta'),
+      ])
+      creatives = await runConcurrent(raw, 10, async (c) => {
+        if (!c.thumbnail_url) return c
+        const stored = await uploadThumb(
+          c.ad_id,
+          c.thumbnail_url,
+          c.is_fb_ads_image ? accessToken : undefined,
+          existingMetaThumbs,
+        )
+        return { ...c, thumbnail_url: stored ?? c.thumbnail_url }
+      })
     } catch (err) {
       console.error('[snapshot] Meta 소재 fetch 실패 (부분 성공):', err)
       creatives = []
@@ -574,22 +642,19 @@ async function buildTiktokSnapshot(args: {
       }
     }
 
-    // 썸네일 업로드: gmvMaxItems + ads 병렬 처리
+    // 기존 썸네일 목록 조회 후 업로드 (이미 존재하는 파일 스킵)
+    const existingTiktokThumbs = await getExistingThumbs('tiktok')
     const [uploadedGmvItems, uploadedAds] = await Promise.all([
-      Promise.all(
-        gmvMaxItems.map(async (item) => {
-          if (!item.thumbnail_url) return item
-          const permanentUrl = await uploadTiktokThumb(item.item_id, item.thumbnail_url)
-          return { ...item, thumbnail_url: permanentUrl ?? item.thumbnail_url }
-        }),
-      ),
-      Promise.all(
-        ads.map(async (ad) => {
-          if (!ad.thumbnail_url) return ad
-          const permanentUrl = await uploadTiktokThumb(ad.ad_id, ad.thumbnail_url)
-          return { ...ad, thumbnail_url: permanentUrl ?? ad.thumbnail_url }
-        }),
-      ),
+      runConcurrent(gmvMaxItems, 10, async (item) => {
+        if (!item.thumbnail_url) return item
+        const permanentUrl = await uploadTiktokThumb(item.item_id, item.thumbnail_url, existingTiktokThumbs)
+        return { ...item, thumbnail_url: permanentUrl ?? item.thumbnail_url }
+      }),
+      runConcurrent(ads, 10, async (ad) => {
+        if (!ad.thumbnail_url) return ad
+        const permanentUrl = await uploadTiktokThumb(ad.ad_id, ad.thumbnail_url, existingTiktokThumbs)
+        return { ...ad, thumbnail_url: permanentUrl ?? ad.thumbnail_url }
+      }),
     ])
 
     gmvMaxItems = uploadedGmvItems
