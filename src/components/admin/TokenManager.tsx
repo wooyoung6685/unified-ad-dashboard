@@ -14,11 +14,12 @@ interface TokenManagerProps {
   settings: AdminPlatformToken[]
 }
 
-// Meta 전용 폼 — access_token 1개만 업데이트
-function MetaTokenForm({ setting }: { setting: AdminPlatformToken }) {
+function TokenForm({ setting }: { setting: AdminPlatformToken }) {
   const [message, setMessage] = useState<string | null>(null)
   const [isError, setIsError] = useState(false)
   const isSet = !!setting.access_token
+
+  const platformLabel = setting.platform === 'meta' ? 'Meta' : 'TikTok'
 
   async function handleSubmit(formData: FormData) {
     setMessage(null)
@@ -35,7 +36,7 @@ function MetaTokenForm({ setting }: { setting: AdminPlatformToken }) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-base">Meta 액세스 토큰</CardTitle>
+        <CardTitle className="text-base">{platformLabel} 액세스 토큰</CardTitle>
         <Badge variant={isSet ? 'default' : 'secondary'}>
           {isSet ? '설정됨' : '미설정'}
         </Badge>
@@ -45,63 +46,9 @@ function MetaTokenForm({ setting }: { setting: AdminPlatformToken }) {
           <input type="hidden" name="platform" value={setting.platform} />
 
           <div className="space-y-1">
-            <Label htmlFor="meta-access-token">Access Token</Label>
+            <Label htmlFor={`${setting.platform}-access-token`}>Access Token</Label>
             <Input
-              id="meta-access-token"
-              type="password"
-              name="access_token"
-              defaultValue={setting.access_token ?? ''}
-              placeholder="액세스 토큰 입력"
-            />
-          </div>
-
-          {message && (
-            <Alert variant={isError ? 'destructive' : 'default'}>
-              <AlertDescription>{message}</AlertDescription>
-            </Alert>
-          )}
-
-          <Button type="submit">저장</Button>
-        </form>
-      </CardContent>
-    </Card>
-  )
-}
-
-// TikTok 전용 폼 — access_token만 업데이트
-function TikTokTokenForm({ setting }: { setting: AdminPlatformToken }) {
-  const [message, setMessage] = useState<string | null>(null)
-  const [isError, setIsError] = useState(false)
-  const isSet = !!setting.access_token
-
-  async function handleSubmit(formData: FormData) {
-    setMessage(null)
-    const result = await updateAccessToken(formData)
-    if ('error' in result) {
-      setIsError(true)
-      setMessage(`오류: ${result.error}`)
-    } else {
-      setIsError(false)
-      setMessage('저장되었습니다.')
-    }
-  }
-
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-base">TikTok 액세스 토큰</CardTitle>
-        <Badge variant={isSet ? 'default' : 'secondary'}>
-          {isSet ? '설정됨' : '미설정'}
-        </Badge>
-      </CardHeader>
-      <CardContent>
-        <form action={handleSubmit} className="space-y-4">
-          <input type="hidden" name="platform" value={setting.platform} />
-
-          <div className="space-y-1">
-            <Label htmlFor="tiktok-access-token">Access Token</Label>
-            <Input
-              id="tiktok-access-token"
+              id={`${setting.platform}-access-token`}
               type="password"
               name="access_token"
               defaultValue={setting.access_token ?? ''}
@@ -131,13 +78,9 @@ export function TokenManager({ settings }: TokenManagerProps) {
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
-      {settings.map((s) =>
-        s.platform === 'meta' ? (
-          <MetaTokenForm key={s.platform} setting={s} />
-        ) : (
-          <TikTokTokenForm key={s.platform} setting={s} />
-        ),
-      )}
+      {settings.map((s) => (
+        <TokenForm key={s.platform} setting={s} />
+      ))}
     </div>
   )
 }
