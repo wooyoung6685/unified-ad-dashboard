@@ -21,24 +21,29 @@ type MetricDef = {
   icon?: React.ElementType
 }
 
-// Meta 효율 지표 (5개)
+// Meta 효율 지표 (8개)
 const META_EFFICIENCY: MetricDef[] = [
   { key: 'roas', label: 'ROAS', format: 'ratio_pct', icon: TrendingUp },
+  { key: 'cpa', label: '구매당 비용', format: 'currency', icon: ShoppingCart },
+  { key: 'purchase_rate', label: '구매율', format: 'percent', icon: RefreshCw },
+  { key: 'aov', label: '객단가', format: 'currency', icon: Banknote },
+  { key: 'cpc', label: 'CPC (클릭당 비용)', format: 'currency', icon: DollarSign },
+  { key: 'ctr', label: 'CTR (클릭률)', format: 'percent', icon: MousePointer },
+  { key: 'cpm', label: 'CPM', format: 'currency', icon: DollarSign },
   { key: 'frequency', label: '빈도', format: 'number2', icon: RefreshCw },
-  { key: 'ctr', label: '클릭률 (CTR)', format: 'percent', icon: MousePointer },
-  { key: 'cpc', label: '클릭당 비용 (CPC)', format: 'currency', icon: DollarSign },
-  { key: 'cpa', label: '구매(전환)당 비용 (CPA)', format: 'currency', icon: ShoppingCart },
 ]
 
-// Meta 원본 지표 (7개)
+// Meta 원본 지표 (8개)
 const META_RAW: MetricDef[] = [
   { key: 'spend', label: '지출금액', format: 'currency' },
   { key: 'revenue', label: '매출', format: 'currency' },
+  { key: 'purchases', label: '구매전환수', format: 'number' },
+  { key: 'add_to_cart', label: '장바구니 담기', format: 'number' },
   { key: 'impressions', label: '노출수', format: 'number' },
   { key: 'reach', label: '도달수', format: 'number' },
-  { key: 'clicks', label: '클릭수', format: 'number' },
-  { key: 'purchases', label: '구매(전환)수', format: 'number' },
-  { key: 'add_to_cart', label: '장바구니 담기', format: 'number' },
+  { key: 'outbound_clicks', label: '아웃바운드 클릭', format: 'number' },
+  { key: 'clicks', label: '전체 클릭 (참고)', format: 'number' },
+  { key: 'content_views', label: '조회수', format: 'number' },
 ]
 
 // TikTok 효율 지표 (4개)

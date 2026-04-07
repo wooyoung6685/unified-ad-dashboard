@@ -9,10 +9,11 @@ function calcMetrics(
   impressions: number | null,
   reach: number | null,
   clicks: number | null,
-  purchases: number | null
+  purchases: number | null,
+  content_views?: number | null
 ) {
   const roas =
-    spend && revenue && spend > 0 ? (revenue / spend) * 100 : null
+    spend && revenue && spend > 0 ? revenue / spend : null
   const frequency =
     impressions && reach && reach > 0 ? impressions / reach : null
   const ctr =
@@ -21,7 +22,17 @@ function calcMetrics(
       : null
   const cpc = spend && clicks && clicks > 0 ? spend / clicks : null
   const cpa = spend && purchases && purchases > 0 ? spend / purchases : null
-  return { roas, frequency, ctr, cpc, cpa }
+  const cpm =
+    spend && impressions && impressions > 0
+      ? spend / (impressions / 1000)
+      : null
+  const aov =
+    revenue != null && purchases && purchases > 0 ? revenue / purchases : null
+  const purchase_rate =
+    purchases != null && content_views && content_views > 0
+      ? (purchases / content_views) * 100
+      : null
+  return { roas, frequency, ctr, cpc, cpa, cpm, aov, purchase_rate }
 }
 
 export async function GET(req: NextRequest) {
@@ -74,13 +85,16 @@ export async function GET(req: NextRequest) {
 
     // 날짜별 데이터 변환
     const dailyData: SummaryDayData[] = rows.map((r) => {
+      const content_views = (r.content_views as number | null) ?? null
+      const outboundClicks = (r.outbound_clicks as number | null) ?? null
       const metrics = calcMetrics(
         r.spend,
         r.revenue,
         r.impressions,
         r.reach ?? null,
-        r.clicks,
-        r.purchases
+        outboundClicks,
+        r.purchases,
+        content_views
       )
       return {
         date: r.date,
@@ -91,11 +105,12 @@ export async function GET(req: NextRequest) {
         clicks: r.clicks,
         purchases: r.purchases,
         add_to_cart: r.add_to_cart ?? null,
+        content_views,
+        outbound_clicks: (r.outbound_clicks as number | null) ?? null,
         video_views: null, // Meta는 항상 null
         views_2s: null,
         views_6s: null,
         views_100pct: null,
-        aov: null,
         ...metrics,
       }
     })
@@ -111,6 +126,10 @@ export async function GET(req: NextRequest) {
         purchases: (acc.purchases ?? 0) + (r.purchases ?? 0),
         add_to_cart:
           (acc.add_to_cart ?? 0) + ((r.add_to_cart as number | null) ?? 0),
+        content_views:
+          (acc.content_views ?? 0) + ((r.content_views as number | null) ?? 0),
+        outbound_clicks:
+          (acc.outbound_clicks ?? 0) + ((r.outbound_clicks as number | null) ?? 0),
       }),
       {
         spend: 0,
@@ -120,23 +139,27 @@ export async function GET(req: NextRequest) {
         clicks: 0,
         purchases: 0,
         add_to_cart: 0,
+        content_views: 0,
+        outbound_clicks: 0,
       }
     )
 
     const totals: SummaryTotals = {
       ...sum,
+      content_views: sum.content_views || null,
+      outbound_clicks: sum.outbound_clicks || null,
       video_views: null, // Meta는 항상 null
       views_2s: null,
       views_6s: null,
       views_100pct: null,
-      aov: null,
       ...calcMetrics(
         sum.spend || null,
         sum.revenue || null,
         sum.impressions || null,
         sum.reach || null,
-        sum.clicks || null,
-        sum.purchases || null
+        sum.outbound_clicks || null,
+        sum.purchases || null,
+        sum.content_views || null
       ),
     }
 
@@ -178,11 +201,12 @@ export async function GET(req: NextRequest) {
         clicks: r.clicks,
         purchases: r.purchases,
         add_to_cart: null, // TikTok은 항상 null
+        content_views: null,
+        outbound_clicks: null,
         video_views: (r as any).video_views ?? null,
         views_2s: (r as any).views_2s ?? null,
         views_6s: (r as any).views_6s ?? null,
         views_100pct: (r as any).views_100pct ?? null,
-        aov: null,
         ...metrics,
       }
     })
@@ -219,7 +243,8 @@ export async function GET(req: NextRequest) {
     const totals: SummaryTotals = {
       ...sum,
       add_to_cart: null, // TikTok은 항상 null
-      aov: null,
+      content_views: null,
+      outbound_clicks: null,
       ...calcMetrics(
         sum.spend || null,
         sum.revenue || null,
@@ -380,7 +405,7 @@ export async function GET(req: NextRequest) {
       const impressions = (r.visitors as number | null) ?? null
       // 전환율: orders / visitors * 100
       const ctr = impressions && purchases && impressions > 0 ? (purchases / impressions) * 100 : null
-      const roas = spend && revenue && spend > 0 ? (revenue / spend) * 100 : null
+      const roas = spend && revenue && spend > 0 ? revenue / spend : null
       const cpc = spend && clicks && clicks > 0 ? spend / clicks : null
       const aov = revenue != null && purchases && purchases > 0 ? revenue / purchases : null
       return {
@@ -392,6 +417,8 @@ export async function GET(req: NextRequest) {
         impressions,
         reach: null,
         add_to_cart: null,
+        content_views: null,
+        outbound_clicks: null,
         video_views: null,
         views_2s: null,
         views_6s: null,
@@ -401,7 +428,9 @@ export async function GET(req: NextRequest) {
         ctr,
         cpc,
         cpa: null,
+        cpm: null,
         aov,
+        purchase_rate: null,
       }
     })
 
@@ -416,7 +445,7 @@ export async function GET(req: NextRequest) {
       { spend: 0, revenue: 0, purchases: 0, clicks: 0, impressions: 0 }
     )
 
-    const roas = sum.spend > 0 ? (sum.revenue / sum.spend) * 100 : null
+    const roas = sum.spend > 0 ? sum.revenue / sum.spend : null
     const ctr = sum.impressions > 0 ? (sum.purchases / sum.impressions) * 100 : null
     const cpc = sum.clicks > 0 ? sum.spend / sum.clicks : null
     const aov = sum.purchases > 0 ? sum.revenue / sum.purchases : null
@@ -429,6 +458,8 @@ export async function GET(req: NextRequest) {
       impressions: sum.impressions || null,
       reach: null,
       add_to_cart: null,
+      content_views: null,
+      outbound_clicks: null,
       video_views: null,
       views_2s: null,
       views_6s: null,
@@ -438,7 +469,9 @@ export async function GET(req: NextRequest) {
       ctr,
       cpc,
       cpa: null,
+      cpm: null,
       aov,
+      purchase_rate: null,
     }
 
     const currency = (rows[0]?.currency as string | null) ?? null
@@ -491,7 +524,7 @@ export async function GET(req: NextRequest) {
         const purchases = d.conversions || null
         const clicks = d.clicks || null
         const impressions = d.impressions || null
-        const roas = spend && revenue && spend > 0 ? (revenue / spend) * 100 : null
+        const roas = spend && revenue && spend > 0 ? revenue / spend : null
         const ctr = clicks && impressions && impressions > 0 ? (clicks / impressions) * 100 : null
         const cpc = spend && clicks && clicks > 0 ? spend / clicks : null
         const cpa = spend && purchases && purchases > 0 ? spend / purchases : null
@@ -505,6 +538,8 @@ export async function GET(req: NextRequest) {
           impressions,
           reach: null,
           add_to_cart: null,
+          content_views: null,
+          outbound_clicks: null,
           video_views: null,
           views_2s: null,
           views_6s: null,
@@ -514,7 +549,9 @@ export async function GET(req: NextRequest) {
           ctr,
           cpc,
           cpa,
+          cpm: null,
           aov: null,
+          purchase_rate: null,
           conversion_rate,
         }
       })
@@ -530,7 +567,7 @@ export async function GET(req: NextRequest) {
       { spend: 0, revenue: 0, purchases: 0, clicks: 0, impressions: 0 }
     )
 
-    const roas = sumRaw.spend > 0 ? (sumRaw.revenue / sumRaw.spend) * 100 : null
+    const roas = sumRaw.spend > 0 ? sumRaw.revenue / sumRaw.spend : null
     const ctr = sumRaw.impressions > 0 ? (sumRaw.clicks / sumRaw.impressions) * 100 : null
     const cpc = sumRaw.clicks > 0 ? sumRaw.spend / sumRaw.clicks : null
     const cpa = sumRaw.purchases > 0 ? sumRaw.spend / sumRaw.purchases : null
@@ -544,6 +581,8 @@ export async function GET(req: NextRequest) {
       impressions: sumRaw.impressions || null,
       reach: null,
       add_to_cart: null,
+      content_views: null,
+      outbound_clicks: null,
       video_views: null,
       views_2s: null,
       views_6s: null,
@@ -553,7 +592,9 @@ export async function GET(req: NextRequest) {
       ctr,
       cpc,
       cpa,
+      cpm: null,
       aov: null,
+      purchase_rate: null,
       conversion_rate,
     }
 

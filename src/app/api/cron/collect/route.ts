@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
   let success = 0
   let failed = 0
 
-  // 4. Meta 수집 루프 (owner_user_id별 토큰 사용)
+  // Meta 수집 루프 (owner_user_id별 토큰 사용)
   const { data: metaAccounts } = await supabaseAdmin
     .from('meta_accounts')
     .select('id, brand_id, account_id, owner_user_id')
@@ -73,7 +73,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // 5. TikTok 수집 루프 (owner_user_id별 토큰 사용)
+  // TikTok 수집 루프 (owner_user_id별 토큰 사용)
   const { data: tiktokAccounts } = await supabaseAdmin
     .from('tiktok_accounts')
     .select('id, brand_id, advertiser_id, owner_user_id, store_id')

@@ -275,13 +275,18 @@ export type SummaryDayData = {
   views_2s: number | null
   views_6s: number | null
   views_100pct: number | null
+  // Meta 전용 원본 지표
+  content_views: number | null
+  outbound_clicks: number | null
   // 계산 지표
   roas: number | null
   frequency: number | null
   ctr: number | null
   cpc: number | null
   cpa: number | null
-  aov: number | null  // 객단가 (Average Order Value = revenue / purchases), shopee_shopping 전용
+  cpm: number | null  // CPM = spend / (impressions / 1000), Meta 전용
+  aov: number | null  // 객단가 (Average Order Value = revenue / purchases)
+  purchase_rate: number | null  // 구매율 = purchases / content_views, Meta 전용
   conversion_rate?: number | null  // 전환율 (conversions / clicks * 100), shopee_inapp 전용
 }
 
