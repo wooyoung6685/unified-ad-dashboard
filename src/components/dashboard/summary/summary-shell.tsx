@@ -44,10 +44,11 @@ export function SummaryShell() {
     endDate: today,
   })
 
-  // 기본 선택 지표: CTR + 노출수
+  // 기본 선택 지표: 지출금액 + 매출 + ROAS
   const [selectedMetrics, setSelectedMetrics] = useState<string[]>([
-    'ctr',
-    'impressions',
+    'spend',
+    'revenue',
+    'roas',
   ])
 
   const [activeTab, setActiveTab] = useState<'campaign' | 'gmv_max'>('gmv_max')
@@ -72,7 +73,7 @@ export function SummaryShell() {
           ? ['spend', 'revenue']
           : newFilters.accountType === 'tiktok'
             ? ['roi', 'cost']
-            : ['ctr', 'impressions']
+            : ['spend', 'revenue', 'roas']
       setSelectedMetrics(defaultMetrics)
       setActiveTab('gmv_max')
     }
@@ -84,12 +85,12 @@ export function SummaryShell() {
     setSelectedMetrics(tab === 'gmv_max' ? ['roi', 'cost'] : ['spend', 'impressions'])
   }
 
-  // FIFO 선택 로직: 최대 2개, 초과 시 가장 오래된 것 제거
+  // FIFO 선택 로직: 최대 3개, 초과 시 가장 오래된 것 제거
   function handleMetricSelect(key: string) {
     setSelectedMetrics((prev) => {
       if (prev.includes(key)) return prev.filter((k) => k !== key)
-      if (prev.length < 2) return [...prev, key]
-      return [prev[1], key]
+      if (prev.length < 3) return [...prev, key]
+      return [...prev.slice(1), key]
     })
   }
 

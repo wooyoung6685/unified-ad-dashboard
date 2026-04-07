@@ -111,7 +111,7 @@ interface SummaryChartProps {
   platform: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp' | null
 }
 
-const COLORS = ['#F59E0B', '#6366F1']
+const COLORS = ['#3b82f6', '#22c55e', '#F59E0B', '#6366F1']
 
 export function SummaryChart({ data, selectedMetrics, platform }: SummaryChartProps) {
   if (!data.length || !selectedMetrics.length) {
@@ -122,14 +122,27 @@ export function SummaryChart({ data, selectedMetrics, platform }: SummaryChartPr
     )
   }
 
-  const metric0 = selectedMetrics[0]
-  const metric1 = selectedMetrics[1]
+  // 포맷별로 Y축 그룹 분류: 같은 포맷의 지표는 같은 Y축 공유
+  const leftFormat = METRIC_META[selectedMetrics[0]]?.format
+  const leftMetrics: string[] = []
+  const rightMetrics: string[] = []
+
+  selectedMetrics.forEach((m) => {
+    const fmt = METRIC_META[m]?.format
+    if (fmt === leftFormat) {
+      leftMetrics.push(m)
+    } else {
+      rightMetrics.push(m)
+    }
+  })
+
+  const hasRight = rightMetrics.length > 0
 
   return (
     <ResponsiveContainer width="100%" height={360}>
       <LineChart
         data={data}
-        margin={{ top: 8, right: 16, left: 8, bottom: 4 }}
+        margin={{ top: 8, right: hasRight ? 16 : 8, left: 8, bottom: 4 }}
       >
         <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
         <XAxis
@@ -139,21 +152,21 @@ export function SummaryChart({ data, selectedMetrics, platform }: SummaryChartPr
           className="text-muted-foreground"
         />
 
-        {/* 첫 번째 Y축 (왼쪽) */}
+        {/* 좌측 Y축 */}
         <YAxis
           yAxisId="left"
-          tickFormatter={(v: number) => formatTick(v, metric0)}
+          tickFormatter={(v: number) => formatTick(v, leftMetrics[0])}
           tick={{ fontSize: 11 }}
           width={80}
           className="text-muted-foreground"
         />
 
-        {/* 두 번째 Y축 (오른쪽, 2개 선택 시만) */}
-        {metric1 && (
+        {/* 우측 Y축 (다른 포맷의 지표가 있을 때만) */}
+        {hasRight && (
           <YAxis
             yAxisId="right"
             orientation="right"
-            tickFormatter={(v: number) => formatTick(v, metric1)}
+            tickFormatter={(v: number) => formatTick(v, rightMetrics[0])}
             tick={{ fontSize: 11 }}
             width={80}
             className="text-muted-foreground"
@@ -168,31 +181,35 @@ export function SummaryChart({ data, selectedMetrics, platform }: SummaryChartPr
           }}
         />
 
-        {/* 첫 번째 라인 */}
-        <Line
-          yAxisId="left"
-          type="monotone"
-          dataKey={metric0}
-          stroke={COLORS[0]}
-          strokeWidth={2}
-          dot={{ r: 3, fill: COLORS[0] }}
-          activeDot={{ r: 5 }}
-          name={metric0}
-        />
-
-        {/* 두 번째 라인 */}
-        {metric1 && (
+        {/* 좌측 Y축 라인들 */}
+        {leftMetrics.map((m, i) => (
           <Line
+            key={m}
+            yAxisId="left"
+            type="monotone"
+            dataKey={m}
+            stroke={COLORS[i]}
+            strokeWidth={2}
+            dot={{ r: 3, fill: COLORS[i] }}
+            activeDot={{ r: 5 }}
+            name={m}
+          />
+        ))}
+
+        {/* 우측 Y축 라인들 */}
+        {rightMetrics.map((m, i) => (
+          <Line
+            key={m}
             yAxisId="right"
             type="monotone"
-            dataKey={metric1}
-            stroke={COLORS[1]}
+            dataKey={m}
+            stroke={COLORS[leftMetrics.length + i]}
             strokeWidth={2}
-            dot={{ r: 3, fill: COLORS[1] }}
+            dot={{ r: 3, fill: COLORS[leftMetrics.length + i] }}
             activeDot={{ r: 5 }}
-            name={metric1}
+            name={m}
           />
-        )}
+        ))}
       </LineChart>
     </ResponsiveContainer>
   )
