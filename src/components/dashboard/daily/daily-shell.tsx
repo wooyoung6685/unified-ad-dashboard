@@ -80,7 +80,7 @@ export function DailyShell() {
     }
   }
 
-  const isShopee = filters.accountType === 'shopee'
+  const isShopee = filters.accountType === 'shopee_shopping' || filters.accountType === 'shopee_inapp'
 
   // 선택된 shopee 계정 정보 (대표 행)
   const selectedShopeeAccount = isShopee

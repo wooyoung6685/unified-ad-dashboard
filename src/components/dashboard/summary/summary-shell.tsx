@@ -68,7 +68,7 @@ export function SummaryShell() {
     if (newFilters.accountType !== filters.accountType || newFilters.accountId !== filters.accountId) {
       // shopee 계열은 지출금액 + 매출, tiktok은 캠페인 탭 기본(지출 + 노출)
       const defaultMetrics =
-        newFilters.accountType === 'shopee'
+        (newFilters.accountType === 'shopee_shopping' || newFilters.accountType === 'shopee_inapp')
           ? ['spend', 'revenue']
           : newFilters.accountType === 'tiktok'
             ? ['spend', 'impressions']
@@ -208,7 +208,7 @@ export function SummaryShell() {
             )}
           </div>
         )
-      })() : filters.accountType === 'shopee' ? (
+      })() : (filters.accountType === 'shopee_shopping' || filters.accountType === 'shopee_inapp') ? (
         <>
           {/* 쇼피: 쇼핑몰 + 인앱 각각 섹션 */}
           {!data && !isFetching && (

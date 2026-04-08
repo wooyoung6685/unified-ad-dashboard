@@ -289,6 +289,16 @@ export type SummaryDayData = {
   aov: number | null  // 객단가 (Average Order Value = revenue / purchases)
   purchase_rate: number | null  // 구매율 = purchases / content_views, Meta 전용
   conversion_rate?: number | null  // 전환율 (conversions / clicks * 100), shopee_inapp 전용
+  // Shopee Shopping 전용 필드
+  buyers?: number | null
+  new_buyers?: number | null
+  existing_buyers?: number | null
+  order_conversion_rate?: number | null
+  repeat_purchase_rate?: number | null
+  cancelled_orders?: number | null
+  cancelled_sales?: number | null
+  refunded_orders?: number | null
+  refunded_sales?: number | null
 }
 
 export type SummaryTotals = Omit<SummaryDayData, 'date'>
@@ -313,6 +323,11 @@ export type SummaryResponse = {
     currency: string | null  // 현지통화 코드 (예: 'SGD', 'VND')
     hasKrw: boolean          // KRW 환산 가능 여부
   }
+  // Shopee 쇼핑몰/인앱 분리 데이터
+  shoppingDailyData?: SummaryDayData[]
+  shoppingTotals?: SummaryTotals
+  inappDailyData?: SummaryDayData[]
+  inappTotals?: SummaryTotals
   // TikTok GMV Max 데이터 (데이터 존재 시에만 포함)
   gmvMaxDailyData?: GmvMaxSummaryDayData[]
   gmvMaxTotals?: GmvMaxSummaryTotals
