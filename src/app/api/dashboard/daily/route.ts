@@ -215,7 +215,7 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({ platform: 'tiktok', rows: data ?? [], gmvMaxRows })
-  } else if (accountType === 'shopee') {
+  } else if (accountType === 'shopee' || accountType === 'shopee_shopping' || accountType === 'shopee_inapp') {
     // 전달된 accountId로 shopee_accounts 조회하여 외부 account_id 획득
     const { data: refAcct } = await supabase
       .from('shopee_accounts')
