@@ -48,20 +48,23 @@ const META_RAW: MetricDef[] = [
 
 // TikTok 효율 지표 (4개)
 const TIKTOK_EFFICIENCY: MetricDef[] = [
-  { key: 'roas', label: 'ROAS', format: 'ratio_pct', icon: TrendingUp },
-  { key: 'ctr', label: '클릭률 (CTR)', format: 'percent', icon: MousePointer },
-  { key: 'cpc', label: '클릭당 비용 (CPC)', format: 'currency', icon: DollarSign },
-  { key: 'cpa', label: '구매(전환)당 비용 (CPA)', format: 'currency', icon: ShoppingCart },
+  { key: 'frequency', label: '빈도', format: 'number2', icon: RefreshCw },
+  { key: 'cpc', label: 'CPC', format: 'currency', icon: DollarSign },
+  { key: 'ctr', label: 'CTR', format: 'percent', icon: MousePointer },
+  { key: 'cpm', label: 'CPM', format: 'currency', icon: DollarSign },
 ]
 
-// TikTok 원본 지표 (6개)
+// TikTok 원본 지표 (9개)
 const TIKTOK_RAW: MetricDef[] = [
   { key: 'spend', label: '지출금액', format: 'currency' },
-  { key: 'revenue', label: '매출', format: 'currency' },
   { key: 'impressions', label: '노출수', format: 'number' },
-  { key: 'clicks', label: '클릭수', format: 'number' },
-  { key: 'purchases', label: '구매(전환)수', format: 'number' },
-  { key: 'video_views', label: '영상조회수', format: 'number' },
+  { key: 'reach', label: '도달수', format: 'number' },
+  { key: 'clicks', label: '클릭수 (랜딩)', format: 'number' },
+  { key: 'video_views', label: '동영상 조회수', format: 'number' },
+  { key: 'views_2s', label: '2초 동영상 조회수', format: 'number' },
+  { key: 'views_6s', label: '6초 동영상 조회수', format: 'number' },
+  { key: 'views_25pct', label: '25% 동영상 조회수', format: 'number' },
+  { key: 'views_100pct', label: '100% 동영상 조회수', format: 'number' },
 ]
 
 // GMV Max 효율 지표 (2개)
@@ -77,43 +80,47 @@ const GMV_MAX_RAW: MetricDef[] = [
   { key: 'orders', label: '주문수', format: 'number' },
 ]
 
-// Shopee 쇼핑몰 효율 지표 (4개)
+// Shopee 쇼핑몰 효율 지표 (3개)
 const SHOPEE_SHOPPING_EFFICIENCY: MetricDef[] = [
-  { key: 'roas',  label: 'ROAS',                   format: 'ratio_pct',  icon: TrendingUp },
-  { key: 'ctr',   label: '전환율',                  format: 'percent',  icon: TrendingUp },
-  { key: 'aov',   label: '객단가 (KRW)',            format: 'currency', icon: Banknote },
-  { key: 'cpc',   label: '클릭당 비용 CPC (KRW)',  format: 'currency', icon: MousePointer },
+  { key: 'aov',                   label: '객단가',      format: 'currency', icon: Banknote },
+  { key: 'order_conversion_rate', label: '구매 전환율', format: 'percent',  icon: RefreshCw },
+  { key: 'repeat_purchase_rate',  label: '재구매율',    format: 'percent',  icon: RefreshCw },
 ]
 
-// Shopee 쇼핑몰 원본 지표 (5개)
+// Shopee 쇼핑몰 원본 지표 (12개)
 const SHOPEE_SHOPPING_RAW: MetricDef[] = [
-  { key: 'spend',       label: '지출금액 (KRW)', format: 'currency' },
-  { key: 'revenue',     label: '매출 (KRW)',     format: 'currency' },
-  { key: 'purchases',   label: '결제 건수',      format: 'number' },
-  { key: 'impressions', label: '방문자수',        format: 'number' },
-  { key: 'clicks',      label: '페이지뷰',        format: 'number' },
+  { key: 'spend',            label: '지출금액',         format: 'currency' },
+  { key: 'revenue',          label: '매출',             format: 'currency' },
+  { key: 'purchases',        label: '주문건',           format: 'number' },
+  { key: 'clicks',           label: '상품 클릭 수',     format: 'number' },
+  { key: 'buyers',           label: '구매자 수',        format: 'number' },
+  { key: 'new_buyers',       label: '신규 구매자 수',   format: 'number' },
+  { key: 'existing_buyers',  label: '기존 구매자 수',   format: 'number' },
+  { key: 'impressions',      label: '방문자 수',        format: 'number' },
+  { key: 'cancelled_orders', label: '취소 주문건',      format: 'number' },
+  { key: 'cancelled_sales',  label: '취소 금액',        format: 'currency' },
+  { key: 'refunded_orders',  label: '반품/환불 주문건', format: 'number' },
+  { key: 'refunded_sales',   label: '반품/환불 금액',   format: 'currency' },
 ]
 
-// Shopee 인앱 효율 지표
+// Shopee 인앱 효율 지표 (3개)
 const SHOPEE_INAPP_EFFICIENCY: MetricDef[] = [
   { key: 'roas', label: 'ROAS', format: 'ratio_pct', icon: TrendingUp },
-  { key: 'ctr', label: '클릭률 CTR (%)', format: 'percent', icon: MousePointer },
-  { key: 'conversion_rate', label: '전환율 (%)', format: 'percent', icon: RefreshCw },
-  { key: 'cpa', label: '구매(전환)당 비용 CPA (KRW)', format: 'currency', icon: ShoppingCart },
+  { key: 'cpc',  label: 'CPC',  format: 'currency',  icon: DollarSign },
+  { key: 'ctr',  label: 'CTR',  format: 'percent',   icon: MousePointer },
 ]
 
-// Shopee 인앱 원본 지표
+// Shopee 인앱 원본 지표 (4개)
 const SHOPEE_INAPP_RAW: MetricDef[] = [
-  { key: 'spend', label: '지출 (KRW)', format: 'currency' },
-  { key: 'revenue', label: '매출 GMV (KRW)', format: 'currency' },
-  { key: 'impressions', label: '노출수', format: 'number' },
-  { key: 'clicks', label: '클릭수', format: 'number' },
-  { key: 'purchases', label: '구매(전환)수', format: 'number' },
+  { key: 'spend',       label: '지출금액',   format: 'currency' },
+  { key: 'revenue',     label: '매출 (GMV)', format: 'currency' },
+  { key: 'impressions', label: '노출',       format: 'number' },
+  { key: 'clicks',      label: '클릭',       format: 'number' },
 ]
 
 // currency 형식 지표 중 환율 미설정 시 현지통화 표시 대상
-const SHOPEE_SHOPPING_CURRENCY_KEYS = new Set(['spend', 'revenue', 'aov', 'cpc'])
-const SHOPEE_INAPP_CURRENCY_KEYS = new Set(['spend', 'revenue', 'cpa'])
+const SHOPEE_SHOPPING_CURRENCY_KEYS = new Set(['spend', 'revenue', 'aov', 'cpc', 'cancelled_sales', 'refunded_sales'])
+const SHOPEE_INAPP_CURRENCY_KEYS = new Set(['spend', 'revenue', 'cpa', 'cpc'])
 
 function formatValue(
   v: number | null,

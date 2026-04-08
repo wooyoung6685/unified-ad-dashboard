@@ -42,8 +42,7 @@ export async function GET(req: NextRequest) {
   const accountType = searchParams.get('account_type') as
     | 'meta'
     | 'tiktok'
-    | 'shopee_shopping'
-    | 'shopee_inapp'
+    | 'shopee'
     | null
   const startDate = searchParams.get('start_date') ?? ''
   const endDate = searchParams.get('end_date') ?? ''
@@ -110,6 +109,7 @@ export async function GET(req: NextRequest) {
         video_views: null, // Meta는 항상 null
         views_2s: null,
         views_6s: null,
+        views_25pct: null,
         views_100pct: null,
         ...metrics,
       }
@@ -151,6 +151,7 @@ export async function GET(req: NextRequest) {
       video_views: null, // Meta는 항상 null
       views_2s: null,
       views_6s: null,
+      views_25pct: null,
       views_100pct: null,
       ...calcMetrics(
         sum.spend || null,
@@ -206,6 +207,7 @@ export async function GET(req: NextRequest) {
         video_views: (r as any).video_views ?? null,
         views_2s: (r as any).views_2s ?? null,
         views_6s: (r as any).views_6s ?? null,
+        views_25pct: (r as any).views_25pct ?? null,
         views_100pct: (r as any).views_100pct ?? null,
         ...metrics,
       }
@@ -223,6 +225,7 @@ export async function GET(req: NextRequest) {
         video_views: (acc.video_views ?? 0) + (((r as any).video_views as number | null) ?? 0),
         views_2s: (acc.views_2s ?? 0) + (((r as any).views_2s as number | null) ?? 0),
         views_6s: (acc.views_6s ?? 0) + (((r as any).views_6s as number | null) ?? 0),
+        views_25pct: (acc.views_25pct ?? 0) + (((r as any).views_25pct as number | null) ?? 0),
         views_100pct: (acc.views_100pct ?? 0) + (((r as any).views_100pct as number | null) ?? 0),
       }),
       {
@@ -236,6 +239,7 @@ export async function GET(req: NextRequest) {
         video_views: 0,
         views_2s: 0,
         views_6s: 0,
+        views_25pct: 0,
         views_100pct: 0,
       }
     )
@@ -311,34 +315,49 @@ export async function GET(req: NextRequest) {
       totals,
       ...(gmvMaxDailyData ? { gmvMaxDailyData, gmvMaxTotals } : {}),
     })
-  } else if (accountType === 'shopee_shopping') {
-    let query = supabase
-      .from('shopee_shopping_stats')
-      .select('date, sales_krw, sales, orders, product_clicks, visitors, currency')
-      .eq('shopee_account_id', accountId)
-      .gte('date', startDate)
-      .lte('date', endDate)
-      .order('date', { ascending: true })
-
-    if (brandId && brandId !== 'all') {
-      query = query.eq('brand_id', brandId)
-    }
-
-    const { data, error } = await query
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-    const rows = data ?? []
-
-    // spend_krw 계산: daily route와 동일하게 Meta + 인앱 데이터 조인
-    const spendByDate: Record<string, number> = {}
-    const { data: shopAcct } = await supabase
+  } else if (accountType === 'shopee') {
+    // 전달된 accountId로 shopee_accounts 조회하여 외부 account_id 획득
+    const { data: refAcct } = await supabase
       .from('shopee_accounts')
-      .select('brand_id, country, sub_brand')
+      .select('account_id, brand_id, country, sub_brand')
       .eq('id', accountId)
       .single()
 
-    if (shopAcct) {
-      const { brand_id: bId, country: bCountry, sub_brand: bSubBrand } = shopAcct
+    if (!refAcct) return NextResponse.json({ error: '쇼피 계정을 찾을 수 없습니다.' }, { status: 404 })
+
+    const { account_id: externalAccountId, brand_id: bId, country: bCountry, sub_brand: bSubBrand } = refAcct
+
+    // 같은 account_id의 shopping/inapp 계정 ID 조회
+    const { data: allShopeeAccts } = await supabase
+      .from('shopee_accounts')
+      .select('id, account_type')
+      .eq('account_id', externalAccountId)
+      .eq('brand_id', bId)
+
+    const shoppingAccountIds = (allShopeeAccts ?? []).filter((a) => a.account_type === 'shopping').map((a) => a.id)
+    const inappAccountIds = (allShopeeAccts ?? []).filter((a) => a.account_type === 'inapp').map((a) => a.id)
+
+    // ── 쇼핑몰 데이터 ──────────────────────────────────────────────────
+    let shoppingDailyData: SummaryDayData[] = []
+    let shoppingTotals: SummaryTotals = buildEmptyTotals()
+    let shoppingCurrency: string | null = null
+    let shoppingHasKrw = false
+
+    if (shoppingAccountIds.length > 0) {
+      let shopQuery = supabase
+        .from('shopee_shopping_stats')
+        .select('date, sales_krw, sales, orders, product_clicks, visitors, currency, buyers, new_buyers, existing_buyers, order_conversion_rate, repeat_purchase_rate, cancelled_orders, cancelled_sales, cancelled_sales_krw, refunded_orders, refunded_sales, refunded_sales_krw')
+        .in('shopee_account_id', shoppingAccountIds)
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: true })
+      if (brandId && brandId !== 'all') shopQuery = shopQuery.eq('brand_id', brandId)
+
+      const { data: shopData } = await shopQuery
+      const shopRows = shopData ?? []
+
+      // spend_krw 계산: Meta + 인앱 spend 조인
+      const spendByDate: Record<string, number> = {}
 
       let metaAcctQuery = supabase
         .from('meta_accounts')
@@ -352,19 +371,6 @@ export async function GET(req: NextRequest) {
       const { data: metaAccts } = await metaAcctQuery
       const metaIds = (metaAccts ?? []).map((a) => a.id)
 
-      let inappAcctQuery = supabase
-        .from('shopee_accounts')
-        .select('id')
-        .eq('brand_id', bId)
-        .eq('country', bCountry)
-        .eq('account_type', 'inapp')
-      inappAcctQuery =
-        bSubBrand === null
-          ? inappAcctQuery.is('sub_brand', null)
-          : inappAcctQuery.eq('sub_brand', bSubBrand)
-      const { data: inappAccts } = await inappAcctQuery
-      const inappIds = (inappAccts ?? []).map((a) => a.id)
-
       if (metaIds.length > 0) {
         const { data: metaStats } = await supabase
           .from('meta_daily_stats')
@@ -377,11 +383,11 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      if (inappIds.length > 0) {
+      if (inappAccountIds.length > 0) {
         const { data: inappStats } = await supabase
           .from('shopee_inapp_stats')
           .select('date, expense_krw')
-          .in('shopee_account_id', inappIds)
+          .in('shopee_account_id', inappAccountIds)
           .gte('date', startDate)
           .lte('date', endDate)
         for (const s of inappStats ?? []) {
@@ -390,214 +396,188 @@ export async function GET(req: NextRequest) {
           }
         }
       }
-    }
 
-    // KRW 환산 가능 여부 판정
-    const hasKrw = rows.some((r) => r.sales_krw != null)
+      shoppingHasKrw = shopRows.some((r) => r.sales_krw != null)
+      shoppingCurrency = (shopRows[0]?.currency as string | null) ?? null
 
-    // spend = spend_krw, revenue = sales_krw (없으면 현지통화 sales로 fallback)
-    // purchases = orders, clicks = product_clicks, impressions = visitors
-    const dailyData: SummaryDayData[] = rows.map((r) => {
-      const spend = spendByDate[r.date] ?? null
-      const revenue = hasKrw ? ((r.sales_krw as number | null) ?? null) : ((r.sales as number | null) ?? null)
-      const purchases = (r.orders as number | null) ?? null
-      const clicks = (r.product_clicks as number | null) ?? null
-      const impressions = (r.visitors as number | null) ?? null
-      // 전환율: orders / visitors * 100
-      const ctr = impressions && purchases && impressions > 0 ? (purchases / impressions) * 100 : null
-      const roas = spend && revenue && spend > 0 ? revenue / spend : null
-      const cpc = spend && clicks && clicks > 0 ? spend / clicks : null
-      const aov = revenue != null && purchases && purchases > 0 ? revenue / purchases : null
-      return {
-        date: r.date,
-        spend,
-        revenue,
-        purchases,
-        clicks,
-        impressions,
-        reach: null,
-        add_to_cart: null,
-        content_views: null,
-        outbound_clicks: null,
-        video_views: null,
-        views_2s: null,
-        views_6s: null,
-        views_100pct: null,
-        roas,
-        frequency: null,
-        ctr,
-        cpc,
-        cpa: null,
-        cpm: null,
-        aov,
-        purchase_rate: null,
-      }
-    })
-
-    const sum = rows.reduce(
-      (acc, r) => ({
-        spend: acc.spend + (spendByDate[r.date] ?? 0),
-        revenue: acc.revenue + (hasKrw ? ((r.sales_krw as number | null) ?? 0) : ((r.sales as number | null) ?? 0)),
-        purchases: acc.purchases + ((r.orders as number | null) ?? 0),
-        clicks: acc.clicks + ((r.product_clicks as number | null) ?? 0),
-        impressions: acc.impressions + ((r.visitors as number | null) ?? 0),
-      }),
-      { spend: 0, revenue: 0, purchases: 0, clicks: 0, impressions: 0 }
-    )
-
-    const roas = sum.spend > 0 ? sum.revenue / sum.spend : null
-    const ctr = sum.impressions > 0 ? (sum.purchases / sum.impressions) * 100 : null
-    const cpc = sum.clicks > 0 ? sum.spend / sum.clicks : null
-    const aov = sum.purchases > 0 ? sum.revenue / sum.purchases : null
-
-    const totals: SummaryTotals = {
-      spend: sum.spend || null,
-      revenue: sum.revenue || null,
-      purchases: sum.purchases || null,
-      clicks: sum.clicks || null,
-      impressions: sum.impressions || null,
-      reach: null,
-      add_to_cart: null,
-      content_views: null,
-      outbound_clicks: null,
-      video_views: null,
-      views_2s: null,
-      views_6s: null,
-      views_100pct: null,
-      roas,
-      frequency: null,
-      ctr,
-      cpc,
-      cpa: null,
-      cpm: null,
-      aov,
-      purchase_rate: null,
-    }
-
-    const currency = (rows[0]?.currency as string | null) ?? null
-    return NextResponse.json({ platform: 'shopee_shopping', dailyData, totals, shopeeExtra: { currency, hasKrw } })
-  } else {
-    // shopee_inapp
-    let query = supabase
-      .from('shopee_inapp_stats')
-      .select('date, impressions, clicks, conversions, gmv, gmv_krw, expense, expense_krw, currency')
-      .eq('shopee_account_id', accountId)
-      .gte('date', startDate)
-      .lte('date', endDate)
-      .order('date', { ascending: true })
-
-    if (brandId && brandId !== 'all') {
-      query = query.eq('brand_id', brandId)
-    }
-
-    const { data, error } = await query
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-    const rows = data ?? []
-
-    // KRW 환산 가능 여부 판정
-    const hasKrw = rows.some((r) => r.expense_krw != null)
-    const currency = (rows[0]?.currency as string | null) ?? null
-
-    // 날짜별 합산 (ads_type 복수 행)
-    const byDate: Record<string, { impressions: number; clicks: number; conversions: number; gmv: number; gmv_krw: number | null; expense: number; expense_krw: number | null }> = {}
-    for (const r of rows) {
-      if (!byDate[r.date]) {
-        byDate[r.date] = { impressions: 0, clicks: 0, conversions: 0, gmv: 0, gmv_krw: null, expense: 0, expense_krw: null }
-      }
-      const d = byDate[r.date]
-      d.impressions += (r.impressions as number | null) ?? 0
-      d.clicks += (r.clicks as number | null) ?? 0
-      d.conversions += (r.conversions as number | null) ?? 0
-      d.gmv += (r.gmv as number | null) ?? 0
-      d.expense += (r.expense as number | null) ?? 0
-      if (r.gmv_krw != null) d.gmv_krw = (d.gmv_krw ?? 0) + (r.gmv_krw as number)
-      if (r.expense_krw != null) d.expense_krw = (d.expense_krw ?? 0) + (r.expense_krw as number)
-    }
-
-    // spend = expense_krw (없으면 expense), revenue = gmv_krw (없으면 gmv), purchases = conversions
-    const dailyData: SummaryDayData[] = Object.entries(byDate)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, d]) => {
-        const spend = hasKrw ? d.expense_krw : (d.expense || null)
-        const revenue = hasKrw ? d.gmv_krw : (d.gmv || null)
-        const purchases = d.conversions || null
-        const clicks = d.clicks || null
-        const impressions = d.impressions || null
+      shoppingDailyData = shopRows.map((r) => {
+        const spend = spendByDate[r.date] ?? null
+        const revenue = shoppingHasKrw ? ((r.sales_krw as number | null) ?? null) : ((r.sales as number | null) ?? null)
+        const purchases = (r.orders as number | null) ?? null
+        const clicks = (r.product_clicks as number | null) ?? null
+        const impressions = (r.visitors as number | null) ?? null
+        const ctr = impressions && purchases && impressions > 0 ? (purchases / impressions) * 100 : null
         const roas = spend && revenue && spend > 0 ? revenue / spend : null
-        const ctr = clicks && impressions && impressions > 0 ? (clicks / impressions) * 100 : null
         const cpc = spend && clicks && clicks > 0 ? spend / clicks : null
-        const cpa = spend && purchases && purchases > 0 ? spend / purchases : null
-        const conversion_rate = clicks && purchases && clicks > 0 ? (purchases / clicks) * 100 : null
+        const aov = revenue != null && purchases && purchases > 0 ? revenue / purchases : null
         return {
-          date,
-          spend,
-          revenue,
-          purchases,
-          clicks,
-          impressions,
-          reach: null,
-          add_to_cart: null,
-          content_views: null,
-          outbound_clicks: null,
-          video_views: null,
-          views_2s: null,
-          views_6s: null,
-          views_100pct: null,
-          roas,
-          frequency: null,
-          ctr,
-          cpc,
-          cpa,
-          cpm: null,
-          aov: null,
-          purchase_rate: null,
-          conversion_rate,
+          date: r.date, spend, revenue, purchases, clicks, impressions,
+          reach: null, add_to_cart: null, content_views: null, outbound_clicks: null,
+          video_views: null, views_2s: null, views_6s: null, views_25pct: null, views_100pct: null,
+          roas, frequency: null, ctr, cpc, cpa: null, cpm: null, aov, purchase_rate: null,
+          buyers: (r.buyers as number | null) ?? null,
+          new_buyers: (r.new_buyers as number | null) ?? null,
+          existing_buyers: (r.existing_buyers as number | null) ?? null,
+          order_conversion_rate: (r.order_conversion_rate as number | null) ?? null,
+          repeat_purchase_rate: (r.repeat_purchase_rate as number | null) ?? null,
+          cancelled_orders: (r.cancelled_orders as number | null) ?? null,
+          cancelled_sales: shoppingHasKrw
+            ? ((r.cancelled_sales_krw as number | null) ?? null)
+            : ((r.cancelled_sales as number | null) ?? null),
+          refunded_orders: (r.refunded_orders as number | null) ?? null,
+          refunded_sales: shoppingHasKrw
+            ? ((r.refunded_sales_krw as number | null) ?? null)
+            : ((r.refunded_sales as number | null) ?? null),
         }
       })
 
-    const sumRaw = Object.values(byDate).reduce(
-      (acc, d) => ({
-        spend: acc.spend + (hasKrw ? (d.expense_krw ?? 0) : d.expense),
-        revenue: acc.revenue + (hasKrw ? (d.gmv_krw ?? 0) : d.gmv),
-        purchases: acc.purchases + d.conversions,
-        clicks: acc.clicks + d.clicks,
-        impressions: acc.impressions + d.impressions,
-      }),
-      { spend: 0, revenue: 0, purchases: 0, clicks: 0, impressions: 0 }
-    )
-
-    const roas = sumRaw.spend > 0 ? sumRaw.revenue / sumRaw.spend : null
-    const ctr = sumRaw.impressions > 0 ? (sumRaw.clicks / sumRaw.impressions) * 100 : null
-    const cpc = sumRaw.clicks > 0 ? sumRaw.spend / sumRaw.clicks : null
-    const cpa = sumRaw.purchases > 0 ? sumRaw.spend / sumRaw.purchases : null
-    const conversion_rate = sumRaw.clicks > 0 ? (sumRaw.purchases / sumRaw.clicks) * 100 : null
-
-    const totals: SummaryTotals = {
-      spend: sumRaw.spend || null,
-      revenue: sumRaw.revenue || null,
-      purchases: sumRaw.purchases || null,
-      clicks: sumRaw.clicks || null,
-      impressions: sumRaw.impressions || null,
-      reach: null,
-      add_to_cart: null,
-      content_views: null,
-      outbound_clicks: null,
-      video_views: null,
-      views_2s: null,
-      views_6s: null,
-      views_100pct: null,
-      roas,
-      frequency: null,
-      ctr,
-      cpc,
-      cpa,
-      cpm: null,
-      aov: null,
-      purchase_rate: null,
-      conversion_rate,
+      const shopSum = shopRows.reduce(
+        (acc, r) => ({
+          spend: acc.spend + (spendByDate[r.date] ?? 0),
+          revenue: acc.revenue + (shoppingHasKrw ? ((r.sales_krw as number | null) ?? 0) : ((r.sales as number | null) ?? 0)),
+          purchases: acc.purchases + ((r.orders as number | null) ?? 0),
+          clicks: acc.clicks + ((r.product_clicks as number | null) ?? 0),
+          impressions: acc.impressions + ((r.visitors as number | null) ?? 0),
+          buyers: acc.buyers + ((r.buyers as number | null) ?? 0),
+          new_buyers: acc.new_buyers + ((r.new_buyers as number | null) ?? 0),
+          existing_buyers: acc.existing_buyers + ((r.existing_buyers as number | null) ?? 0),
+          cancelled_orders: acc.cancelled_orders + ((r.cancelled_orders as number | null) ?? 0),
+          cancelled_sales: acc.cancelled_sales + (shoppingHasKrw ? ((r.cancelled_sales_krw as number | null) ?? 0) : ((r.cancelled_sales as number | null) ?? 0)),
+          refunded_orders: acc.refunded_orders + ((r.refunded_orders as number | null) ?? 0),
+          refunded_sales: acc.refunded_sales + (shoppingHasKrw ? ((r.refunded_sales_krw as number | null) ?? 0) : ((r.refunded_sales as number | null) ?? 0)),
+        }),
+        { spend: 0, revenue: 0, purchases: 0, clicks: 0, impressions: 0, buyers: 0, new_buyers: 0, existing_buyers: 0, cancelled_orders: 0, cancelled_sales: 0, refunded_orders: 0, refunded_sales: 0 }
+      )
+      shoppingTotals = {
+        spend: shopSum.spend || null, revenue: shopSum.revenue || null,
+        purchases: shopSum.purchases || null, clicks: shopSum.clicks || null,
+        impressions: shopSum.impressions || null,
+        reach: null, add_to_cart: null, content_views: null, outbound_clicks: null,
+        video_views: null, views_2s: null, views_6s: null, views_25pct: null, views_100pct: null,
+        roas: shopSum.spend > 0 ? shopSum.revenue / shopSum.spend : null,
+        frequency: null,
+        ctr: shopSum.impressions > 0 ? (shopSum.purchases / shopSum.impressions) * 100 : null,
+        cpc: shopSum.clicks > 0 ? shopSum.spend / shopSum.clicks : null,
+        cpa: null, cpm: null,
+        aov: shopSum.purchases > 0 ? shopSum.revenue / shopSum.purchases : null,
+        purchase_rate: null,
+        buyers: shopSum.buyers || null,
+        new_buyers: shopSum.new_buyers || null,
+        existing_buyers: shopSum.existing_buyers || null,
+        order_conversion_rate: shopSum.impressions > 0 ? (shopSum.purchases / shopSum.impressions) * 100 : null,
+        repeat_purchase_rate: shopSum.buyers > 0 ? (shopSum.existing_buyers / shopSum.buyers) * 100 : null,
+        cancelled_orders: shopSum.cancelled_orders || null,
+        cancelled_sales: shopSum.cancelled_sales || null,
+        refunded_orders: shopSum.refunded_orders || null,
+        refunded_sales: shopSum.refunded_sales || null,
+      }
     }
 
-    return NextResponse.json({ platform: 'shopee_inapp', dailyData, totals, shopeeExtra: { currency, hasKrw } })
+    // ── 인앱 데이터 ────────────────────────────────────────────────────
+    let inappDailyData: SummaryDayData[] = []
+    let inappTotals: SummaryTotals = buildEmptyTotals()
+    let inappCurrency: string | null = null
+    let inappHasKrw = false
+
+    if (inappAccountIds.length > 0) {
+      let inappQuery = supabase
+        .from('shopee_inapp_stats')
+        .select('date, impressions, clicks, conversions, gmv, gmv_krw, expense, expense_krw, currency')
+        .in('shopee_account_id', inappAccountIds)
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: true })
+      if (brandId && brandId !== 'all') inappQuery = inappQuery.eq('brand_id', brandId)
+
+      const { data: inappData } = await inappQuery
+      const inappRows = inappData ?? []
+
+      inappHasKrw = inappRows.some((r) => r.expense_krw != null)
+      inappCurrency = (inappRows[0]?.currency as string | null) ?? null
+
+      const byDate: Record<string, { impressions: number; clicks: number; conversions: number; gmv: number; gmv_krw: number | null; expense: number; expense_krw: number | null }> = {}
+      for (const r of inappRows) {
+        if (!byDate[r.date]) byDate[r.date] = { impressions: 0, clicks: 0, conversions: 0, gmv: 0, gmv_krw: null, expense: 0, expense_krw: null }
+        const d = byDate[r.date]
+        d.impressions += (r.impressions as number | null) ?? 0
+        d.clicks += (r.clicks as number | null) ?? 0
+        d.conversions += (r.conversions as number | null) ?? 0
+        d.gmv += (r.gmv as number | null) ?? 0
+        d.expense += (r.expense as number | null) ?? 0
+        if (r.gmv_krw != null) d.gmv_krw = (d.gmv_krw ?? 0) + (r.gmv_krw as number)
+        if (r.expense_krw != null) d.expense_krw = (d.expense_krw ?? 0) + (r.expense_krw as number)
+      }
+
+      inappDailyData = Object.entries(byDate)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, d]) => {
+          const spend = inappHasKrw ? d.expense_krw : (d.expense || null)
+          const revenue = inappHasKrw ? d.gmv_krw : (d.gmv || null)
+          const purchases = d.conversions || null
+          const clicks = d.clicks || null
+          const impressions = d.impressions || null
+          const roas = spend && revenue && spend > 0 ? revenue / spend : null
+          const ctr = clicks && impressions && impressions > 0 ? (clicks / impressions) * 100 : null
+          const cpc = spend && clicks && clicks > 0 ? spend / clicks : null
+          const cpa = spend && purchases && purchases > 0 ? spend / purchases : null
+          const conversion_rate = clicks && purchases && clicks > 0 ? (purchases / clicks) * 100 : null
+          return {
+            date, spend, revenue, purchases, clicks, impressions,
+            reach: null, add_to_cart: null, content_views: null, outbound_clicks: null,
+            video_views: null, views_2s: null, views_6s: null, views_25pct: null, views_100pct: null,
+            roas, frequency: null, ctr, cpc, cpa, cpm: null, aov: null, purchase_rate: null, conversion_rate,
+          }
+        })
+
+      const inappSum = Object.values(byDate).reduce(
+        (acc, d) => ({
+          spend: acc.spend + (inappHasKrw ? (d.expense_krw ?? 0) : d.expense),
+          revenue: acc.revenue + (inappHasKrw ? (d.gmv_krw ?? 0) : d.gmv),
+          purchases: acc.purchases + d.conversions,
+          clicks: acc.clicks + d.clicks,
+          impressions: acc.impressions + d.impressions,
+        }),
+        { spend: 0, revenue: 0, purchases: 0, clicks: 0, impressions: 0 }
+      )
+      inappTotals = {
+        spend: inappSum.spend || null, revenue: inappSum.revenue || null,
+        purchases: inappSum.purchases || null, clicks: inappSum.clicks || null,
+        impressions: inappSum.impressions || null,
+        reach: null, add_to_cart: null, content_views: null, outbound_clicks: null,
+        video_views: null, views_2s: null, views_6s: null, views_25pct: null, views_100pct: null,
+        roas: inappSum.spend > 0 ? inappSum.revenue / inappSum.spend : null,
+        frequency: null,
+        ctr: inappSum.impressions > 0 ? (inappSum.clicks / inappSum.impressions) * 100 : null,
+        cpc: inappSum.clicks > 0 ? inappSum.spend / inappSum.clicks : null,
+        cpa: inappSum.purchases > 0 ? inappSum.spend / inappSum.purchases : null,
+        cpm: null, aov: null, purchase_rate: null,
+        conversion_rate: inappSum.clicks > 0 ? (inappSum.purchases / inappSum.clicks) * 100 : null,
+      }
+    }
+
+    const currency = shoppingCurrency ?? inappCurrency
+    const hasKrw = shoppingHasKrw || inappHasKrw
+
+    return NextResponse.json({
+      platform: 'shopee',
+      dailyData: shoppingDailyData,  // 대표 데이터 (하위호환)
+      totals: shoppingTotals,
+      shopeeExtra: { currency, hasKrw },
+      shoppingDailyData,
+      shoppingTotals,
+      inappDailyData,
+      inappTotals,
+    })
+  }
+}
+
+// 빈 totals 초기값 생성 헬퍼
+function buildEmptyTotals(): SummaryTotals {
+  return {
+    spend: null, revenue: null, purchases: null, clicks: null, impressions: null,
+    reach: null, add_to_cart: null, content_views: null, outbound_clicks: null,
+    video_views: null, views_2s: null, views_6s: null, views_25pct: null, views_100pct: null,
+    roas: null, frequency: null, ctr: null, cpc: null, cpa: null, cpm: null,
+    aov: null, purchase_rate: null,
   }
 }

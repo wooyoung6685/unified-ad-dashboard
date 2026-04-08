@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const { brand_id, platform, country, internal_account_id, year, month } = body as {
     brand_id: string
-    platform: 'meta' | 'shopee_inapp'
+    platform: 'meta' | 'shopee' | 'tiktok'
     country: string | null
     internal_account_id: string | null
     year: number

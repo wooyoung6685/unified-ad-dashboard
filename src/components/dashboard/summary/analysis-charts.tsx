@@ -1,15 +1,12 @@
 'use client'
 
-import { fmtKRW, fmtNum, fmtPct } from '@/lib/format'
+import { fmtKRW, fmtNum } from '@/lib/format'
 import type { SummaryDayData } from '@/types/database'
+import { ChevronDown } from 'lucide-react'
 import {
   Bar,
   CartesianGrid,
-  Cell,
   ComposedChart,
-  Funnel,
-  FunnelChart,
-  LabelList,
   Legend,
   Line,
   ResponsiveContainer,
@@ -52,38 +49,6 @@ function EmptyState() {
   )
 }
 
-// 퍼널 차트 툴팁
-function FunnelTooltip({ active, payload }: any) {
-  if (!active || !payload?.[0]) return null
-  const item = payload[0].payload
-  return (
-    <div
-      style={{
-        backgroundColor: 'white',
-        border: '1px solid #E5E7EB',
-        borderRadius: '8px',
-        padding: '10px 14px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-        fontSize: '12px',
-        color: '#374151',
-      }}
-    >
-      <p style={{ fontWeight: 600, marginBottom: 6, color: '#111827' }}>
-        {item.name}
-      </p>
-      <p style={{ margin: '2px 0' }}>수량: {fmtNum(item.actualValue)}</p>
-      {item.convRate != null && (
-        <p style={{ margin: '2px 0', color: '#6B7280' }}>
-          이전 단계 대비: {item.convRate.toFixed(1)}%
-        </p>
-      )}
-      <p style={{ margin: '2px 0', color: '#6B7280' }}>
-        전체 대비: {item.totalRate.toFixed(1)}%
-      </p>
-    </div>
-  )
-}
-
 // 비용 효율 툴팁
 function CostTooltip({ active, payload, label }: any) {
   if (!active || !payload || !payload.length) return null
@@ -119,7 +84,106 @@ function CostTooltip({ active, payload, label }: any) {
   )
 }
 
-const FUNNEL_COLORS = ['#6366F1', '#3B82F6', '#10B981', '#F59E0B']
+const FUNNEL_GRADIENTS = [
+  { id: 'funnel-0', from: '#818CF8', to: '#6366F1', text: '#EEF2FF' },
+  { id: 'funnel-1', from: '#60A5FA', to: '#3B82F6', text: '#EFF6FF' },
+  { id: 'funnel-2', from: '#34D399', to: '#10B981', text: '#ECFDF5' },
+  { id: 'funnel-3', from: '#FBBF24', to: '#F59E0B', text: '#FFFBEB' },
+]
+
+// 커스텀 퍼널 차트 컴포넌트 (수평 바 기반)
+function CustomFunnel({ data }: { data: ReturnType<typeof buildFunnelData> }) {
+  const widths = [100, 70, 45, 25]
+  return (
+    <div className="flex flex-col items-center gap-0 py-2">
+      {data.map((step, i) => (
+        <div key={step.name} className="flex w-full flex-col items-center">
+          {/* 퍼널 바 */}
+          <div
+            className="group relative"
+            style={{ width: `${widths[i]}%`, minWidth: 100 }}
+          >
+            <div
+              className="flex h-[52px] cursor-default items-center justify-between rounded-xl px-4 shadow-sm transition-all duration-200 group-hover:shadow-md group-hover:brightness-105"
+              style={{
+                background: `linear-gradient(135deg, ${FUNNEL_GRADIENTS[i].from}, ${FUNNEL_GRADIENTS[i].to})`,
+              }}
+            >
+              <span className="text-[13px] font-semibold text-white/90">
+                {step.name}
+              </span>
+              <span className="text-[13px] font-bold text-white">
+                {fmtNum(step.actualValue)}
+              </span>
+            </div>
+            {/* hover 툴팁: 마지막 항목은 위쪽으로 표시 */}
+            <div
+              className={`invisible absolute left-1/2 z-20 min-w-[180px] -translate-x-1/2 rounded-lg border border-gray-100 bg-white px-3.5 py-2.5 opacity-0 shadow-lg transition-all duration-150 group-hover:visible group-hover:opacity-100 ${
+                i === data.length - 1
+                  ? 'bottom-full mb-2'
+                  : 'top-full mt-2'
+              }`}
+            >
+              <p className="mb-1.5 text-[12px] font-semibold text-gray-900">
+                {step.name}
+              </p>
+              <p className="text-[11px] text-gray-600">
+                수량:{' '}
+                <span className="font-medium text-gray-900">
+                  {fmtNum(step.actualValue)}
+                </span>
+              </p>
+              {step.convRate != null && (
+                <p className="text-[11px] text-gray-500">
+                  이전 단계 대비:{' '}
+                  <span className="font-medium">{step.convRate.toFixed(1)}%</span>
+                </p>
+              )}
+              <p className="text-[11px] text-gray-500">
+                전체 대비:{' '}
+                <span className="font-medium">{step.totalRate.toFixed(1)}%</span>
+              </p>
+            </div>
+          </div>
+          {/* 단계 간 커넥터 */}
+          {i < data.length - 1 && (
+            <div className="flex flex-col items-center py-0.5">
+              <ChevronDown className="h-4 w-4 text-gray-300" />
+              {data[i + 1].convRate != null && (
+                <span className="text-[10px] font-semibold text-gray-400">
+                  {data[i + 1].convRate!.toFixed(1)}%
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// funnelData 생성 로직 분리 (CustomFunnel 타입 참조용)
+function buildFunnelData(
+  totals: {
+    impressions: number
+    outbound_clicks: number
+    content_views: number
+    purchases: number
+  },
+  funnelSteps: { key: keyof typeof totals; label: string }[],
+) {
+  return funnelSteps.map((step, i) => {
+    const value = totals[step.key]
+    const prevValue = i > 0 ? totals[funnelSteps[i - 1].key] : null
+    return {
+      name: step.label,
+      actualValue: value,
+      convRate: prevValue && prevValue > 0 ? (value / prevValue) * 100 : null,
+      totalRate:
+        totals.impressions > 0 ? (value / totals.impressions) * 100 : 0,
+    }
+  })
+}
 
 export { AnalysisCharts as MetaAnalyticsCharts }
 
@@ -142,23 +206,7 @@ export function AnalysisCharts({ data }: AnalysisChartsProps) {
     { key: 'purchases' as const, label: '구매' },
   ]
 
-  // 시각적 비율 보정: 실제 값 차이가 극단적이므로 단계별 최소 너비 보장
-  const funnelData = funnelSteps.map((step, i) => {
-    const value = totals[step.key]
-    const prevValue = i > 0 ? totals[funnelSteps[i - 1].key] : null
-    // 시각적 너비: 100 → 70 → 45 → 25 (고정 비율로 점점 좁아지는 형태)
-    const displayValue = [100, 70, 45, 25][i]
-    return {
-      name: step.label,
-      value: displayValue,
-      actualValue: value,
-      fill: FUNNEL_COLORS[i],
-      convRate: prevValue && prevValue > 0 ? (value / prevValue) * 100 : null,
-      totalRate:
-        totals.impressions > 0 ? (value / totals.impressions) * 100 : 0,
-      label: `${fmtNum(value)}${prevValue && prevValue > 0 ? ` (${((value / prevValue) * 100).toFixed(1)}%)` : ''}`,
-    }
-  })
+  const funnelData = buildFunnelData(totals, funnelSteps)
 
   // 일별 비용 효율 데이터 (비용 효율 차트용)
   const costData = data.map((d) => ({
@@ -186,40 +234,7 @@ export function AnalysisCharts({ data }: AnalysisChartsProps) {
           {data.length === 0 || totals.impressions === 0 ? (
             <EmptyState />
           ) : (
-            <>
-              <ResponsiveContainer width="100%" height={280}>
-                <FunnelChart>
-                  <Tooltip content={<FunnelTooltip />} />
-                  <Funnel
-                    dataKey="value"
-                    nameKey="name"
-                    data={funnelData}
-                    isAnimationActive
-                  >
-                    <LabelList
-                      dataKey="label"
-                      position="right"
-                      style={{ fill: '#374151', fontSize: 11 }}
-                    />
-                    {funnelData.map((entry, index) => (
-                      <Cell key={index} fill={entry.fill} />
-                    ))}
-                  </Funnel>
-                </FunnelChart>
-              </ResponsiveContainer>
-              {/* 커스텀 범례 */}
-              <div className="mt-2 flex items-center justify-center gap-4">
-                {funnelData.map((entry, index) => (
-                  <div key={index} className="flex items-center gap-1.5">
-                    <span
-                      className="inline-block h-2.5 w-2.5 rounded-sm"
-                      style={{ backgroundColor: entry.fill }}
-                    />
-                    <span className="text-xs text-gray-500">{entry.name}</span>
-                  </div>
-                ))}
-              </div>
-            </>
+            <CustomFunnel data={funnelData} />
           )}
         </ChartCard>
 

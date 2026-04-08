@@ -5,12 +5,13 @@ import type { SummaryDayData } from '@/types/database'
 import {
   Bar,
   CartesianGrid,
+  Cell,
   ComposedChart,
   Legend,
   Line,
+  Pie,
+  PieChart,
   ResponsiveContainer,
-  Scatter,
-  ScatterChart,
   Tooltip,
   XAxis,
   YAxis,
@@ -58,8 +59,7 @@ function CustomTooltip({ active, payload, label }: any) {
 
   const formatValue = (name: string, value: any) => {
     if (value === null || value === undefined) return '-'
-    if (['ROAS', '전환율'].includes(name)) return `${Number(value).toFixed(2)}%`
-    if (['GMV', '매출', '지출금액', '광고비', '객단가', 'CPC'].includes(name))
+    if (['매출', '지출금액', '광고비'].includes(name))
       return `₩${Math.round(value).toLocaleString()}`
     return Math.round(value).toLocaleString()
   }
@@ -90,56 +90,45 @@ function CustomTooltip({ active, payload, label }: any) {
   )
 }
 
-// ScatterChart 전용 툴팁
-function ScatterCustomTooltip({ active, payload }: any) {
-  if (!active || !payload || !payload.length) return null
-  const d = payload[0]?.payload
+// PieChart 커스텀 라벨
+function renderPieLabel({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }: any) {
+  const RADIAN = Math.PI / 180
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.5
+  const x = cx + radius * Math.cos(-midAngle * RADIAN)
+  const y = cy + radius * Math.sin(-midAngle * RADIAN)
+  if (percent < 0.05) return null
   return (
-    <div
-      style={{
-        backgroundColor: 'white',
-        border: '1px solid #E5E7EB',
-        borderRadius: '8px',
-        padding: '10px 14px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-        fontSize: '12px',
-        color: '#374151',
-      }}
-    >
-      <p style={{ fontWeight: 600, marginBottom: 6, color: '#111827' }}>
-        {d?.date}
-      </p>
-      <p style={{ color: '#10B981', margin: '2px 0' }}>
-        광고비: ₩{Math.round(d?.x ?? 0).toLocaleString()}
-      </p>
-      <p style={{ color: '#10B981', margin: '2px 0' }}>
-        GMV: ₩{Math.round(d?.y ?? 0).toLocaleString()}
-      </p>
-    </div>
+    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight={600}>
+      {`${(percent * 100).toFixed(1)}%`}
+    </text>
   )
 }
+
+const PIE_COLORS = ['#10B981', '#F59E0B']
 
 export function ShopeeShoppingAnalyticsCharts({
   data,
   hasKrw,
   currency,
 }: ShopeeShoppingAnalyticsChartsProps) {
-  // Composed 차트용 데이터 (MM-DD 날짜 포맷)
   const chartData = data.map((d) => ({
     date: d.date.slice(5),
-    fullDate: d.date,
     spend: d.spend,
     revenue: d.revenue,
     purchases: d.purchases,
     impressions: d.impressions,
-    clicks: d.clicks,
-    aov: d.aov,
+    new_buyers: d.new_buyers ?? null,
+    existing_buyers: d.existing_buyers ?? null,
   }))
 
-  // Scatter 차트용 데이터 (spend/revenue 모두 있는 날짜만)
-  const scatterData = data
-    .filter((d) => d.spend != null && d.revenue != null)
-    .map((d) => ({ x: d.spend!, y: d.revenue!, date: d.date }))
+  // 신규/기존 구매자 합계 (PieChart용)
+  const totalNewBuyers = data.reduce((sum, d) => sum + (d.new_buyers ?? 0), 0)
+  const totalExistingBuyers = data.reduce((sum, d) => sum + (d.existing_buyers ?? 0), 0)
+  const hasBuyerData = totalNewBuyers + totalExistingBuyers > 0
+  const pieData = [
+    { name: '신규 구매자', value: totalNewBuyers },
+    { name: '기존 구매자', value: totalExistingBuyers },
+  ]
 
   return (
     <div className="space-y-2">
@@ -152,55 +141,10 @@ export function ShopeeShoppingAnalyticsCharts({
         </p>
       )}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* 그래프 1 – 투자 성과 (Scatter) */}
+        {/* 그래프 1 – 일별 객단가 분석 (주문수 vs 매출) */}
         <ChartCard
-          title="투자 성과 (Spend vs GMV)"
-          subtitle="광고비 대비 거래액(GMV) 분포"
-        >
-          {data.length === 0 || scatterData.length === 0 ? (
-            <EmptyState />
-          ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <ScatterChart margin={{ top: 10, right: 20, left: 10, bottom: 30 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis
-                  dataKey="x"
-                  type="number"
-                  name="광고비"
-                  tick={{ fontSize: 11 }}
-                  tickFormatter={(v) => fmtKRW(v)}
-                  label={{
-                    value: '광고비',
-                    position: 'insideBottom',
-                    offset: -15,
-                    fontSize: 11,
-                  }}
-                />
-                <YAxis
-                  dataKey="y"
-                  type="number"
-                  name="GMV"
-                  tick={{ fontSize: 11 }}
-                  tickFormatter={(v) => fmtKRW(v)}
-                  width={80}
-                  label={{
-                    value: 'GMV',
-                    angle: -90,
-                    position: 'insideLeft',
-                    fontSize: 11,
-                  }}
-                />
-                <Tooltip content={<ScatterCustomTooltip />} />
-                <Scatter data={scatterData} fill="#10B981" r={6} />
-              </ScatterChart>
-            </ResponsiveContainer>
-          )}
-        </ChartCard>
-
-        {/* 그래프 2 – 매출 분석 (결제수 Bar + GMV Line) */}
-        <ChartCard
-          title="매출 분석 (결제수 vs GMV)"
-          subtitle="결제 건수와 총 매출의 추이"
+          title="일별 객단가 분석 (주문수 vs 매출)"
+          subtitle="일별 주문 건수와 총 매출 추이"
         >
           {data.length === 0 ? (
             <EmptyState />
@@ -226,11 +170,11 @@ export function ShopeeShoppingAnalyticsCharts({
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: 11 }} />
-                <Bar yAxisId="left" dataKey="purchases" name="결제건수" fill="#6366F1" />
+                <Bar yAxisId="left" dataKey="purchases" name="주문수" fill="#6366F1" />
                 <Line
                   yAxisId="right"
                   dataKey="revenue"
-                  name="GMV"
+                  name="매출"
                   stroke="#10B981"
                   dot={{ r: 3 }}
                 />
@@ -239,10 +183,10 @@ export function ShopeeShoppingAnalyticsCharts({
           )}
         </ChartCard>
 
-        {/* 그래프 3 – 객단가 분석 (주문수 Bar + AOV Line) */}
+        {/* 그래프 2 – 일별 광고 성과 (Spend vs GMV) */}
         <ChartCard
-          title="객단가 분석 (주문수 vs AOV)"
-          subtitle="주문수 증가에 따른 객단가 변화"
+          title="일별 광고 성과 (Spend vs GMV)"
+          subtitle="광고비 지출과 거래액(GMV) 추이"
         >
           {data.length === 0 ? (
             <EmptyState />
@@ -256,8 +200,9 @@ export function ShopeeShoppingAnalyticsCharts({
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                 <YAxis
                   yAxisId="left"
-                  tickFormatter={(v) => fmtNum(v)}
+                  tickFormatter={(v) => fmtKRW(v)}
                   tick={{ fontSize: 11 }}
+                  width={80}
                 />
                 <YAxis
                   yAxisId="right"
@@ -268,12 +213,12 @@ export function ShopeeShoppingAnalyticsCharts({
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: 11 }} />
-                <Bar yAxisId="left" dataKey="purchases" name="주문수" fill="#6B7280" />
+                <Bar yAxisId="left" dataKey="spend" name="지출금액" fill="#6366F1" />
                 <Line
                   yAxisId="right"
-                  dataKey="aov"
-                  name="객단가"
-                  stroke="#EF4444"
+                  dataKey="revenue"
+                  name="매출"
+                  stroke="#10B981"
                   dot={{ r: 3 }}
                 />
               </ComposedChart>
@@ -281,10 +226,10 @@ export function ShopeeShoppingAnalyticsCharts({
           )}
         </ChartCard>
 
-        {/* 그래프 4 – 트래픽 품질 (방문자 vs PV) */}
+        {/* 그래프 3 – 일별 구매 전환 흐름 (방문자 수 vs 주문 수) */}
         <ChartCard
-          title="트래픽 품질 (방문자 vs PV)"
-          subtitle="방문자당 페이지뷰(Depth) 확인"
+          title="일별 구매 전환 흐름 (방문자 수 vs 주문 수)"
+          subtitle="방문자 유입 대비 실제 주문 전환 추이"
         >
           {data.length === 0 ? (
             <EmptyState />
@@ -306,20 +251,64 @@ export function ShopeeShoppingAnalyticsCharts({
                   orientation="right"
                   tickFormatter={(v) => fmtNum(v)}
                   tick={{ fontSize: 11 }}
-                  width={80}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: 11 }} />
-                <Bar yAxisId="left" dataKey="clicks" name="페이지뷰" fill="#D1D5DB" />
+                <Bar yAxisId="left" dataKey="impressions" name="방문자 수" fill="#06B6D4" />
                 <Line
                   yAxisId="right"
-                  dataKey="impressions"
-                  name="방문자수"
-                  stroke="#6366F1"
+                  dataKey="purchases"
+                  name="주문 수"
+                  stroke="#8B5CF6"
                   dot={{ r: 3 }}
                 />
               </ComposedChart>
             </ResponsiveContainer>
+          )}
+        </ChartCard>
+
+        {/* 그래프 4 – 신규/기존 구매자 비율 (PieChart) */}
+        <ChartCard
+          title="신규 구매자 / 기존 구매자 비율"
+          subtitle="기간 내 신규 vs 기존 구매자 구성"
+        >
+          {!hasBuyerData ? (
+            <EmptyState />
+          ) : (
+            <div className="flex flex-col items-center">
+              <ResponsiveContainer width="100%" height={260}>
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={100}
+                    dataKey="value"
+                    labelLine={false}
+                    label={renderPieLabel}
+                  >
+                    {pieData.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value: any, name: any) => {
+                      if (value === undefined || value === null) return ['-', name ?? '']
+                      const total = totalNewBuyers + totalExistingBuyers
+                      return [
+                        `${Number(value).toLocaleString()}명 (${total > 0 ? ((Number(value) / total) * 100).toFixed(1) : 0}%)`,
+                        name ?? '',
+                      ]
+                    }}
+                  />
+                  <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: 11 }} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="mt-1 flex gap-6 text-xs text-gray-500">
+                <span>신규: <strong className="text-gray-700">{totalNewBuyers.toLocaleString()}명</strong></span>
+                <span>기존: <strong className="text-gray-700">{totalExistingBuyers.toLocaleString()}명</strong></span>
+              </div>
+            </div>
           )}
         </ChartCard>
       </div>

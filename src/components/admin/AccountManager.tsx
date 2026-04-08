@@ -39,7 +39,7 @@ import { cn } from '@/lib/utils'
 import type { Brand } from '@/types/database'
 import { useCallback, useEffect, useState } from 'react'
 
-type PlatformType = 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp'
+type PlatformType = 'meta' | 'tiktok' | 'shopee'
 
 interface PendingRow {
   _key: string
@@ -63,6 +63,7 @@ interface RegisteredAccount {
   country: string | null
   is_active: boolean
   store_id?: string | null  // TikTok GMV Max용 Store ID (자동 감지)
+  _shopeeRowIds?: string[]  // 쇼피 통합: shopping+inapp 두 행의 DB PK
 }
 
 interface EditingValues {
@@ -79,8 +80,7 @@ interface AccountManagerProps {
 const PLATFORM_LABEL: Record<PlatformType, string> = {
   meta: '페북/인스타',
   tiktok: '틱톡',
-  shopee_shopping: '쇼핑몰',
-  shopee_inapp: '인앱',
+  shopee: '쇼피',
 }
 
 const COUNTRY_OPTIONS = [
@@ -97,7 +97,7 @@ const COUNTRY_OPTIONS = [
 ]
 
 function isShopee(platform: PlatformType | ''): boolean {
-  return platform === 'shopee_shopping' || platform === 'shopee_inapp'
+  return platform === 'shopee'
 }
 
 function getApiEndpoint(platform: PlatformType): string {
@@ -148,6 +148,7 @@ export function AccountManager({ brands }: AccountManagerProps) {
   const [deleteTarget, setDeleteTarget] = useState<{
     id: string
     platform: PlatformType
+    shopeeExternalId?: string  // 쇼피: 외부 account_id로 두 행 모두 삭제
   } | null>(null)
 
   // 브랜드별 등록 계정 수
@@ -190,16 +191,41 @@ export function AccountManager({ brands }: AccountManagerProps) {
         platform: 'tiktok' as PlatformType,
         store_id: (a as RegisteredAccount).store_id ?? null,
       }))
-      const shopeeAccountsMapped: RegisteredAccount[] = (
-        shopeeJson.accounts ?? []
-      ).map(
-        (a: Omit<RegisteredAccount, 'platform'> & { account_type: string }) => ({
-          ...a,
-          platform: (
-            a.account_type === 'shopping' ? 'shopee_shopping' : 'shopee_inapp'
-          ) as PlatformType,
+      // shopee 계정을 brand_id + account_id 기준으로 그룹핑하여 하나의 항목으로 표시
+      type ShopeeRawAccount = {
+        id: string
+        brand_id: string
+        brand_name: string
+        account_id: string
+        sub_brand: string | null
+        account_type: string
+        country: string | null
+        is_active: boolean
+      }
+      const shopeeByKey = new Map<string, ShopeeRawAccount[]>()
+      for (const row of shopeeJson.accounts ?? []) {
+        const key = `${row.brand_id}__${row.account_id}`
+        if (!shopeeByKey.has(key)) shopeeByKey.set(key, [])
+        shopeeByKey.get(key)!.push(row)
+      }
+
+      const shopeeAccountsMapped: RegisteredAccount[] = []
+      for (const rows of shopeeByKey.values()) {
+        // 대표 행: shopping 우선, 없으면 첫 번째 행
+        const rep = rows.find((r) => r.account_type === 'shopping') ?? rows[0]
+        shopeeAccountsMapped.push({
+          id: rep.id,
+          brand_id: rep.brand_id,
+          brand_name: rep.brand_name,
+          platform: 'shopee' as PlatformType,
+          account_id: rep.account_id,
+          sub_brand: rep.sub_brand,
+          note: null,
+          country: rep.country,
+          is_active: rows.some((r) => r.is_active),
+          _shopeeRowIds: rows.map((r) => r.id),
         })
-      )
+      }
 
       setRegistered([...metaAccounts, ...tiktokAccounts, ...shopeeAccountsMapped])
     } finally {
@@ -253,9 +279,7 @@ export function AccountManager({ brands }: AccountManagerProps) {
       country: row.country || null,
       is_active: row.is_active,
     }
-    if (isShopee(row.platform)) {
-      body.account_type = row.platform === 'shopee_shopping' ? 'shopping' : 'inapp'
-    }
+    // shopee: account_type 없이 POST → API에서 shopping+inapp 두 행 동시 생성
 
     const res = await fetch(endpoint, {
       method: 'POST',
@@ -277,7 +301,16 @@ export function AccountManager({ brands }: AccountManagerProps) {
   }
 
   // 등록 계정 삭제
-  async function deleteRegistered(id: string, platform: PlatformType) {
+  async function deleteRegistered(id: string, platform: PlatformType, shopeeExternalId?: string) {
+    if (platform === 'shopee' && shopeeExternalId) {
+      // shopee: account_id 기준으로 shopping+inapp 두 행 모두 삭제
+      const res = await fetch(`/api/admin/accounts/shopee?account_id=${shopeeExternalId}`, { method: 'DELETE' })
+      const json = await res.json()
+      if (!json.error) {
+        setRegistered((prev) => prev.filter((a) => !(a.platform === 'shopee' && a.account_id === shopeeExternalId)))
+      }
+      return
+    }
     const endpoint = getApiEndpoint(platform)
     const res = await fetch(`${endpoint}?id=${id}`, { method: 'DELETE' })
     const json = await res.json()
@@ -308,9 +341,7 @@ export function AccountManager({ brands }: AccountManagerProps) {
       country: editingValues.country || null,
       is_active: account.is_active,
     }
-    if (isShopee(account.platform)) {
-      body.account_type = account.platform === 'shopee_shopping' ? 'shopping' : 'inapp'
-    }
+    // shopee: account_type 없이 POST → API에서 shopping+inapp 두 행 동시 upsert
 
     const res = await fetch(endpoint, {
       method: 'POST',
@@ -331,7 +362,9 @@ export function AccountManager({ brands }: AccountManagerProps) {
     } else if (account.platform === 'tiktok') {
       await toggleTiktokAccount(account.id, !account.is_active)
     } else {
-      await toggleShopeeAccount(account.id, !account.is_active)
+      // shopee: 연결된 모든 행(shopping+inapp) 토글
+      const ids = account._shopeeRowIds ?? [account.id]
+      await Promise.all(ids.map((rid) => toggleShopeeAccount(rid, !account.is_active)))
     }
     setRegistered((prev) =>
       prev.map((a) =>
@@ -429,8 +462,7 @@ export function AccountManager({ brands }: AccountManagerProps) {
                         <SelectContent>
                           <SelectItem value="meta">페북/인스타</SelectItem>
                           <SelectItem value="tiktok">틱톡</SelectItem>
-                          <SelectItem value="shopee_shopping">쇼핑몰</SelectItem>
-                          <SelectItem value="shopee_inapp">인앱</SelectItem>
+                          <SelectItem value="shopee">쇼피</SelectItem>
                         </SelectContent>
                       </Select>
                     </TableCell>
@@ -664,6 +696,8 @@ export function AccountManager({ brands }: AccountManagerProps) {
                                   setDeleteTarget({
                                     id: account.id,
                                     platform: account.platform,
+                                    shopeeExternalId:
+                                      account.platform === 'shopee' ? account.account_id : undefined,
                                   })
                                 }
                               >
@@ -701,7 +735,7 @@ export function AccountManager({ brands }: AccountManagerProps) {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
                 if (deleteTarget)
-                  deleteRegistered(deleteTarget.id, deleteTarget.platform)
+                  deleteRegistered(deleteTarget.id, deleteTarget.platform, deleteTarget.shopeeExternalId)
                 setDeleteTarget(null)
               }}
             >

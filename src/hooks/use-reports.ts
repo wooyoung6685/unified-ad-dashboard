@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 type CreateReportBody = {
   brand_id: string
-  platform: 'meta' | 'shopee_inapp' | 'tiktok'
+  platform: 'meta' | 'shopee' | 'tiktok'
   country: string | null
   internal_account_id: string | null
   year: number

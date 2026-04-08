@@ -160,7 +160,7 @@ export function ReportDetail({ report, role, creatorEmail }: Props) {
             insightMemo={report.insight_memo}
             insightMemoGmvMax={report.insight_memo_gmv_max}
           />
-        ) : snapshot.platform === 'shopee_inapp' ? (
+        ) : (snapshot.platform === 'shopee' || snapshot.platform === 'shopee_inapp') ? (
           <ShopeeReportDetail data={snapshot.data} title={title} />
         ) : null}
       </div>

@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/table'
 import { fmtDec, fmtKRW, fmtNum, fmtPct } from '@/lib/format'
 import type {
+  MetaAdsetData,
   MetaCampaignData,
   MetaCreativeData,
   MetaMonthlyData,
@@ -134,24 +135,17 @@ function MonthlyKpi({ m }: { m: MetaMonthlyData }) {
       <CardContent>
         <div className="grid grid-cols-4 gap-3">
           <MetaKpiCard label="지출금액" curr={m.spend} prev={m.prev_spend} format="krw" goodUp={false} />
-          <MetaKpiCard label="매출" curr={m.revenue} prev={m.prev_revenue} format="krw" goodUp />
+          <MetaKpiCard label="구매전환값" curr={m.revenue} prev={m.prev_revenue} format="krw" goodUp />
           <MetaKpiCard label="ROAS" curr={m.roas} prev={m.prev_roas} format="pct" goodUp />
-          <MetaKpiCard label="구매(전환)수" curr={m.purchases} prev={m.prev_purchases} format="num" goodUp />
+          <MetaKpiCard label="구매전환수" curr={m.purchases} prev={m.prev_purchases} format="num" goodUp />
+          <MetaKpiCard label="장바구니 담기" curr={m.add_to_cart} prev={m.prev_add_to_cart} format="num" goodUp />
           <MetaKpiCard label="노출수" curr={m.impressions} prev={m.prev_impressions} format="num" goodUp />
-          <MetaKpiCard label="도달수" curr={m.reach} prev={m.prev_reach} format="num" goodUp />
+          <MetaKpiCard label="도달" curr={m.reach} prev={m.prev_reach} format="num" goodUp />
           <MetaKpiCard label="빈도" curr={m.frequency} prev={m.prev_frequency} format="dec" goodUp />
           <MetaKpiCard label="CPM" curr={m.cpm} prev={m.prev_cpm} format="krw" goodUp={false} />
           <MetaKpiCard label="클릭수" curr={m.clicks} prev={m.prev_clicks} format="num" goodUp />
-          <MetaKpiCard label="클릭률(CTR)" curr={m.ctr} prev={m.prev_ctr} format="pct" goodUp />
-          <MetaKpiCard label="클릭당 비용(CPC)" curr={m.cpc} prev={m.prev_cpc} format="krw" goodUp={false} />
-          <MetaKpiCard label="장바구니 담기" curr={m.add_to_cart} prev={m.prev_add_to_cart} format="num" goodUp />
-          <MetaKpiCard
-            label="장바구니 담기당 비용"
-            curr={m.cost_per_add_to_cart}
-            prev={m.prev_cost_per_add_to_cart}
-            format="krw"
-            goodUp={false}
-          />
+          <MetaKpiCard label="CTR (클릭률)" curr={m.ctr} prev={m.prev_ctr} format="pct" goodUp />
+          <MetaKpiCard label="CPC (클릭당 비용)" curr={m.cpc} prev={m.prev_cpc} format="krw" goodUp={false} />
         </div>
       </CardContent>
     </Card>
@@ -174,39 +168,39 @@ function WeeklyCharts({ weekly }: { weekly: MetaWeeklyData[] }) {
 
   const chartConfigs = [
     {
-      title: 'CPM & 노출수',
+      title: 'ROAS vs 매출',
+      barKey: 'revenue',
+      barName: '매출',
+      lineKey: 'roas',
+      lineName: 'ROAS',
+      lineStroke: '#10B981',
+      lineLabel: '%',
+    },
+    {
+      title: '구매전환값 vs 장바구니 담기',
+      barKey: 'add_to_cart',
+      barName: '장바구니 담기',
+      lineKey: 'revenue',
+      lineName: '구매전환값',
+      lineStroke: '#F59E0B',
+      lineLabel: '₩',
+    },
+    {
+      title: 'CPM vs 노출',
       barKey: 'impressions',
-      barName: '노출수',
+      barName: '노출',
       lineKey: 'cpm',
       lineName: 'CPM',
       lineStroke: '#EF4444',
       lineLabel: '₩',
     },
     {
-      title: 'CTR & 클릭수',
+      title: 'CTR vs 클릭',
       barKey: 'clicks',
-      barName: '클릭수',
+      barName: '클릭',
       lineKey: 'ctr',
       lineName: 'CTR',
       lineStroke: '#3B82F6',
-      lineLabel: '%',
-    },
-    {
-      title: '장바구니 전환값 & 장바구니 담기',
-      barKey: 'add_to_cart',
-      barName: '장바구니 담기',
-      lineKey: 'add_to_cart_value',
-      lineName: '전환값',
-      lineStroke: '#F59E0B',
-      lineLabel: '₩',
-    },
-    {
-      title: 'ROAS & 매출',
-      barKey: 'revenue',
-      barName: '매출',
-      lineKey: 'roas',
-      lineName: 'ROAS',
-      lineStroke: '#10B981',
       lineLabel: '%',
     },
   ]
@@ -460,6 +454,84 @@ function CampaignTable({ campaigns }: { campaigns: MetaCampaignData[] }) {
   )
 }
 
+// 섹션 6: 광고세트 성과
+function AdsetTable({ adsets }: { adsets: MetaAdsetData[] }) {
+  if (adsets.length === 0) return null
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">📂 광고세트 성과 분석 (Meta)</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="sticky left-0 z-10 whitespace-nowrap bg-white after:absolute after:right-0 after:top-0 after:h-full after:w-px after:bg-border dark:bg-background">
+                  광고세트명
+                </TableHead>
+                <TableHead className="whitespace-nowrap">캠페인명</TableHead>
+                <TableHead className="whitespace-nowrap">지출금액</TableHead>
+                <TableHead className="whitespace-nowrap">장바구니 담기</TableHead>
+                <TableHead className="whitespace-nowrap">장바구니 담기당 비용</TableHead>
+                <TableHead className="whitespace-nowrap">장바구니 전환값</TableHead>
+                <TableHead className="whitespace-nowrap">구매(전환)수</TableHead>
+                <TableHead className="whitespace-nowrap">매출</TableHead>
+                <TableHead className="whitespace-nowrap">ROAS</TableHead>
+                <TableHead className="whitespace-nowrap">노출수</TableHead>
+                <TableHead className="whitespace-nowrap">도달수</TableHead>
+                <TableHead className="whitespace-nowrap">빈도</TableHead>
+                <TableHead className="whitespace-nowrap">CPC</TableHead>
+                <TableHead className="whitespace-nowrap">클릭률(CTR)</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {adsets.map((a) => {
+                const costPerCart =
+                  a.cost_per_add_to_cart ??
+                  (a.spend != null && a.add_to_cart != null && a.add_to_cart > 0
+                    ? a.spend / a.add_to_cart
+                    : null)
+                const prevCostPerCart =
+                  a.prev_cost_per_add_to_cart ??
+                  (a.prev_spend != null && a.prev_add_to_cart != null && a.prev_add_to_cart > 0
+                    ? a.prev_spend / a.prev_add_to_cart
+                    : null)
+                return (
+                  <TableRow key={a.adset_id}>
+                    <TableCell className="sticky left-0 z-10 max-w-[200px] whitespace-nowrap bg-white font-medium after:absolute after:right-0 after:top-0 after:h-full after:w-px after:bg-border dark:bg-background">
+                      <span className="block truncate" title={a.adset_name}>
+                        {a.adset_name}
+                      </span>
+                    </TableCell>
+                    <TableCell className="max-w-[160px] whitespace-nowrap">
+                      <span className="block truncate text-xs text-muted-foreground" title={a.campaign_name}>
+                        {a.campaign_name}
+                      </span>
+                    </TableCell>
+                    <CampCell curr={a.spend} prev={a.prev_spend} format="krw" goodUp={false} />
+                    <CampCell curr={a.add_to_cart} prev={a.prev_add_to_cart} format="num" goodUp />
+                    <CampCell curr={costPerCart} prev={prevCostPerCart} format="krw" goodUp={false} />
+                    <CampCell curr={a.add_to_cart_value} prev={null} format="krw" goodUp />
+                    <CampCell curr={a.purchases} prev={a.prev_purchases} format="num" goodUp />
+                    <CampCell curr={a.revenue} prev={a.prev_revenue} format="krw" goodUp />
+                    <CampCell curr={a.roas ?? 0} prev={a.prev_roas} format="pct" goodUp />
+                    <CampCell curr={a.impressions} prev={a.prev_impressions} format="num" goodUp />
+                    <CampCell curr={a.reach} prev={a.prev_reach} format="num" goodUp />
+                    <CampCell curr={a.frequency} prev={a.prev_frequency} format="dec" goodUp />
+                    <CampCell curr={a.cpc} prev={a.prev_cpc} format="krw" goodUp={false} />
+                    <CampCell curr={a.ctr} prev={a.prev_ctr} format="pct" goodUp />
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 // 순위 뱃지 색상
 function RankBadge({ rank }: { rank: number }) {
   const styles: Record<number, string> = {
@@ -592,7 +664,10 @@ export function MetaReportDetail({ data, title }: Props) {
       {/* 섹션 5: 캠페인 성과 */}
       <CampaignTable campaigns={data.campaigns} />
 
-      {/* 섹션 6: 소재 성과 */}
+      {/* 섹션 6: 광고세트 성과 */}
+      <AdsetTable adsets={data.adsets ?? []} />
+
+      {/* 섹션 7: 소재 성과 */}
       <CreativeSection creatives={data.creatives} />
     </div>
   )

@@ -56,8 +56,7 @@ function CustomTooltip({ active, payload, label }: any) {
 
   const formatValue = (name: string, value: any) => {
     if (value === null || value === undefined) return '-'
-    if (['ROAS', 'CTR', '전환율'].includes(name)) return `${Number(value).toFixed(2)}%`
-    if (['광고비', '지출금액', 'CPC', 'CPA', '매출'].includes(name))
+    if (['지출금액', '매출 GMV'].includes(name))
       return `₩${Math.round(value).toLocaleString()}`
     return Math.round(value).toLocaleString()
   }
@@ -95,17 +94,11 @@ export function ShopeeInappAnalyticsCharts({
 }: ShopeeInappAnalyticsChartsProps) {
   const chartData = data.map((d) => ({
     date: d.date.slice(5),
-    fullDate: d.date,
     expense: d.spend,
+    revenue: d.revenue,
     impressions: d.impressions,
     clicks: d.clicks,
-    purchases: d.purchases,
-    roas: d.roas,
-    ctr: d.ctr,
-    cpc: d.cpc,
   }))
-
-  const expenseLabel = hasKrw ? '광고비' : `광고비(${currency ?? '현지'})`
 
   return (
     <div className="space-y-2">
@@ -118,10 +111,10 @@ export function ShopeeInappAnalyticsCharts({
         </p>
       )}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* 그래프 1 – 광고 효율 (광고비 Bar + ROAS Line) */}
+        {/* 그래프 1 – 지출금액 vs 매출 */}
         <ChartCard
-          title="광고 효율 (광고비 vs ROAS)"
-          subtitle="광고비 투자 대비 ROAS 효율 점검"
+          title="지출금액 vs 매출"
+          subtitle="광고비 지출 대비 GMV 매출 추이"
         >
           {data.length === 0 ? (
             <EmptyState />
@@ -142,16 +135,17 @@ export function ShopeeInappAnalyticsCharts({
                 <YAxis
                   yAxisId="right"
                   orientation="right"
-                  tickFormatter={(v) => `${Number(v).toFixed(0)}%`}
+                  tickFormatter={(v) => fmtKRW(v)}
                   tick={{ fontSize: 11 }}
+                  width={80}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: 11 }} />
-                <Bar yAxisId="left" dataKey="expense" name={expenseLabel} fill="#6366F1" />
+                <Bar yAxisId="left" dataKey="expense" name="지출금액" fill="#6366F1" />
                 <Line
                   yAxisId="right"
-                  dataKey="roas"
-                  name="ROAS"
+                  dataKey="revenue"
+                  name="매출 GMV"
                   stroke="#10B981"
                   dot={{ r: 3 }}
                 />
@@ -160,10 +154,10 @@ export function ShopeeInappAnalyticsCharts({
           )}
         </ChartCard>
 
-        {/* 그래프 2 – 노출 성과 (노출수 Bar + CTR Line) */}
+        {/* 그래프 2 – 노출 vs 클릭 */}
         <ChartCard
-          title="노출 성과 (노출 vs CTR)"
-          subtitle="노출량과 클릭 반응률(CTR) 비교"
+          title="노출 vs 클릭"
+          subtitle="광고 노출량 대비 클릭 반응 추이"
         >
           {data.length === 0 ? (
             <EmptyState />
@@ -183,100 +177,17 @@ export function ShopeeInappAnalyticsCharts({
                 <YAxis
                   yAxisId="right"
                   orientation="right"
-                  tickFormatter={(v) => `${Number(v).toFixed(2)}%`}
+                  tickFormatter={(v) => fmtNum(v)}
                   tick={{ fontSize: 11 }}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: 11 }} />
-                <Bar yAxisId="left" dataKey="impressions" name="노출수" fill="#06B6D4" />
+                <Bar yAxisId="left" dataKey="impressions" name="노출" fill="#06B6D4" />
                 <Line
                   yAxisId="right"
-                  dataKey="ctr"
-                  name="CTR"
+                  dataKey="clicks"
+                  name="클릭"
                   stroke="#8B5CF6"
-                  dot={{ r: 3 }}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
-          )}
-        </ChartCard>
-
-        {/* 그래프 3 – 유입 비용 (클릭수 Bar + CPC Line) */}
-        <ChartCard
-          title="유입 비용 (클릭 vs CPC)"
-          subtitle="클릭수 확보에 따른 클릭당 비용 변화"
-        >
-          {data.length === 0 ? (
-            <EmptyState />
-          ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <ComposedChart
-                data={chartData}
-                margin={{ top: 10, right: 20, left: 10, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                <YAxis
-                  yAxisId="left"
-                  tickFormatter={(v) => fmtNum(v)}
-                  tick={{ fontSize: 11 }}
-                />
-                <YAxis
-                  yAxisId="right"
-                  orientation="right"
-                  tickFormatter={(v) => fmtKRW(v)}
-                  tick={{ fontSize: 11 }}
-                  width={80}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: 11 }} />
-                <Bar yAxisId="left" dataKey="clicks" name="클릭수" fill="#6B7280" />
-                <Line
-                  yAxisId="right"
-                  dataKey="cpc"
-                  name="CPC"
-                  stroke="#EF4444"
-                  dot={{ r: 3 }}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
-          )}
-        </ChartCard>
-
-        {/* 그래프 4 – 전환 성과 (클릭수 Bar + 전환수 Line) */}
-        <ChartCard
-          title="전환 성과 (클릭 vs 전환수)"
-          subtitle="유입 클릭 대비 실제 전환수(CVR) 확인"
-        >
-          {data.length === 0 ? (
-            <EmptyState />
-          ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <ComposedChart
-                data={chartData}
-                margin={{ top: 10, right: 20, left: 10, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                <YAxis
-                  yAxisId="left"
-                  tickFormatter={(v) => fmtNum(v)}
-                  tick={{ fontSize: 11 }}
-                />
-                <YAxis
-                  yAxisId="right"
-                  orientation="right"
-                  tickFormatter={(v) => fmtNum(v)}
-                  tick={{ fontSize: 11 }}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: 11 }} />
-                <Bar yAxisId="left" dataKey="clicks" name="클릭수" fill="#D1D5DB" />
-                <Line
-                  yAxisId="right"
-                  dataKey="purchases"
-                  name="전환수"
-                  stroke="#6366F1"
                   dot={{ r: 3 }}
                 />
               </ComposedChart>

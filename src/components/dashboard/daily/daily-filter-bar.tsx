@@ -21,7 +21,7 @@ import { DateRangePicker } from './date-range-picker'
 interface AccountOption {
   id: string
   label: string
-  type: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp'
+  type: 'meta' | 'tiktok' | 'shopee'
   brandId: string
 }
 
@@ -72,25 +72,27 @@ export function DailyFilterBar({
     brandId: a.brand_id,
   }))
 
-  const shopeeShoppingOptions: AccountOption[] = shopeeAccounts
-    .filter((a) => a.account_type === 'shopping' && brandFilter(a))
-    .map((a) => ({
-      id: a.id,
-      label: [a.sub_brand, '쇼핑몰', a.country].filter(Boolean).join('_'),
-      type: 'shopee_shopping',
-      brandId: a.brand_id,
-    }))
+  // account_id 기준 중복 제거 (shopping 행 우선)
+  const shopeeOptions: AccountOption[] = (() => {
+    const seen = new Set<string>()
+    const result: AccountOption[] = []
+    const sorted = [...shopeeAccounts.filter(brandFilter)].sort((a) =>
+      a.account_type === 'shopping' ? -1 : 1
+    )
+    for (const a of sorted) {
+      if (seen.has(a.account_id)) continue
+      seen.add(a.account_id)
+      result.push({
+        id: a.id,
+        label: [a.sub_brand, '쇼피', a.country].filter(Boolean).join('_'),
+        type: 'shopee',
+        brandId: a.brand_id,
+      })
+    }
+    return result
+  })()
 
-  const shopeeInappOptions: AccountOption[] = shopeeAccounts
-    .filter((a) => a.account_type === 'inapp' && brandFilter(a))
-    .map((a) => ({
-      id: a.id,
-      label: [a.sub_brand, '인앱', a.country].filter(Boolean).join('_'),
-      type: 'shopee_inapp',
-      brandId: a.brand_id,
-    }))
-
-  const allOptions = [...metaOptions, ...tiktokOptions, ...shopeeShoppingOptions, ...shopeeInappOptions]
+  const allOptions = [...metaOptions, ...tiktokOptions, ...shopeeOptions]
 
   function handleBrandChange(value: string) {
     onChange({ ...filters, brandId: value, accountId: '' })

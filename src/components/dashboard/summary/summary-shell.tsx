@@ -66,16 +66,15 @@ export function SummaryShell() {
   // 계정 타입 변경 시 선택 지표 초기화
   function handleFiltersChange(newFilters: SummaryFilters) {
     if (newFilters.accountType !== filters.accountType || newFilters.accountId !== filters.accountId) {
-      // shopee 계열은 지출금액 + 매출, tiktok은 GMV Max 탭 기본(ROI + 비용)
+      // shopee 계열은 지출금액 + 매출, tiktok은 캠페인 탭 기본(지출 + 노출)
       const defaultMetrics =
-        newFilters.accountType === 'shopee_shopping' ||
-        newFilters.accountType === 'shopee_inapp'
+        newFilters.accountType === 'shopee'
           ? ['spend', 'revenue']
           : newFilters.accountType === 'tiktok'
-            ? ['roi', 'cost']
+            ? ['spend', 'impressions']
             : ['spend', 'revenue', 'roas']
       setSelectedMetrics(defaultMetrics)
-      setActiveTab('gmv_max')
+      setActiveTab(newFilters.accountType === 'tiktok' ? 'campaign' : 'gmv_max')
     }
     setFilters(newFilters)
   }
@@ -209,16 +208,88 @@ export function SummaryShell() {
             )}
           </div>
         )
-      })() : (
+      })() : filters.accountType === 'shopee' ? (
         <>
-          {/* Non-TikTok: 기존 KPI + 차트 */}
+          {/* 쇼피: 쇼핑몰 + 인앱 각각 섹션 */}
+          {!data && !isFetching && (
+            <div className="text-muted-foreground rounded-lg border py-12 text-center text-sm">
+              계정을 선택하고 조회하기 버튼을 눌러주세요
+            </div>
+          )}
+
+          {/* 쇼핑몰 섹션 */}
+          {data && (
+            <div className="space-y-6">
+              <h2 className="text-base font-semibold">쇼핑몰</h2>
+              <KpiSection
+                totals={data.shoppingTotals ?? null}
+                accountType="shopee_shopping"
+                selectedMetrics={selectedMetrics}
+                onSelect={handleMetricSelect}
+                isLoading={isFetching}
+                shopeeExtra={data.shopeeExtra}
+              />
+              <div className="space-y-2">
+                <h3 className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
+                  일별 추이
+                </h3>
+                <div className="bg-card rounded-lg border p-4">
+                  <SummaryChart
+                    data={data.shoppingDailyData ?? []}
+                    selectedMetrics={selectedMetrics}
+                    platform="shopee_shopping"
+                  />
+                </div>
+              </div>
+              <ShopeeShoppingAnalyticsCharts
+                data={data.shoppingDailyData ?? []}
+                hasKrw={data.shopeeExtra?.hasKrw ?? true}
+                currency={data.shopeeExtra?.currency ?? null}
+              />
+            </div>
+          )}
+
+          {/* 인앱 섹션 */}
+          {data && (
+            <div className="space-y-6">
+              <h2 className="text-base font-semibold">인앱</h2>
+              <KpiSection
+                totals={data.inappTotals ?? null}
+                accountType="shopee_inapp"
+                selectedMetrics={selectedMetrics}
+                onSelect={handleMetricSelect}
+                isLoading={isFetching}
+                shopeeExtra={data.shopeeExtra}
+              />
+              <div className="space-y-2">
+                <h3 className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
+                  일별 추이
+                </h3>
+                <div className="bg-card rounded-lg border p-4">
+                  <SummaryChart
+                    data={data.inappDailyData ?? []}
+                    selectedMetrics={selectedMetrics}
+                    platform="shopee_inapp"
+                  />
+                </div>
+              </div>
+              <ShopeeInappAnalyticsCharts
+                data={data.inappDailyData ?? []}
+                hasKrw={data.shopeeExtra?.hasKrw ?? true}
+                currency={data.shopeeExtra?.currency ?? null}
+              />
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          {/* Meta: 기존 단일 섹션 */}
           <KpiSection
             totals={data?.totals ?? null}
-            accountType={filters.accountType}
+            accountType="meta"
             selectedMetrics={selectedMetrics}
             onSelect={handleMetricSelect}
             isLoading={isFetching}
-            shopeeExtra={data?.shopeeExtra}
           />
 
           <div className="space-y-2">
@@ -230,7 +301,7 @@ export function SummaryShell() {
                 <SummaryChart
                   data={data.dailyData}
                   selectedMetrics={selectedMetrics}
-                  platform={data.platform}
+                  platform="meta"
                 />
               </div>
             ) : (
@@ -242,23 +313,7 @@ export function SummaryShell() {
             )}
           </div>
 
-          {data && filters.accountType === 'meta' && (
-            <MetaAnalyticsCharts data={data.dailyData} />
-          )}
-          {data && filters.accountType === 'shopee_shopping' && (
-            <ShopeeShoppingAnalyticsCharts
-              data={data.dailyData}
-              hasKrw={data.shopeeExtra?.hasKrw ?? true}
-              currency={data.shopeeExtra?.currency ?? null}
-            />
-          )}
-          {data && filters.accountType === 'shopee_inapp' && (
-            <ShopeeInappAnalyticsCharts
-              data={data.dailyData}
-              hasKrw={data.shopeeExtra?.hasKrw ?? true}
-              currency={data.shopeeExtra?.currency ?? null}
-            />
-          )}
+          {data && <MetaAnalyticsCharts data={data.dailyData} />}
         </>
       )}
     </div>

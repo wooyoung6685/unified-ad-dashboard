@@ -76,7 +76,7 @@ interface ReportShellProps {
 
 const PLATFORM_OPTIONS = [
   { value: 'meta' as const, label: 'META' },
-  { value: 'shopee_inapp' as const, label: 'SHOPEE (인앱)' },
+  { value: 'shopee' as const, label: 'SHOPEE (쇼피)' },
   { value: 'tiktok' as const, label: 'TIKTOK' },
 ]
 
@@ -92,7 +92,7 @@ function prevMonth() {
 
 // ── 플랫폼 뱃지 ──────────────────────────────
 
-function PlatformBadge({ platform }: { platform: 'meta' | 'shopee_inapp' | 'tiktok' }) {
+function PlatformBadge({ platform }: { platform: 'meta' | 'shopee' | 'shopee_inapp' | 'tiktok' }) {
   if (platform === 'meta') {
     return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">META</Badge>
   }
@@ -172,7 +172,7 @@ function CreateReportDialog({ open, onOpenChange, brands }: CreateDialogProps) {
   const generateSnapshot = useGenerateSnapshot()
 
   const [brandId, setBrandId] = useState('')
-  const [platform, setPlatform] = useState<'meta' | 'shopee_inapp' | 'tiktok' | ''>('')
+  const [platform, setPlatform] = useState<'meta' | 'shopee' | 'tiktok' | ''>('')
   const [country, setCountry] = useState('')
   const [accountId, setAccountId] = useState('')  // internal_account_id (DB PK)
   const { year: defaultYear, month: defaultMonth } = prevMonth()
@@ -215,18 +215,31 @@ function CreateReportDialog({ open, onOpenChange, brands }: CreateDialogProps) {
         account_type: 'meta',
       }))
 
-    const shopeeInappAccounts: AccountOption[] = (accountsData.shopee ?? [])
-      .filter(
-        (a: { brand_id: string; account_type: string; is_active: boolean }) =>
-          a.brand_id === brandId && a.account_type === 'inapp' && a.is_active,
-      )
-      .map((a: { id: string; account_id: string; sub_brand: string | null; country: string | null }) => ({
-        id: a.id,
-        account_id: a.account_id,
-        label: [a.sub_brand, a.account_id].filter(Boolean).join(' / '),
-        country: a.country,
-        account_type: 'shopee_inapp',
-      }))
+    // account_id 기준 중복 제거 (inapp 행 우선 - 리포트는 inapp 기반)
+    const shopeeInappAccounts: AccountOption[] = (() => {
+      const seen = new Set<string>()
+      const result: AccountOption[] = []
+      const sorted = [...(accountsData.shopee ?? [])]
+        .filter(
+          (a: { brand_id: string; is_active: boolean }) =>
+            a.brand_id === brandId && a.is_active,
+        )
+        .sort((a: { account_type: string }, b: { account_type: string }) =>
+          a.account_type === 'inapp' ? -1 : b.account_type === 'inapp' ? 1 : 0
+        )
+      for (const a of sorted as { id: string; account_id: string; sub_brand: string | null; country: string | null; account_type: string }[]) {
+        if (seen.has(a.account_id)) continue
+        seen.add(a.account_id)
+        result.push({
+          id: a.id,
+          account_id: a.account_id,
+          label: [a.sub_brand, a.account_id].filter(Boolean).join(' / '),
+          country: a.country,
+          account_type: 'shopee',
+        })
+      }
+      return result
+    })()
 
     const tiktokAccounts: AccountOption[] = (accountsData.tiktok ?? [])
       .filter((a: { brand_id: string; is_active: boolean }) => a.brand_id === brandId && a.is_active)
@@ -244,11 +257,11 @@ function CreateReportDialog({ open, onOpenChange, brands }: CreateDialogProps) {
   // 플랫폼별 사용 가능 옵션
   const availablePlatforms = useMemo(() => {
     const hasMeta = allAccounts.some((a) => a.account_type === 'meta')
-    const hasShopee = allAccounts.some((a) => a.account_type === 'shopee_inapp')
+    const hasShopee = allAccounts.some((a) => a.account_type === 'shopee')
     const hasTiktok = allAccounts.some((a) => a.account_type === 'tiktok')
     return PLATFORM_OPTIONS.filter((p) => {
       if (p.value === 'meta') return hasMeta
-      if (p.value === 'shopee_inapp') return hasShopee
+      if (p.value === 'shopee') return hasShopee
       if (p.value === 'tiktok') return hasTiktok
       return false
     })
@@ -282,7 +295,7 @@ function CreateReportDialog({ open, onOpenChange, brands }: CreateDialogProps) {
       const selectedAccount = allAccounts.find((a) => a.id === accountId)
       const report = await createReport.mutateAsync({
         brand_id: brandId,
-        platform: platform as 'meta' | 'shopee_inapp' | 'tiktok',
+        platform: platform as 'meta' | 'shopee' | 'tiktok',
         country: country || null,
         internal_account_id: selectedAccount?.id ?? null,
         year,
@@ -375,7 +388,7 @@ function CreateReportDialog({ open, onOpenChange, brands }: CreateDialogProps) {
                 <Select
                   value={platform}
                   onValueChange={(v) => {
-                    setPlatform(v as 'meta' | 'shopee_inapp' | 'tiktok')
+                    setPlatform(v as 'meta' | 'shopee' | 'tiktok')
                     setCountry('')
                     setAccountId('')
                   }}

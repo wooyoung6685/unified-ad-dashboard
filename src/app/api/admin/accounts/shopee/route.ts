@@ -25,30 +25,73 @@ export async function GET() {
   return NextResponse.json({ accounts })
 }
 
-// shopee_accounts upsert (account_id + account_type 충돌 시 덮어쓰기)
+// shopee_accounts upsert
+// account_type 없으면 shopping + inapp 두 행 동시 upsert (통합 모드)
+// account_type 있으면 단건 upsert (업로드 API 등 하위호환)
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const body = await req.json()
   const { brand_id, account_id, sub_brand, account_type, country, is_active } = body
 
-  const { data, error } = await supabase
-    .from('shopee_accounts')
-    .upsert(
-      { brand_id, account_id, account_name: sub_brand ?? '', account_type, country, is_active: is_active ?? true },
-      { onConflict: 'account_id,account_type' }
-    )
-    .select()
-    .single()
+  if (account_type) {
+    // 단건 upsert (하위호환)
+    const { data, error } = await supabase
+      .from('shopee_accounts')
+      .upsert(
+        { brand_id, account_id, account_name: sub_brand ?? '', account_type, country, is_active: is_active ?? true },
+        { onConflict: 'account_id,account_type' }
+      )
+      .select()
+      .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ account: data })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ account: data })
+  }
+
+  // 통합 모드: shopping + inapp 두 행 동시 upsert
+  const [shoppingResult, inappResult] = await Promise.all([
+    supabase
+      .from('shopee_accounts')
+      .upsert(
+        { brand_id, account_id, account_name: sub_brand ?? '', account_type: 'shopping', country, is_active: is_active ?? true },
+        { onConflict: 'account_id,account_type' }
+      )
+      .select()
+      .single(),
+    supabase
+      .from('shopee_accounts')
+      .upsert(
+        { brand_id, account_id, account_name: sub_brand ?? '', account_type: 'inapp', country, is_active: is_active ?? true },
+        { onConflict: 'account_id,account_type' }
+      )
+      .select()
+      .single(),
+  ])
+
+  if (shoppingResult.error) return NextResponse.json({ error: shoppingResult.error.message }, { status: 500 })
+  if (inappResult.error) return NextResponse.json({ error: inappResult.error.message }, { status: 500 })
+  return NextResponse.json({ accounts: [shoppingResult.data, inappResult.data] })
 }
 
-// shopee_accounts 행 삭제 (?id=<uuid>)
+// shopee_accounts 행 삭제
+// ?account_id=<외부ID> → 해당 account_id의 모든 행(shopping+inapp) 삭제
+// ?id=<uuid> → 단건 삭제 (하위호환)
 export async function DELETE(req: NextRequest) {
   const supabase = await createClient()
+  const accountIdParam = req.nextUrl.searchParams.get('account_id')
   const id = req.nextUrl.searchParams.get('id')
-  if (!id) return NextResponse.json({ error: 'id 파라미터가 필요합니다.' }, { status: 400 })
+
+  if (accountIdParam) {
+    const { error } = await supabase
+      .from('shopee_accounts')
+      .delete()
+      .eq('account_id', accountIdParam)
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ success: true })
+  }
+
+  if (!id) return NextResponse.json({ error: 'id 또는 account_id 파라미터가 필요합니다.' }, { status: 400 })
 
   const { error } = await supabase.from('shopee_accounts').delete().eq('id', id)
 

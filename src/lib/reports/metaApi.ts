@@ -1,5 +1,5 @@
-import type { MetaCreativeData } from '@/types/database'
-import type { MetaCampaignCurrent } from './aggregators'
+import type { MetaAdsetData, MetaCreativeData } from '@/types/database'
+import type { MetaAdsetCurrent, MetaCampaignCurrent } from './aggregators'
 
 const META_GRAPH_BASE = 'https://graph.facebook.com/v21.0'
 
@@ -145,6 +145,111 @@ export function mergeMetaCampaignPrev(
   const prevMap = new Map(prev.map((c) => [c.campaign_id, c]))
   return current.map((cur) => {
     const p = prevMap.get(cur.campaign_id)
+    return {
+      ...cur,
+      prev_spend: p?.spend ?? null,
+      prev_revenue: p?.revenue ?? null,
+      prev_roas: p?.roas ?? null,
+      prev_purchases: p?.purchases ?? null,
+      prev_impressions: p?.impressions ?? null,
+      prev_reach: p?.reach ?? null,
+      prev_frequency: p?.frequency ?? null,
+      prev_cpm: p?.cpm ?? null,
+      prev_clicks: p?.clicks ?? null,
+      prev_ctr: p?.ctr ?? null,
+      prev_cpc: p?.cpc ?? null,
+      prev_add_to_cart: p?.add_to_cart ?? null,
+      prev_cost_per_add_to_cart: p?.cost_per_add_to_cart ?? null,
+    }
+  })
+}
+
+// ── 광고세트(Adset) 인사이트 ────────────────────────────────────────────────
+
+const ADSET_FIELDS = [
+  'adset_id',
+  'adset_name',
+  'campaign_name',
+  'spend',
+  'impressions',
+  'reach',
+  'frequency',
+  'cpm',
+  'clicks',
+  'ctr',
+  'cpc',
+  'actions',
+  'action_values',
+  'catalog_segment_actions',
+  'catalog_segment_value',
+  'cost_per_action_type',
+].join(',')
+
+export async function fetchMetaAdsets(
+  accountId: string,
+  accessToken: string,
+  since: string,
+  until: string,
+): Promise<MetaAdsetCurrent[]> {
+  const params = new URLSearchParams({
+    fields: ADSET_FIELDS,
+    level: 'adset',
+    time_range: JSON.stringify({ since, until }),
+    access_token: accessToken,
+    limit: '200',
+  })
+
+  const res = await fetch(`${META_GRAPH_BASE}/act_${accountId}/insights?${params}`)
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Meta 광고세트 API 오류 ${res.status}: ${body}`)
+  }
+
+  const json = await res.json()
+  if (json.error) throw new Error(`Meta 광고세트 API 오류: ${json.error.message}`)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (json.data ?? []).map((row: any): MetaAdsetCurrent => {
+    const spend = parseFloat(row.spend ?? '0')
+    const impressions = parseFloat(row.impressions ?? '0')
+    const reach = parseFloat(row.reach ?? '0')
+    const clicks = parseFloat(row.clicks ?? '0')
+
+    const purchases = findAction(row.actions, PURCHASE_CANDIDATES, row.catalog_segment_actions)
+    const revenue = findAction(row.action_values, PURCHASE_CANDIDATES, row.catalog_segment_value)
+    const add_to_cart = findAction(row.actions, ADD_TO_CART_CANDIDATES, row.catalog_segment_actions)
+    const add_to_cart_value = findAction(row.action_values, ADD_TO_CART_CANDIDATES, row.catalog_segment_value)
+    const cost_per_add_to_cart = findAction(row.cost_per_action_type, ADD_TO_CART_CANDIDATES)
+
+    return {
+      adset_id: row.adset_id,
+      adset_name: row.adset_name,
+      campaign_name: row.campaign_name,
+      spend: spend || null,
+      revenue,
+      roas: revenue != null && spend > 0 ? (revenue / spend) * 100 : null,
+      purchases: purchases != null ? Math.round(purchases) : null,
+      impressions: impressions || null,
+      reach: reach || null,
+      frequency: reach > 0 ? impressions / reach : null,
+      cpm: impressions > 0 ? (spend / impressions) * 1000 : null,
+      clicks: clicks || null,
+      ctr: impressions > 0 ? (clicks / impressions) * 100 : null,
+      cpc: clicks > 0 ? spend / clicks : null,
+      add_to_cart: add_to_cart != null ? Math.round(add_to_cart) : null,
+      cost_per_add_to_cart,
+      add_to_cart_value,
+    }
+  })
+}
+
+export function mergeMetaAdsetPrev(
+  current: MetaAdsetCurrent[],
+  prev: MetaAdsetCurrent[],
+): MetaAdsetData[] {
+  const prevMap = new Map(prev.map((a) => [a.adset_id, a]))
+  return current.map((cur) => {
+    const p = prevMap.get(cur.adset_id)
     return {
       ...cur,
       prev_spend: p?.spend ?? null,

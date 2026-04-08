@@ -1,6 +1,6 @@
 'use client'
 
-import { fmtKRW, fmtNum } from '@/lib/format'
+import { fmtNum, fmtPct } from '@/lib/format'
 import type { SummaryDayData } from '@/types/database'
 import {
   Bar,
@@ -9,8 +9,6 @@ import {
   Legend,
   Line,
   ResponsiveContainer,
-  Scatter,
-  ScatterChart,
   Tooltip,
   XAxis,
   YAxis,
@@ -50,43 +48,13 @@ function EmptyState() {
   )
 }
 
-// ScatterChart 전용 툴팁
-function ScatterCustomTooltip({ active, payload }: any) {
-  if (!active || !payload || !payload.length) return null
-  const d = payload[0]?.payload
-  return (
-    <div
-      style={{
-        backgroundColor: 'white',
-        border: '1px solid #E5E7EB',
-        borderRadius: '8px',
-        padding: '10px 14px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-        fontSize: '12px',
-        color: '#374151',
-      }}
-    >
-      <p style={{ fontWeight: 600, marginBottom: 6, color: '#111827' }}>
-        {d?.date}
-      </p>
-      <p style={{ color: '#6366F1', margin: '2px 0' }}>
-        지출: ₩{Math.round(d?.x).toLocaleString()}
-      </p>
-      <p style={{ color: '#6366F1', margin: '2px 0' }}>
-        매출: ₩{Math.round(d?.y).toLocaleString()}
-      </p>
-    </div>
-  )
-}
-
-// ComposedChart 공통 툴팁 (TikTok 전용 포맷)
+// 공통 툴팁
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload || !payload.length) return null
 
   const formatValue = (name: string, value: any) => {
     if (value === null || value === undefined) return '-'
-    if (['CPC', 'CPA'].includes(name))
-      return `₩${Math.round(value).toLocaleString()}`
+    if (name === 'CTR (랜딩)') return `${value.toFixed(2)}%`
     return Math.round(value).toLocaleString()
   }
 
@@ -119,20 +87,15 @@ function CustomTooltip({ active, payload, label }: any) {
 export function TiktokAnalyticsCharts({ data }: TiktokAnalyticsChartsProps) {
   const chartData = data.map((d) => ({
     date: d.date.slice(5),
-    spend: d.spend,
-    revenue: d.revenue,
+    impressions: d.impressions,
+    video_views: d.video_views,
     views_2s: d.views_2s,
     views_6s: d.views_6s,
+    views_25pct: d.views_25pct,
     views_100pct: d.views_100pct,
-    cpc: d.cpc,
-    cpa: d.cpa,
-    video_views: d.video_views,
+    ctr: d.ctr,
     clicks: d.clicks,
   }))
-
-  const scatterData = data
-    .filter((d) => d.spend != null && d.revenue != null)
-    .map((d) => ({ x: d.spend!, y: d.revenue!, date: d.date }))
 
   return (
     <div className="space-y-2">
@@ -140,57 +103,10 @@ export function TiktokAnalyticsCharts({ data }: TiktokAnalyticsChartsProps) {
         성과 분석 그래프
       </h3>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* 그래프 1 – 매출 스케일링 (Scatter) */}
+        {/* 그래프 1 – 노출 vs 조회수 */}
         <ChartCard
-          title="매출 스케일링"
-          subtitle="지출 대비 매출 산점도 – 선형 증가 여부 확인"
-        >
-          {data.length === 0 || scatterData.length === 0 ? (
-            <EmptyState />
-          ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <ScatterChart
-                margin={{ top: 10, right: 20, left: 10, bottom: 30 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis
-                  dataKey="x"
-                  type="number"
-                  name="지출"
-                  tick={{ fontSize: 11 }}
-                  tickFormatter={(v) => fmtKRW(v)}
-                  label={{
-                    value: '지출 (Spend)',
-                    position: 'insideBottom',
-                    offset: -15,
-                    fontSize: 11,
-                  }}
-                />
-                <YAxis
-                  dataKey="y"
-                  type="number"
-                  name="매출"
-                  tick={{ fontSize: 11 }}
-                  tickFormatter={(v) => fmtKRW(v)}
-                  width={80}
-                  label={{
-                    value: '매출 (Sales)',
-                    angle: -90,
-                    position: 'insideLeft',
-                    fontSize: 11,
-                  }}
-                />
-                <Tooltip content={<ScatterCustomTooltip />} />
-                <Scatter data={scatterData} fill="#6366F1" r={6} />
-              </ScatterChart>
-            </ResponsiveContainer>
-          )}
-        </ChartCard>
-
-        {/* 그래프 2 – 동영상 조회 퍼널 */}
-        <ChartCard
-          title="동영상 조회 퍼널"
-          subtitle="2초 / 6초 / 100% 조회수 – 시청 완료율 진단"
+          title="노출 vs 조회수"
+          subtitle="노출수 대비 동영상 조회수 추이"
         >
           {data.length === 0 ? (
             <EmptyState />
@@ -207,28 +123,25 @@ export function TiktokAnalyticsCharts({ data }: TiktokAnalyticsChartsProps) {
                   tickFormatter={(v) => fmtNum(v)}
                   tick={{ fontSize: 11 }}
                 />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend
-                  verticalAlign="bottom"
-                  wrapperStyle={{ fontSize: 11 }}
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  tickFormatter={(v) => fmtNum(v)}
+                  tick={{ fontSize: 11 }}
                 />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: 11 }} />
                 <Bar
-                  dataKey="views_2s"
-                  name="2초조회수"
+                  yAxisId="left"
+                  dataKey="impressions"
+                  name="노출수"
                   fill="#D1D5DB"
-                  yAxisId="left"
-                />
-                <Bar
-                  dataKey="views_6s"
-                  name="6초조회수"
-                  fill="#06B6D4"
-                  yAxisId="left"
                 />
                 <Line
-                  dataKey="views_100pct"
-                  name="100%조회수"
+                  yAxisId="right"
+                  dataKey="video_views"
+                  name="동영상 조회수"
                   stroke="#6366F1"
-                  yAxisId="left"
                   dot={{ r: 3 }}
                 />
               </ComposedChart>
@@ -236,59 +149,10 @@ export function TiktokAnalyticsCharts({ data }: TiktokAnalyticsChartsProps) {
           )}
         </ChartCard>
 
-        {/* 그래프 3 – 랜딩 효율 (CPC Bar + CPA Line) */}
+        {/* 그래프 2 – 조회수 vs 2초 vs 6초 */}
         <ChartCard
-          title="랜딩 효율"
-          subtitle="CPC(클릭당 비용) vs CPA(전환당 비용) – 퍼널 효율 진단"
-        >
-          {data.length === 0 ? (
-            <EmptyState />
-          ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <ComposedChart
-                data={chartData}
-                margin={{ top: 10, right: 20, left: 10, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                <YAxis
-                  yAxisId="left"
-                  tickFormatter={(v) => fmtKRW(v)}
-                  tick={{ fontSize: 11 }}
-                />
-                <YAxis
-                  yAxisId="right"
-                  orientation="right"
-                  tickFormatter={(v) => fmtKRW(v)}
-                  tick={{ fontSize: 11 }}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend
-                  verticalAlign="bottom"
-                  wrapperStyle={{ fontSize: 11 }}
-                />
-                <Bar
-                  yAxisId="left"
-                  dataKey="cpc"
-                  name="CPC"
-                  fill="#EF4444"
-                />
-                <Line
-                  yAxisId="right"
-                  dataKey="cpa"
-                  name="CPA"
-                  stroke="#10B981"
-                  dot={{ r: 3 }}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
-          )}
-        </ChartCard>
-
-        {/* 그래프 4 – 반응성 (영상조회수 Bar + 클릭수 Line) */}
-        <ChartCard
-          title="반응성"
-          subtitle="영상조회수 vs 클릭수 – 소재 흡입력과 랜딩 전환 상관관계"
+          title="조회수 vs 2초 vs 6초"
+          subtitle="동영상 시청 초기 이탈 구간 분석"
         >
           {data.length === 0 ? (
             <EmptyState />
@@ -305,27 +169,116 @@ export function TiktokAnalyticsCharts({ data }: TiktokAnalyticsChartsProps) {
                   tickFormatter={(v) => fmtNum(v)}
                   tick={{ fontSize: 11 }}
                 />
-                <YAxis
-                  yAxisId="right"
-                  orientation="right"
-                  tickFormatter={(v) => fmtNum(v)}
-                  tick={{ fontSize: 11 }}
-                />
                 <Tooltip content={<CustomTooltip />} />
-                <Legend
-                  verticalAlign="bottom"
-                  wrapperStyle={{ fontSize: 11 }}
-                />
+                <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: 11 }} />
                 <Bar
                   yAxisId="left"
                   dataKey="video_views"
-                  name="영상조회수"
+                  name="동영상 조회수"
+                  fill="#D1D5DB"
+                />
+                <Bar
+                  yAxisId="left"
+                  dataKey="views_2s"
+                  name="2초 조회수"
+                  fill="#06B6D4"
+                />
+                <Line
+                  yAxisId="left"
+                  dataKey="views_6s"
+                  name="6초 조회수"
+                  stroke="#6366F1"
+                  dot={{ r: 3 }}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          )}
+        </ChartCard>
+
+        {/* 그래프 3 – 6초 vs 25% vs 100% */}
+        <ChartCard
+          title="6초 vs 25% vs 100%"
+          subtitle="동영상 시청 완료율 퍼널 분석"
+        >
+          {data.length === 0 ? (
+            <EmptyState />
+          ) : (
+            <ResponsiveContainer width="100%" height={300}>
+              <ComposedChart
+                data={chartData}
+                margin={{ top: 10, right: 20, left: 10, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                <YAxis
+                  yAxisId="left"
+                  tickFormatter={(v) => fmtNum(v)}
+                  tick={{ fontSize: 11 }}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: 11 }} />
+                <Bar
+                  yAxisId="left"
+                  dataKey="views_6s"
+                  name="6초 조회수"
+                  fill="#06B6D4"
+                />
+                <Bar
+                  yAxisId="left"
+                  dataKey="views_25pct"
+                  name="25% 조회수"
+                  fill="#10B981"
+                />
+                <Line
+                  yAxisId="left"
+                  dataKey="views_100pct"
+                  name="100% 조회수"
+                  stroke="#6366F1"
+                  dot={{ r: 3 }}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          )}
+        </ChartCard>
+
+        {/* 그래프 4 – CTR vs 클릭수(랜딩) */}
+        <ChartCard
+          title="CTR vs 클릭수 (랜딩)"
+          subtitle="클릭률과 클릭 볼륨 상관관계"
+        >
+          {data.length === 0 ? (
+            <EmptyState />
+          ) : (
+            <ResponsiveContainer width="100%" height={300}>
+              <ComposedChart
+                data={chartData}
+                margin={{ top: 10, right: 20, left: 10, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                <YAxis
+                  yAxisId="left"
+                  tickFormatter={(v) => fmtNum(v)}
+                  tick={{ fontSize: 11 }}
+                />
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  tickFormatter={(v) => fmtPct(v)}
+                  tick={{ fontSize: 11 }}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: 11 }} />
+                <Bar
+                  yAxisId="left"
+                  dataKey="clicks"
+                  name="클릭수 (랜딩)"
                   fill="#9CA3AF"
                 />
                 <Line
                   yAxisId="right"
-                  dataKey="clicks"
-                  name="클릭수"
+                  dataKey="ctr"
+                  name="CTR (랜딩)"
                   stroke="#6366F1"
                   dot={{ r: 3 }}
                 />

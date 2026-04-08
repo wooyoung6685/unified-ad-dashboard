@@ -27,7 +27,12 @@ const METRIC_META: Record<string, { label: string; format: string }> = {
   clicks: { label: '클릭수', format: 'number' },
   purchases: { label: '구매(전환)수', format: 'number' },
   add_to_cart: { label: '장바구니 담기', format: 'number' },
-  video_views: { label: '영상조회수', format: 'number' },
+  video_views: { label: '동영상 조회수', format: 'number' },
+  views_2s: { label: '2초 동영상 조회수', format: 'number' },
+  views_6s: { label: '6초 동영상 조회수', format: 'number' },
+  views_25pct: { label: '25% 동영상 조회수', format: 'number' },
+  views_100pct: { label: '100% 동영상 조회수', format: 'number' },
+  cpm: { label: 'CPM', format: 'currency' },
   aov: { label: '객단가 (KRW)', format: 'currency' },
   // GMV Max 전용 지표
   cost: { label: '비용', format: 'currency' },
@@ -35,18 +40,28 @@ const METRIC_META: Record<string, { label: string; format: string }> = {
   roi: { label: 'ROI', format: 'ratio_pct' },
   orders: { label: '주문수', format: 'number' },
   cost_per_order: { label: '주문당 비용', format: 'currency' },
+  // shopee_shopping 전용 지표
+  buyers: { label: '구매자 수', format: 'number' },
+  new_buyers: { label: '신규 구매자 수', format: 'number' },
+  existing_buyers: { label: '기존 구매자 수', format: 'number' },
+  order_conversion_rate: { label: '구매 전환율', format: 'percent' },
+  repeat_purchase_rate: { label: '재구매율', format: 'percent' },
+  cancelled_orders: { label: '취소 주문건', format: 'number' },
+  cancelled_sales: { label: '취소 금액', format: 'currency' },
+  refunded_orders: { label: '반품/환불 주문건', format: 'number' },
+  refunded_sales: { label: '반품/환불 금액', format: 'currency' },
 }
 
 // 플랫폼별 라벨 오버라이드
 const PLATFORM_LABEL_OVERRIDES: Record<string, Record<string, string>> = {
   shopee_shopping: {
-    ctr: '전환율',
-    impressions: '방문자수',
-    clicks: '페이지뷰',
-    purchases: '결제건수',
-    spend: '지출금액 (KRW)',
-    revenue: '매출 (KRW)',
-    aov: '객단가 (KRW)',
+    impressions: '방문자 수',
+    clicks: '상품 클릭 수',
+    purchases: '주문건',
+    spend: '지출금액',
+    revenue: '매출',
+    aov: '객단가',
+    ctr: '구매 전환율',
   },
   shopee_inapp: {
     spend: '지출 (KRW)',

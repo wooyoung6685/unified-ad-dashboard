@@ -162,6 +162,10 @@ export function groupTiktokByWeek(
     const clicks = sumRows(rs.map((r) => r.clicks))
     const purchases = sumRows(rs.map((r) => r.purchases))
     const video_views = sumRows(rs.map((r) => r.video_views))
+    const views_2s = sumRows(rs.map((r) => r.views_2s))
+    const views_6s = sumRows(rs.map((r) => r.views_6s))
+    const views_25pct = sumRows(rs.map((r) => r.views_25pct))
+    const views_100pct = sumRows(rs.map((r) => r.views_100pct))
     const add_to_cart = sumRows(rs.map((r) => r.add_to_cart))
     const add_to_cart_value = sumRows(rs.map((r) => r.add_to_cart_value))
     return {
@@ -179,6 +183,10 @@ export function groupTiktokByWeek(
       cpc: divOrNull(spend, clicks),
       ctr: divOrNull(clicks * 100, impressions),
       video_views: video_views || null,
+      views_2s: views_2s || null,
+      views_6s: views_6s || null,
+      views_25pct: views_25pct || null,
+      views_100pct: views_100pct || null,
       add_to_cart: add_to_cart || null,
       add_to_cart_value: add_to_cart_value || null,
     }

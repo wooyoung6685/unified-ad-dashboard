@@ -2,7 +2,7 @@ import { fetchGmvMaxDailyReport } from '@/lib/tiktok/gmvMax'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { getTokenForCurrentUser } from '@/lib/tokens'
-import type { ShopeeInappStat, ShopeeInappDayRow } from '@/types/database'
+import type { ShopeeInappStat, ShopeeInappDayRow, ShopeeShoppingStat } from '@/types/database'
 import { NextRequest, NextResponse } from 'next/server'
 
 // 인앱 stats를 날짜별로 합산
@@ -70,8 +70,7 @@ export async function GET(req: NextRequest) {
   const accountType = searchParams.get('account_type') as
     | 'meta'
     | 'tiktok'
-    | 'shopee_shopping'
-    | 'shopee_inapp'
+    | 'shopee'
     | null
   const startDate = searchParams.get('start_date') ?? ''
   const endDate = searchParams.get('end_date') ?? ''
@@ -216,37 +215,46 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({ platform: 'tiktok', rows: data ?? [], gmvMaxRows })
-  } else if (accountType === 'shopee_shopping') {
-    let query = supabase
-      .from('shopee_shopping_stats')
-      .select('*')
-      .eq('shopee_account_id', accountId)
-      .gte('date', startDate)
-      .lte('date', endDate)
-      .order('date', { ascending: true })
-
-    if (brandId && brandId !== 'all') {
-      query = query.eq('brand_id', brandId)
-    }
-
-    const { data, error } = await query
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-    const rows = data ?? []
-
-    // 쇼핑 계정 정보 조회 (brand_id, country, sub_brand)
-    const { data: shopAcct } = await supabase
+  } else if (accountType === 'shopee') {
+    // 전달된 accountId로 shopee_accounts 조회하여 외부 account_id 획득
+    const { data: refAcct } = await supabase
       .from('shopee_accounts')
-      .select('brand_id, country, sub_brand')
+      .select('account_id, brand_id, country, sub_brand')
       .eq('id', accountId)
       .single()
 
-    const spendByDate: Record<string, number> = {}
+    if (!refAcct) return NextResponse.json({ error: '쇼피 계정을 찾을 수 없습니다.' }, { status: 404 })
 
-    if (shopAcct) {
-      const { brand_id: bId, country: bCountry, sub_brand: bSubBrand } = shopAcct
+    const { account_id: externalAccountId, brand_id: bId, country: bCountry, sub_brand: bSubBrand } = refAcct
 
-      // 매칭 메타 계정 ID 조회 (같은 브랜드 + 국가 + 서브브랜드)
+    // 같은 account_id의 shopping/inapp 계정 ID 조회
+    const { data: allShopeeAccts } = await supabase
+      .from('shopee_accounts')
+      .select('id, account_type')
+      .eq('account_id', externalAccountId)
+      .eq('brand_id', bId)
+
+    const shoppingIds = (allShopeeAccts ?? []).filter((a) => a.account_type === 'shopping').map((a) => a.id)
+    const inappIds = (allShopeeAccts ?? []).filter((a) => a.account_type === 'inapp').map((a) => a.id)
+
+    // 쇼핑몰 데이터 조회
+    let shopping_rows: ShopeeShoppingStat[] = []
+    if (shoppingIds.length > 0) {
+      let shopQuery = supabase
+        .from('shopee_shopping_stats')
+        .select('*')
+        .in('shopee_account_id', shoppingIds)
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: true })
+      if (brandId && brandId !== 'all') shopQuery = shopQuery.eq('brand_id', brandId)
+
+      const { data: shopData } = await shopQuery
+      const shopRows = shopData ?? []
+
+      // spend_krw 계산: Meta + 인앱 spend 조인
+      const spendByDate: Record<string, number> = {}
+
       let metaAcctQuery = supabase
         .from('meta_accounts')
         .select('id')
@@ -257,28 +265,13 @@ export async function GET(req: NextRequest) {
           ? metaAcctQuery.is('sub_brand', null)
           : metaAcctQuery.eq('sub_brand', bSubBrand)
       const { data: metaAccts } = await metaAcctQuery
-      const metaIds = (metaAccts ?? []).map((a) => a.id)
+      const metaAccountIds = (metaAccts ?? []).map((a) => a.id)
 
-      // 매칭 인앱 계정 ID 조회 (같은 브랜드 + 국가 + 서브브랜드)
-      let inappAcctQuery = supabase
-        .from('shopee_accounts')
-        .select('id')
-        .eq('brand_id', bId)
-        .eq('country', bCountry)
-        .eq('account_type', 'inapp')
-      inappAcctQuery =
-        bSubBrand === null
-          ? inappAcctQuery.is('sub_brand', null)
-          : inappAcctQuery.eq('sub_brand', bSubBrand)
-      const { data: inappAccts } = await inappAcctQuery
-      const inappIds = (inappAccts ?? []).map((a) => a.id)
-
-      // 날짜별 메타 spend 합산
-      if (metaIds.length > 0) {
+      if (metaAccountIds.length > 0) {
         const { data: metaStats } = await supabase
           .from('meta_daily_stats')
           .select('date, spend')
-          .in('meta_account_id', metaIds)
+          .in('meta_account_id', metaAccountIds)
           .gte('date', startDate)
           .lte('date', endDate)
         for (const s of metaStats ?? []) {
@@ -286,7 +279,6 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      // 날짜별 인앱 expense_krw 합산
       if (inappIds.length > 0) {
         const { data: inappStats } = await supabase
           .from('shopee_inapp_stats')
@@ -300,32 +292,28 @@ export async function GET(req: NextRequest) {
           }
         }
       }
+
+      shopping_rows = shopRows.map((row) => ({
+        ...row,
+        spend_krw: spendByDate[row.date] ?? null,
+      })) as ShopeeShoppingStat[]
     }
 
-    // 각 행에 spend_krw 병합 (매칭 데이터가 없으면 null)
-    const rowsWithSpend = rows.map((row) => ({
-      ...row,
-      spend_krw: spendByDate[row.date] ?? null,
-    }))
+    // 인앱 데이터 조회
+    let inapp_rows: ShopeeInappDayRow[] = []
+    if (inappIds.length > 0) {
+      let inappQuery = supabase
+        .from('shopee_inapp_stats')
+        .select('*')
+        .in('shopee_account_id', inappIds)
+        .gte('date', startDate)
+        .lte('date', endDate)
+      if (brandId && brandId !== 'all') inappQuery = inappQuery.eq('brand_id', brandId)
 
-    return NextResponse.json({ platform: 'shopee_shopping', rows: rowsWithSpend })
-  } else {
-    // shopee_inapp
-    let query = supabase
-      .from('shopee_inapp_stats')
-      .select('*')
-      .eq('shopee_account_id', accountId)
-      .gte('date', startDate)
-      .lte('date', endDate)
-
-    if (brandId && brandId !== 'all') {
-      query = query.eq('brand_id', brandId)
+      const { data: inappData } = await inappQuery
+      inapp_rows = aggregateInappByDate((inappData ?? []) as ShopeeInappStat[])
     }
 
-    const { data, error } = await query
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-    const aggregated = aggregateInappByDate((data ?? []) as ShopeeInappStat[])
-    return NextResponse.json({ platform: 'shopee_inapp', rows: aggregated })
+    return NextResponse.json({ platform: 'shopee', shopping_rows, inapp_rows })
   }
 }

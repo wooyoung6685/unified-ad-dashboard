@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Separator } from '@/components/ui/separator'
 import type {
   DailyFilters,
   GmvMaxDailyRow,
@@ -31,8 +32,7 @@ import { TiktokGmvMaxDailyTable } from './tiktok-gmvmax-daily-table'
 type DailyApiResponse =
   | { platform: 'meta'; rows: MetaDailyStatFull[] }
   | { platform: 'tiktok'; rows: TiktokDailyStatFull[]; gmvMaxRows: GmvMaxDailyRow[] | null }
-  | { platform: 'shopee_shopping'; rows: ShopeeShoppingStat[] }
-  | { platform: 'shopee_inapp'; rows: ShopeeInappDayRow[] }
+  | { platform: 'shopee'; shopping_rows: ShopeeShoppingStat[]; inapp_rows: ShopeeInappDayRow[] }
 
 async function fetchDailyStats(filters: DailyFilters): Promise<DailyApiResponse> {
   const params = new URLSearchParams({
@@ -80,12 +80,24 @@ export function DailyShell() {
     }
   }
 
-  const isShopee =
-    filters.accountType === 'shopee_shopping' || filters.accountType === 'shopee_inapp'
+  const isShopee = filters.accountType === 'shopee'
 
-  // 선택된 shopee 계정 정보
+  // 선택된 shopee 계정 정보 (대표 행)
   const selectedShopeeAccount = isShopee
     ? shopeeAccounts.find((a) => a.id === filters.accountId)
+    : null
+
+  // 업로드용: 같은 account_id의 shopping/inapp 각각의 DB PK 조회
+  const shopeeExternalAccountId = selectedShopeeAccount?.account_id ?? ''
+  const shoppingAccountForUpload = shopeeExternalAccountId
+    ? shopeeAccounts.find(
+        (a) => a.account_id === shopeeExternalAccountId && a.account_type === 'shopping'
+      )
+    : null
+  const inappAccountForUpload = shopeeExternalAccountId
+    ? shopeeAccounts.find(
+        (a) => a.account_id === shopeeExternalAccountId && a.account_type === 'inapp'
+      )
     : null
 
   // fetchButton 슬롯
@@ -147,22 +159,42 @@ export function DailyShell() {
         fetchButton={fetchButtonSlot}
       />
 
-      {/* Shopee 파일 업로드 Dialog */}
+      {/* Shopee 파일 업로드 Dialog — 쇼핑몰/인앱 두 업로드 영역 */}
       <Dialog open={showUpload && !!selectedShopeeAccount} onOpenChange={setShowUpload}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>파일 업로드</DialogTitle>
+            <DialogTitle>쇼피 파일 업로드</DialogTitle>
           </DialogHeader>
           {selectedShopeeAccount && (
-            <ShopeeUploadArea
-              shopeeAccountId={selectedShopeeAccount.id}
-              accountExternalId={selectedShopeeAccount.account_id}
-              accountType={filters.accountType as 'shopee_shopping' | 'shopee_inapp'}
-              onUploadSuccess={() => {
-                setShowUpload(false)
-                handleSearch()
-              }}
-            />
+            <div className="space-y-6">
+              {shoppingAccountForUpload && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">쇼핑몰 데이터 (.xlsx)</p>
+                  <ShopeeUploadArea
+                    shopeeAccountId={shoppingAccountForUpload.id}
+                    accountExternalId={shopeeExternalAccountId}
+                    accountType="shopee_shopping"
+                    onUploadSuccess={() => {
+                      handleSearch()
+                    }}
+                  />
+                </div>
+              )}
+              {shoppingAccountForUpload && inappAccountForUpload && <Separator />}
+              {inappAccountForUpload && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">인앱 데이터 (.csv)</p>
+                  <ShopeeUploadArea
+                    shopeeAccountId={inappAccountForUpload.id}
+                    accountExternalId={shopeeExternalAccountId}
+                    accountType="shopee_inapp"
+                    onUploadSuccess={() => {
+                      handleSearch()
+                    }}
+                  />
+                </div>
+              )}
+            </div>
           )}
         </DialogContent>
       </Dialog>
@@ -181,14 +213,31 @@ export function DailyShell() {
                 <TiktokGmvMaxDailyTable rows={data.gmvMaxRows} />
               )}
             </>
-          ) : data.platform === 'shopee_shopping' ? (
-            <div className="rounded-lg border">
-              <ShopeeShoppingTable rows={data.rows as ShopeeShoppingStat[]} />
-            </div>
           ) : (
-            <div className="rounded-lg border">
-              <ShopeeInappTable rows={data.rows as ShopeeInappDayRow[]} />
-            </div>
+            // shopee: 쇼핑몰 + 인앱 테이블 세로 나란히
+            <>
+              {data.shopping_rows.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">쇼핑몰</p>
+                  <div className="rounded-lg border">
+                    <ShopeeShoppingTable rows={data.shopping_rows} />
+                  </div>
+                </div>
+              )}
+              {data.inapp_rows.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">인앱</p>
+                  <div className="rounded-lg border">
+                    <ShopeeInappTable rows={data.inapp_rows} />
+                  </div>
+                </div>
+              )}
+              {data.shopping_rows.length === 0 && data.inapp_rows.length === 0 && (
+                <div className="text-muted-foreground rounded-lg border py-12 text-center text-sm">
+                  해당 기간에 데이터가 없습니다.
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
