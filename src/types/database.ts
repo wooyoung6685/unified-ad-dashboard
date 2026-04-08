@@ -274,6 +274,7 @@ export type SummaryDayData = {
   video_views: number | null
   views_2s: number | null
   views_6s: number | null
+  views_25pct: number | null
   views_100pct: number | null
   // Meta 전용 원본 지표
   content_views: number | null
