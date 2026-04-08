@@ -375,6 +375,7 @@ export type MetaReportData = {
   monthly: MetaMonthlyData
   weekly: MetaWeeklyData[]
   campaigns: MetaCampaignData[]
+  adsets?: MetaAdsetData[]
   creatives: MetaCreativeData[]
 }
 
@@ -428,6 +429,39 @@ export type MetaWeeklyData = {
 
 export type MetaCampaignData = {
   campaign_id: string
+  campaign_name: string
+  spend: number | null
+  revenue: number | null
+  roas: number | null
+  purchases: number | null
+  impressions: number | null
+  reach: number | null
+  frequency: number | null
+  cpm: number | null
+  clicks: number | null
+  ctr: number | null
+  cpc: number | null
+  add_to_cart: number | null
+  cost_per_add_to_cart: number | null
+  add_to_cart_value: number | null
+  prev_spend: number | null
+  prev_revenue: number | null
+  prev_roas: number | null
+  prev_purchases: number | null
+  prev_impressions: number | null
+  prev_reach: number | null
+  prev_frequency: number | null
+  prev_cpm: number | null
+  prev_clicks: number | null
+  prev_ctr: number | null
+  prev_cpc: number | null
+  prev_add_to_cart: number | null
+  prev_cost_per_add_to_cart: number | null
+}
+
+export type MetaAdsetData = {
+  adset_id: string
+  adset_name: string
   campaign_name: string
   spend: number | null
   revenue: number | null
@@ -549,6 +583,7 @@ export type TiktokReportData = {
   monthly: TiktokMonthlyData
   weekly: TiktokWeeklyData[]
   campaigns: TiktokCampaignRow[]
+  adgroups?: TiktokAdgroupRow[]
   ads: TiktokAdRow[]
   hasGmvMax: boolean
   gmvMaxMonthly?: GmvMaxMonthlyData
@@ -564,11 +599,16 @@ export type TiktokMonthlyData = {
   purchases: number | null
   impressions: number | null
   reach: number | null
+  frequency: number | null
   clicks: number | null
   ctr: number | null
   cpc: number | null
   cpm: number | null
   video_views: number | null
+  views_2s: number | null
+  views_6s: number | null
+  views_25pct: number | null
+  views_100pct: number | null
   // 전월
   prev_spend: number | null
   prev_revenue: number | null
@@ -576,11 +616,16 @@ export type TiktokMonthlyData = {
   prev_purchases: number | null
   prev_impressions: number | null
   prev_reach: number | null
+  prev_frequency: number | null
   prev_clicks: number | null
   prev_ctr: number | null
   prev_cpc: number | null
   prev_cpm: number | null
   prev_video_views: number | null
+  prev_views_2s: number | null
+  prev_views_6s: number | null
+  prev_views_25pct: number | null
+  prev_views_100pct: number | null
 }
 
 export type TiktokWeeklyData = {
@@ -600,6 +645,10 @@ export type TiktokWeeklyData = {
   cpc: number | null
   ctr: number | null
   video_views: number | null
+  views_2s: number | null
+  views_6s: number | null
+  views_25pct: number | null
+  views_100pct: number | null
 }
 
 export type TiktokCampaignRow = {
@@ -618,6 +667,23 @@ export type TiktokCampaignRow = {
   roas: number | null
   video_views: number | null
   isGmvMax: boolean
+}
+
+export type TiktokAdgroupRow = {
+  adgroup_id: string
+  adgroup_name: string
+  campaign_name: string
+  spend: number | null
+  impressions: number | null
+  reach: number | null
+  clicks: number | null
+  ctr: number | null
+  cpc: number | null
+  cpm: number | null
+  purchases: number | null
+  revenue: number | null
+  roas: number | null
+  video_views: number | null
 }
 
 export type TiktokAdRow = {

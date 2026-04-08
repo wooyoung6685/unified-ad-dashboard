@@ -18,6 +18,7 @@ import type {
   GmvMaxMonthlyData,
   GmvMaxWeeklyData,
   TiktokAdRow,
+  TiktokAdgroupRow,
   TiktokCampaignRow,
   TiktokMonthlyData,
   TiktokReportData,
@@ -136,15 +137,18 @@ function MonthlyKpi({ m }: { m: TiktokMonthlyData }) {
       <CardContent>
         <div className="grid grid-cols-4 gap-3">
           <TiktokKpiCard label="지출금액" curr={m.spend} prev={m.prev_spend} format="krw" goodUp={false} />
-          <TiktokKpiCard label="매출" curr={m.revenue} prev={m.prev_revenue} format="krw" goodUp />
-          <TiktokKpiCard label="ROAS" curr={m.roas} prev={m.prev_roas} format="pct" goodUp />
-          <TiktokKpiCard label="전환수" curr={m.purchases} prev={m.prev_purchases} format="num" goodUp />
           <TiktokKpiCard label="노출수" curr={m.impressions} prev={m.prev_impressions} format="num" goodUp />
           <TiktokKpiCard label="도달수" curr={m.reach} prev={m.prev_reach} format="num" goodUp />
+          <TiktokKpiCard label="클릭수(랜딩)" curr={m.clicks} prev={m.prev_clicks} format="num" goodUp />
+          <TiktokKpiCard label="빈도" curr={m.frequency} prev={m.prev_frequency} format="dec" goodUp={false} />
+          <TiktokKpiCard label="CPC" curr={m.cpc} prev={m.prev_cpc} format="krw" goodUp={false} />
+          <TiktokKpiCard label="CTR" curr={m.ctr} prev={m.prev_ctr} format="pct" goodUp />
           <TiktokKpiCard label="CPM" curr={m.cpm} prev={m.prev_cpm} format="krw" goodUp={false} />
-          <TiktokKpiCard label="클릭수" curr={m.clicks} prev={m.prev_clicks} format="num" goodUp />
-          <TiktokKpiCard label="클릭률(CTR)" curr={m.ctr} prev={m.prev_ctr} format="pct" goodUp />
-          <TiktokKpiCard label="클릭당 비용(CPC)" curr={m.cpc} prev={m.prev_cpc} format="krw" goodUp={false} />
+          <TiktokKpiCard label="동영상 조회수" curr={m.video_views} prev={m.prev_video_views} format="num" goodUp />
+          <TiktokKpiCard label="2초 동영상 조회수" curr={m.views_2s} prev={m.prev_views_2s} format="num" goodUp />
+          <TiktokKpiCard label="6초 동영상 조회수" curr={m.views_6s} prev={m.prev_views_6s} format="num" goodUp />
+          <TiktokKpiCard label="25% 동영상 조회수" curr={m.views_25pct} prev={m.prev_views_25pct} format="num" goodUp />
+          <TiktokKpiCard label="100% 동영상 조회수" curr={m.views_100pct} prev={m.prev_views_100pct} format="num" goodUp />
         </div>
       </CardContent>
     </Card>
@@ -157,54 +161,21 @@ function WeeklyCharts({ weekly }: { weekly: TiktokWeeklyData[] }) {
   const chartData = weekly.map((w) => ({
     label: `${w.week}주차`,
     impressions: w.impressions,
-    cpm: w.cpm,
-    clicks: w.clicks,
-    ctr: w.ctr,
-    revenue: w.revenue,
-    roas: w.roas,
     video_views: w.video_views,
-    purchases: w.purchases,
-    spend: w.spend,
+    views_2s: w.views_2s,
+    views_6s: w.views_6s,
+    views_25pct: w.views_25pct,
+    views_100pct: w.views_100pct,
+    ctr: w.ctr,
+    clicks: w.clicks,
   }))
 
-  const chartConfigs = [
-    {
-      title: 'CPM & 노출수',
-      barKey: 'impressions',
-      barName: '노출수',
-      lineKey: 'cpm',
-      lineName: 'CPM',
-      lineStroke: '#EF4444',
-      lineLabel: '₩',
-    },
-    {
-      title: 'CTR & 클릭수',
-      barKey: 'clicks',
-      barName: '클릭수',
-      lineKey: 'ctr',
-      lineName: 'CTR',
-      lineStroke: '#3B82F6',
-      lineLabel: '%',
-    },
-    {
-      title: '동영상 조회수 & 전환수',
-      barKey: 'purchases',
-      barName: '전환수',
-      lineKey: 'video_views',
-      lineName: '동영상 조회수',
-      lineStroke: '#8B5CF6',
-      lineLabel: 'num',
-    },
-    {
-      title: 'ROAS & 지출금액',
-      barKey: 'spend',
-      barName: '지출금액',
-      lineKey: 'roas',
-      lineName: 'ROAS',
-      lineStroke: '#10B981',
-      lineLabel: '%',
-    },
-  ]
+  const tickFmt = (v: number) =>
+    v >= 1000000
+      ? `${(v / 1000000).toFixed(1)}M`
+      : v >= 1000
+        ? `${(v / 1000).toFixed(0)}K`
+        : String(Math.round(v))
 
   return (
     <Card>
@@ -213,73 +184,78 @@ function WeeklyCharts({ weekly }: { weekly: TiktokWeeklyData[] }) {
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-2 gap-6">
-          {chartConfigs.map((cfg) => (
-            <div key={cfg.title}>
-              <p className="mb-2 text-center text-sm font-medium text-muted-foreground">
-                {cfg.title}
-              </p>
-              <ResponsiveContainer width="100%" height={260}>
-                <ComposedChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-                  <YAxis
-                    yAxisId="left"
-                    orientation="left"
-                    tick={{ fontSize: 11 }}
-                    width={60}
-                    tickFormatter={(v: number) =>
-                      v >= 1000000
-                        ? `${(v / 1000000).toFixed(1)}M`
-                        : v >= 1000
-                          ? `${(v / 1000).toFixed(0)}K`
-                          : String(Math.round(v))
-                    }
-                  />
-                  <YAxis
-                    yAxisId="right"
-                    orientation="right"
-                    tick={{ fontSize: 11 }}
-                    width={55}
-                    tickFormatter={(v: number) => {
-                      if (cfg.lineLabel === '₩')
-                        return v >= 1000 ? `₩${(v / 1000).toFixed(0)}K` : `₩${Math.round(v)}`
-                      return v.toFixed(1)
-                    }}
-                  />
-                  <Tooltip
-                    formatter={(value, name) => {
-                      const v = Number(value)
-                      const n = String(name)
-                      if (n === cfg.lineName) {
-                        if (cfg.lineLabel === '%') return [`${v.toFixed(2)}%`, n]
-                        if (cfg.lineLabel === '₩')
-                          return [`₩${Math.round(v).toLocaleString('ko-KR')}`, n]
-                        if (cfg.lineLabel === 'num') return [Math.round(v).toLocaleString('ko-KR'), n]
-                      }
-                      return [Math.round(v).toLocaleString('ko-KR'), n]
-                    }}
-                  />
-                  <Legend verticalAlign="top" height={30} />
-                  <Bar
-                    yAxisId="left"
-                    dataKey={cfg.barKey}
-                    name={cfg.barName}
-                    fill="#9CA3AF"
-                    radius={[2, 2, 0, 0]}
-                  />
-                  <Line
-                    yAxisId="right"
-                    dataKey={cfg.lineKey}
-                    name={cfg.lineName}
-                    stroke={cfg.lineStroke}
-                    dot={{ r: 4 }}
-                    type="monotone"
-                    strokeWidth={2}
-                  />
-                </ComposedChart>
-              </ResponsiveContainer>
-            </div>
-          ))}
+          {/* 차트 1 – 노출 vs 조회수 */}
+          <div>
+            <p className="mb-2 text-center text-sm font-medium text-muted-foreground">노출 vs 조회수</p>
+            <ResponsiveContainer width="100%" height={260}>
+              <ComposedChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                <YAxis yAxisId="left" orientation="left" tick={{ fontSize: 11 }} width={60} tickFormatter={tickFmt} />
+                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} width={60} tickFormatter={tickFmt} />
+                <Tooltip formatter={(v, n) => [Math.round(Number(v)).toLocaleString('ko-KR'), n]} />
+                <Legend verticalAlign="bottom" height={30} />
+                <Bar yAxisId="left" dataKey="impressions" name="노출수" fill="#D1D5DB" radius={[2, 2, 0, 0]} />
+                <Line yAxisId="right" dataKey="video_views" name="동영상 조회수" stroke="#6366F1" dot={{ r: 4 }} type="monotone" strokeWidth={2} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* 차트 2 – 조회수 vs 2초 vs 6초 */}
+          <div>
+            <p className="mb-2 text-center text-sm font-medium text-muted-foreground">조회수 vs 2초 vs 6초</p>
+            <ResponsiveContainer width="100%" height={260}>
+              <ComposedChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                <YAxis yAxisId="left" orientation="left" tick={{ fontSize: 11 }} width={60} tickFormatter={tickFmt} />
+                <Tooltip formatter={(v, n) => [Math.round(Number(v)).toLocaleString('ko-KR'), n]} />
+                <Legend verticalAlign="bottom" height={30} />
+                <Bar yAxisId="left" dataKey="video_views" name="동영상 조회수" fill="#D1D5DB" radius={[2, 2, 0, 0]} />
+                <Bar yAxisId="left" dataKey="views_2s" name="2초 조회수" fill="#06B6D4" radius={[2, 2, 0, 0]} />
+                <Line yAxisId="left" dataKey="views_6s" name="6초 조회수" stroke="#6366F1" dot={{ r: 4 }} type="monotone" strokeWidth={2} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* 차트 3 – 6초 vs 25% vs 100% */}
+          <div>
+            <p className="mb-2 text-center text-sm font-medium text-muted-foreground">6초 vs 25% vs 100%</p>
+            <ResponsiveContainer width="100%" height={260}>
+              <ComposedChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                <YAxis yAxisId="left" orientation="left" tick={{ fontSize: 11 }} width={60} tickFormatter={tickFmt} />
+                <Tooltip formatter={(v, n) => [Math.round(Number(v)).toLocaleString('ko-KR'), n]} />
+                <Legend verticalAlign="bottom" height={30} />
+                <Bar yAxisId="left" dataKey="views_6s" name="6초 조회수" fill="#06B6D4" radius={[2, 2, 0, 0]} />
+                <Bar yAxisId="left" dataKey="views_25pct" name="25% 조회수" fill="#10B981" radius={[2, 2, 0, 0]} />
+                <Line yAxisId="left" dataKey="views_100pct" name="100% 조회수" stroke="#6366F1" dot={{ r: 4 }} type="monotone" strokeWidth={2} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* 차트 4 – CTR vs 클릭수(랜딩) */}
+          <div>
+            <p className="mb-2 text-center text-sm font-medium text-muted-foreground">CTR vs 클릭수(랜딩)</p>
+            <ResponsiveContainer width="100%" height={260}>
+              <ComposedChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                <YAxis yAxisId="left" orientation="left" tick={{ fontSize: 11 }} width={60} tickFormatter={tickFmt} />
+                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} width={55} tickFormatter={(v: number) => `${v.toFixed(2)}%`} />
+                <Tooltip
+                  formatter={(v, n) => {
+                    if (String(n) === 'CTR (랜딩)') return [`${Number(v).toFixed(2)}%`, n]
+                    return [Math.round(Number(v)).toLocaleString('ko-KR'), n]
+                  }}
+                />
+                <Legend verticalAlign="bottom" height={30} />
+                <Bar yAxisId="left" dataKey="clicks" name="클릭수 (랜딩)" fill="#9CA3AF" radius={[2, 2, 0, 0]} />
+                <Line yAxisId="right" dataKey="ctr" name="CTR (랜딩)" stroke="#6366F1" dot={{ r: 4 }} type="monotone" strokeWidth={2} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -409,6 +385,71 @@ function CampaignSection({
           </Table>
         </div>
         )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// ── 섹션 5.5: 광고그룹(세트) 테이블 ─────────────────────
+
+function AdgroupSection({ adgroups }: { adgroups: TiktokAdgroupRow[] }) {
+  if (adgroups.length === 0) return null
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">📂 광고그룹 성과 분석 (TikTok)</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="sticky left-0 z-10 whitespace-nowrap bg-white after:absolute after:right-0 after:top-0 after:h-full after:w-px after:bg-border dark:bg-background">
+                  광고그룹명
+                </TableHead>
+                <TableHead className="whitespace-nowrap">캠페인명</TableHead>
+                <TableHead className="whitespace-nowrap">지출금액</TableHead>
+                <TableHead className="whitespace-nowrap">매출</TableHead>
+                <TableHead className="whitespace-nowrap">ROAS</TableHead>
+                <TableHead className="whitespace-nowrap">구매수</TableHead>
+                <TableHead className="whitespace-nowrap">동영상 조회수</TableHead>
+                <TableHead className="whitespace-nowrap">클릭수</TableHead>
+                <TableHead className="whitespace-nowrap">CPC</TableHead>
+                <TableHead className="whitespace-nowrap">노출수</TableHead>
+                <TableHead className="whitespace-nowrap">도달수</TableHead>
+                <TableHead className="whitespace-nowrap">CPM</TableHead>
+                <TableHead className="whitespace-nowrap">클릭률(CTR)</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {adgroups.map((a) => (
+                <TableRow key={a.adgroup_id}>
+                  <TableCell className="sticky left-0 z-10 max-w-[200px] whitespace-nowrap bg-white font-medium after:absolute after:right-0 after:top-0 after:h-full after:w-px after:bg-border dark:bg-background">
+                    <span className="block truncate" title={a.adgroup_name}>
+                      {a.adgroup_name}
+                    </span>
+                  </TableCell>
+                  <TableCell className="max-w-[160px] whitespace-nowrap">
+                    <span className="block truncate text-xs text-muted-foreground" title={a.campaign_name}>
+                      {a.campaign_name}
+                    </span>
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">{fmtKRW(a.spend)}</TableCell>
+                  <TableCell className="whitespace-nowrap">{fmtKRW(a.revenue)}</TableCell>
+                  <TableCell className="whitespace-nowrap">{fmtPct(a.roas)}</TableCell>
+                  <TableCell className="whitespace-nowrap">{fmtNum(a.purchases)}</TableCell>
+                  <TableCell className="whitespace-nowrap">{fmtNum(a.video_views)}</TableCell>
+                  <TableCell className="whitespace-nowrap">{fmtNum(a.clicks)}</TableCell>
+                  <TableCell className="whitespace-nowrap">{fmtKRW(a.cpc)}</TableCell>
+                  <TableCell className="whitespace-nowrap">{fmtNum(a.impressions)}</TableCell>
+                  <TableCell className="whitespace-nowrap">{fmtNum(a.reach)}</TableCell>
+                  <TableCell className="whitespace-nowrap">{fmtKRW(a.cpm)}</TableCell>
+                  <TableCell className="whitespace-nowrap">{fmtPct(a.ctr)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </CardContent>
     </Card>
   )
@@ -872,6 +913,7 @@ export function TiktokReportDetail({ data, title, reportId, role, insightMemo, i
     monthly,
     weekly,
     campaigns,
+    adgroups,
     ads,
     hasGmvMax,
     gmvMaxMonthly,
@@ -896,6 +938,7 @@ export function TiktokReportDetail({ data, title, reportId, role, insightMemo, i
         <WeeklyCharts weekly={weekly} />
         <WeeklyTable weekly={weekly} />
         <CampaignSection campaigns={normalCampaigns} title="🎯 캠페인 성과 분석 (TikTok)" />
+        <AdgroupSection adgroups={adgroups ?? []} />
         <CreativeSection ads={ads} />
         <InsightMemoCard
           reportId={reportId}
@@ -927,6 +970,7 @@ export function TiktokReportDetail({ data, title, reportId, role, insightMemo, i
           <WeeklyCharts weekly={weekly} />
           <WeeklyTable weekly={weekly} />
           <CampaignSection campaigns={normalCampaigns} title="🎯 캠페인 성과 분석 (TikTok)" />
+          <AdgroupSection adgroups={adgroups ?? []} />
           <CreativeSection ads={ads} />
           <InsightMemoCard
             reportId={reportId}

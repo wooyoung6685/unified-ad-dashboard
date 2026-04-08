@@ -1,6 +1,7 @@
 import type {
   MetaMonthlyData,
   MetaCampaignData,
+  MetaAdsetData,
   ShopeeMonthlyData,
   TiktokMonthlyData,
 } from '@/types/database'
@@ -32,6 +33,23 @@ export type MetaDailyRow = {
 // prev_ 필드가 없는 중간 타입
 export type MetaCampaignCurrent = Omit<
   MetaCampaignData,
+  | 'prev_spend'
+  | 'prev_revenue'
+  | 'prev_roas'
+  | 'prev_purchases'
+  | 'prev_impressions'
+  | 'prev_reach'
+  | 'prev_frequency'
+  | 'prev_cpm'
+  | 'prev_clicks'
+  | 'prev_ctr'
+  | 'prev_cpc'
+  | 'prev_add_to_cart'
+  | 'prev_cost_per_add_to_cart'
+>
+
+export type MetaAdsetCurrent = Omit<
+  MetaAdsetData,
   | 'prev_spend'
   | 'prev_revenue'
   | 'prev_roas'
@@ -158,6 +176,10 @@ export type TiktokDailyRow = {
   clicks: number | null
   purchases: number | null
   video_views: number | null
+  views_2s: number | null
+  views_6s: number | null
+  views_25pct: number | null
+  views_100pct: number | null
   add_to_cart: number | null
   add_to_cart_value: number | null
 }
@@ -170,6 +192,10 @@ function calcTiktokAgg(rows: TiktokDailyRow[]) {
   const clicks = sumRows(rows.map((r) => r.clicks))
   const purchases = sumRows(rows.map((r) => r.purchases))
   const video_views = sumRows(rows.map((r) => r.video_views))
+  const views_2s = sumRows(rows.map((r) => r.views_2s))
+  const views_6s = sumRows(rows.map((r) => r.views_6s))
+  const views_25pct = sumRows(rows.map((r) => r.views_25pct))
+  const views_100pct = sumRows(rows.map((r) => r.views_100pct))
   const add_to_cart = sumRows(rows.map((r) => r.add_to_cart))
   const add_to_cart_value = sumRows(rows.map((r) => r.add_to_cart_value))
   return {
@@ -179,11 +205,16 @@ function calcTiktokAgg(rows: TiktokDailyRow[]) {
     purchases: purchases || null,
     impressions: impressions || null,
     reach: reach || null,
+    frequency: divOrNull(impressions, reach),
     clicks: clicks || null,
     ctr: divOrNull(clicks * 100, impressions),
     cpc: divOrNull(spend, clicks),
     cpm: divOrNull(spend * 1000, impressions),
     video_views: video_views || null,
+    views_2s: views_2s || null,
+    views_6s: views_6s || null,
+    views_25pct: views_25pct || null,
+    views_100pct: views_100pct || null,
     add_to_cart: add_to_cart || null,
     add_to_cart_value: add_to_cart_value || null,
   }
@@ -203,11 +234,16 @@ export function aggregateTiktokMonthly(
     prev_purchases: prev.purchases,
     prev_impressions: prev.impressions,
     prev_reach: prev.reach,
+    prev_frequency: prev.frequency,
     prev_clicks: prev.clicks,
     prev_ctr: prev.ctr,
     prev_cpc: prev.cpc,
     prev_cpm: prev.cpm,
     prev_video_views: prev.video_views,
+    prev_views_2s: prev.views_2s,
+    prev_views_6s: prev.views_6s,
+    prev_views_25pct: prev.views_25pct,
+    prev_views_100pct: prev.views_100pct,
   }
 }
 

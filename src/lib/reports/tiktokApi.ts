@@ -1,4 +1,4 @@
-import type { TiktokCampaignRow, TiktokAdRow } from '@/types/database'
+import type { TiktokCampaignRow, TiktokAdgroupRow, TiktokAdRow } from '@/types/database'
 import { floatOrNull, roundOrNull } from '@/lib/tiktok/utils'
 import { getAllAdminTokens } from '@/lib/tokens'
 
@@ -148,6 +148,65 @@ export async function fetchTiktokCampaigns(
       roas,
       video_views: roundOrNull(m.video_play_actions),
       isGmvMax,
+    }
+  })
+}
+
+// ── 광고그룹(세트) 성과 조회 ──────────────────────────────────────────────
+
+export async function fetchTiktokAdgroups(
+  advertiserId: string,
+  accessToken: string,
+  startDate: string,
+  endDate: string,
+): Promise<TiktokAdgroupRow[]> {
+  const data = (await tiktokGet('/report/integrated/get/', accessToken, {
+    advertiser_id: advertiserId,
+    report_type: 'BASIC',
+    data_level: 'AUCTION_ADGROUP',
+    dimensions: JSON.stringify(['adgroup_id']),
+    metrics: JSON.stringify([
+      'adgroup_name',
+      'campaign_name',
+      'spend',
+      'impressions',
+      'reach',
+      'clicks',
+      'ctr',
+      'cpc',
+      'cpm',
+      'conversion',
+      'total_purchase_value',
+      'video_play_actions',
+    ]),
+    start_date: startDate,
+    end_date: endDate,
+    page: '1',
+    page_size: '1000',
+  })) as { list: Array<{ dimensions: Record<string, string>; metrics: Record<string, string> }> }
+
+  return (data.list ?? []).map((item) => {
+    const d = item.dimensions
+    const m = item.metrics
+    const spend = floatOrNull(m.spend)
+    const revenue = floatOrNull(m.total_purchase_value)
+    const roas = spend != null && spend > 0 && revenue != null ? revenue / spend : null
+
+    return {
+      adgroup_id: d.adgroup_id,
+      adgroup_name: m.adgroup_name,
+      campaign_name: m.campaign_name,
+      spend,
+      impressions: roundOrNull(m.impressions),
+      reach: roundOrNull(m.reach),
+      clicks: roundOrNull(m.clicks),
+      ctr: floatOrNull(m.ctr),
+      cpc: floatOrNull(m.cpc),
+      cpm: floatOrNull(m.cpm),
+      purchases: roundOrNull(m.conversion),
+      revenue,
+      roas,
+      video_views: roundOrNull(m.video_play_actions),
     }
   })
 }

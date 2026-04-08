@@ -16,10 +16,12 @@ import {
 import { groupGmvMaxByWeek, groupMetaByWeek, groupShopeeByWeek, groupTiktokByWeek } from '@/lib/reports/weeklyGrouper'
 import {
   fetchMetaCampaigns,
+  fetchMetaAdsets,
   fetchMetaCreatives,
   mergeMetaCampaignPrev,
+  mergeMetaAdsetPrev,
 } from '@/lib/reports/metaApi'
-import { fetchTiktokCampaigns, fetchTiktokAds } from '@/lib/reports/tiktokApi'
+import { fetchTiktokCampaigns, fetchTiktokAdgroups, fetchTiktokAds } from '@/lib/reports/tiktokApi'
 import { fetchGmvMaxCampaignReport, fetchGmvMaxItems } from '@/lib/tiktok/gmvMax'
 import type { ReportSnapshot, ShopeeAdsBreakdownData } from '@/types/database'
 
@@ -345,6 +347,7 @@ async function buildMetaSnapshot(args: {
   const accessToken = await getTokenForCurrentUser('meta')
 
   let campaigns: ReturnType<typeof mergeMetaCampaignPrev> = []
+  let adsets: ReturnType<typeof mergeMetaAdsetPrev> = []
   let creatives: Awaited<ReturnType<typeof fetchMetaCreatives>> = []
 
   if (accessToken) {
@@ -357,6 +360,17 @@ async function buildMetaSnapshot(args: {
     } catch (err) {
       console.error('[snapshot] Meta 캠페인 fetch 실패 (부분 성공):', err)
       campaigns = []
+    }
+
+    try {
+      const [curAdsets, prevAdsets] = await Promise.all([
+        fetchMetaAdsets(metaAccount.account_id, accessToken, thisMonthStart, thisMonthEnd),
+        fetchMetaAdsets(metaAccount.account_id, accessToken, prevMonthStart, prevMonthEnd),
+      ])
+      adsets = mergeMetaAdsetPrev(curAdsets, prevAdsets)
+    } catch (err) {
+      console.error('[snapshot] Meta 광고세트 fetch 실패 (부분 성공):', err)
+      adsets = []
     }
 
     try {
@@ -382,7 +396,7 @@ async function buildMetaSnapshot(args: {
 
   return {
     platform: 'meta',
-    data: { monthly, weekly, campaigns, creatives },
+    data: { monthly, weekly, campaigns, adsets, creatives },
   }
 }
 
@@ -517,13 +531,13 @@ async function buildTiktokSnapshot(args: {
   ] = await Promise.all([
     supabaseAdmin
       .from('tiktok_daily_stats')
-      .select('date, spend, revenue, impressions, reach, clicks, purchases, video_views, add_to_cart, add_to_cart_value')
+      .select('date, spend, revenue, impressions, reach, clicks, purchases, video_views, views_2s, views_6s, views_25pct, views_100pct, add_to_cart, add_to_cart_value')
       .eq('tiktok_account_id', internal_account_id)
       .gte('date', thisMonthStart)
       .lte('date', thisMonthEnd),
     supabaseAdmin
       .from('tiktok_daily_stats')
-      .select('date, spend, revenue, impressions, reach, clicks, purchases, video_views, add_to_cart, add_to_cart_value')
+      .select('date, spend, revenue, impressions, reach, clicks, purchases, video_views, views_2s, views_6s, views_25pct, views_100pct, add_to_cart, add_to_cart_value')
       .eq('tiktok_account_id', internal_account_id)
       .gte('date', prevMonthStart)
       .lte('date', prevMonthEnd),
@@ -559,6 +573,7 @@ async function buildTiktokSnapshot(args: {
   const accessToken = await getTokenForCurrentUser('tiktok')
 
   let campaigns: Awaited<ReturnType<typeof fetchTiktokCampaigns>> = []
+  let adgroups: Awaited<ReturnType<typeof fetchTiktokAdgroups>> = []
   let ads: Awaited<ReturnType<typeof fetchTiktokAds>> = []
   let gmvMaxCampaigns: Awaited<ReturnType<typeof fetchGmvMaxCampaignReport>> = []
   let gmvMaxItems: Awaited<ReturnType<typeof fetchGmvMaxItems>> = []
@@ -575,7 +590,7 @@ async function buildTiktokSnapshot(args: {
       : null
 
     // 그룹 A: 서로 독립적인 호출 병렬 실행
-    const [fetchedCampaigns, fetchedGmvCampaigns, fetchedAds] = await Promise.all([
+    const [fetchedCampaigns, fetchedAdgroups, fetchedGmvCampaigns, fetchedAds] = await Promise.all([
       fetchTiktokCampaigns(
         tiktokAccount.advertiser_id,
         accessToken,
@@ -584,6 +599,15 @@ async function buildTiktokSnapshot(args: {
       ).catch((err) => {
         console.error('[snapshot] TikTok 캠페인 fetch 실패 (부분 성공):', err)
         return [] as typeof campaigns
+      }),
+      fetchTiktokAdgroups(
+        tiktokAccount.advertiser_id,
+        accessToken,
+        thisMonthStart,
+        thisMonthEnd,
+      ).catch((err) => {
+        console.error('[snapshot] TikTok 광고그룹 fetch 실패 (부분 성공):', err)
+        return [] as typeof adgroups
       }),
       gmvParams
         ? fetchGmvMaxCampaignReport(gmvParams).catch((err) => {
@@ -603,6 +627,7 @@ async function buildTiktokSnapshot(args: {
     ])
 
     campaigns = fetchedCampaigns
+    adgroups = fetchedAdgroups
     gmvMaxCampaigns = fetchedGmvCampaigns
     ads = fetchedAds
 
@@ -669,6 +694,7 @@ async function buildTiktokSnapshot(args: {
       monthly,
       weekly,
       campaigns,
+      adgroups,
       ads,
       hasGmvMax,
       ...(gmvMaxMonthly !== undefined && { gmvMaxMonthly }),
