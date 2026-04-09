@@ -245,11 +245,101 @@ export type KpiSummary = {
 export type MetaDailyStatFull = MetaDailyStat
 export type TiktokDailyStatFull = TiktokDailyStat
 
+// ── Amazon ──────────────────────────────────
+
+export type AmazonAccount = {
+  id: string
+  brand_id: string
+  account_id: string
+  account_name: string
+  account_type: 'organic' | 'ads' | 'asin'
+  country: string | null
+  is_active: boolean
+  created_at: string
+}
+
+export type AmazonOrganicStat = {
+  id: string
+  amazon_account_id: string
+  brand_id: string
+  date: string
+  currency: string | null
+  ordered_product_sales: number | null
+  ordered_product_sales_b2b: number | null
+  orders: number | null
+  orders_b2b: number | null
+  total_order_items: number | null
+  total_order_items_b2b: number | null
+  page_views: number | null
+  page_views_b2b: number | null
+  sessions: number | null
+  sessions_b2b: number | null
+  buy_box_percentage: number | null
+  buy_box_percentage_b2b: number | null
+  unit_session_percentage: number | null
+  unit_session_percentage_b2b: number | null
+  average_offer_count: number | null
+  average_parent_items: number | null
+  created_at: string
+}
+
+export type AmazonAdsStat = {
+  id: string
+  amazon_account_id: string
+  brand_id: string
+  date: string
+  currency: string | null
+  impressions: number | null
+  viewable_impressions: number | null
+  clicks: number | null
+  cost: number | null
+  purchases: number | null
+  purchases_new_to_brand: number | null
+  sales: number | null
+  long_term_sales: number | null
+  ctr: number | null
+  cpc: number | null
+  roas: number | null
+  long_term_roas: number | null
+  cost_per_purchase: number | null
+  created_at: string
+}
+
+export type AmazonAsinStat = {
+  id: string
+  amazon_account_id: string
+  brand_id: string
+  date: string
+  currency: string | null
+  parent_asin: string | null
+  child_asin: string | null
+  title: string | null
+  sessions: number | null
+  sessions_b2b: number | null
+  session_percentage: number | null
+  session_percentage_b2b: number | null
+  page_views: number | null
+  page_views_b2b: number | null
+  page_views_percentage: number | null
+  page_views_percentage_b2b: number | null
+  buy_box_percentage: number | null
+  buy_box_percentage_b2b: number | null
+  orders: number | null
+  orders_b2b: number | null
+  unit_session_percentage: number | null
+  unit_session_percentage_b2b: number | null
+  ordered_product_sales: number | null
+  ordered_product_sales_b2b: number | null
+  total_order_items: number | null
+  total_order_items_b2b: number | null
+  created_at: string
+}
+
 // 일별 페이지 필터
 export type DailyFilters = {
   brandId: string
   accountId: string
-  accountType: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp'
+  accountType: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp' | 'amazon_organic' | 'amazon_ads' | 'amazon_asin'
   startDate: string
   endDate: string
 }
@@ -257,7 +347,7 @@ export type DailyFilters = {
 export type SummaryFilters = {
   brandId: string
   accountId: string
-  accountType: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp'
+  accountType: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp' | 'amazon_organic' | 'amazon_ads' | 'amazon_asin'
   startDate: string
   endDate: string
 }
@@ -299,6 +389,9 @@ export type SummaryDayData = {
   cancelled_sales?: number | null
   refunded_orders?: number | null
   refunded_sales?: number | null
+  // Amazon 오가닉 전용 필드
+  buy_box_percentage?: number | null
+  unit_session_percentage?: number | null
 }
 
 export type SummaryTotals = Omit<SummaryDayData, 'date'>
@@ -315,8 +408,40 @@ export type GmvMaxSummaryDayData = {
 
 export type GmvMaxSummaryTotals = Omit<GmvMaxSummaryDayData, 'date'>
 
+// ── Amazon Dashboard ──────────────────────────
+
+// 광고 요약 일별 데이터
+export type AmazonAdsSummaryDayData = {
+  date: string
+  cost: number | null
+  sales: number | null
+  impressions: number | null
+  clicks: number | null
+  purchases: number | null
+  purchases_new_to_brand: number | null
+  acos: number | null
+  roas: number | null
+  cpc: number | null
+  ctr: number | null
+  cost_per_purchase: number | null
+}
+
+export type AmazonAdsSummaryTotals = Omit<AmazonAdsSummaryDayData, 'date'>
+
+// 통합 핵심 지표 (오가닉 + 광고 합산)
+export type AmazonCombinedTotals = {
+  total_sales: number | null
+  organic_sales: number | null
+  ad_sales: number | null
+  ad_cost: number | null
+  tacos: number | null           // TACoS = ad_cost / organic_sales * 100
+  ad_sales_ratio: number | null  // ad_sales / total_sales * 100
+  total_orders: number | null
+  total_sessions: number | null
+}
+
 export type SummaryResponse = {
-  platform: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp'
+  platform: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp' | 'amazon'
   dailyData: SummaryDayData[]
   totals: SummaryTotals
   shopeeExtra?: {
@@ -331,6 +456,13 @@ export type SummaryResponse = {
   // TikTok GMV Max 데이터 (데이터 존재 시에만 포함)
   gmvMaxDailyData?: GmvMaxSummaryDayData[]
   gmvMaxTotals?: GmvMaxSummaryTotals
+  // Amazon 오가닉/광고 분리 데이터
+  organicDailyData?: SummaryDayData[]
+  organicTotals?: SummaryTotals
+  adsDailyData?: AmazonAdsSummaryDayData[]
+  adsTotals?: AmazonAdsSummaryTotals
+  combinedTotals?: AmazonCombinedTotals
+  amazonExtra?: { currency: string | null }
 }
 
 export type ExchangeRate = {

@@ -68,6 +68,19 @@ export async function toggleShopeeAccount(id: string, isActive: boolean) {
   return { success: true }
 }
 
+// AmazonAccount 활성화 토글
+export async function toggleAmazonAccount(id: string, isActive: boolean) {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('amazon_accounts')
+    .update({ is_active: isActive })
+    .eq('id', id)
+
+  if (error) return { error: error.message }
+  revalidatePath('/dashboard/admin')
+  return { success: true }
+}
+
 // Brand 생성
 export async function createBrand(formData: FormData) {
   const supabase = await createClient()
@@ -125,7 +138,7 @@ export async function deleteBrand(id: string) {
   }
 
   // 연결된 광고 계정 확인 (병렬 조회)
-  const [{ count: metaCount }, { count: tiktokCount }, { count: shopeeCount }] =
+  const [{ count: metaCount }, { count: tiktokCount }, { count: shopeeCount }, { count: amazonCount }] =
     await Promise.all([
       supabase
         .from('meta_accounts')
@@ -139,9 +152,13 @@ export async function deleteBrand(id: string) {
         .from('shopee_accounts')
         .select('*', { count: 'exact', head: true })
         .eq('brand_id', id),
+      supabase
+        .from('amazon_accounts')
+        .select('*', { count: 'exact', head: true })
+        .eq('brand_id', id),
     ])
 
-  const totalAccounts = (metaCount || 0) + (tiktokCount || 0) + (shopeeCount || 0)
+  const totalAccounts = (metaCount || 0) + (tiktokCount || 0) + (shopeeCount || 0) + (amazonCount || 0)
   if (totalAccounts > 0) {
     return {
       error: `해당 브랜드에 연결된 광고 계정이 ${totalAccounts}개 있어 삭제할 수 없습니다. 먼저 광고 계정을 삭제해주세요.`,

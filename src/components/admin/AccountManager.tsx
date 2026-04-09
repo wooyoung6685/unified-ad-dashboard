@@ -1,6 +1,7 @@
 'use client'
 
 import {
+  toggleAmazonAccount,
   toggleMetaAccount,
   toggleShopeeAccount,
   toggleTiktokAccount,
@@ -39,7 +40,7 @@ import { cn } from '@/lib/utils'
 import type { Brand } from '@/types/database'
 import { useCallback, useEffect, useState } from 'react'
 
-type PlatformType = 'meta' | 'tiktok' | 'shopee'
+type PlatformType = 'meta' | 'tiktok' | 'shopee' | 'amazon'
 
 interface PendingRow {
   _key: string
@@ -64,6 +65,7 @@ interface RegisteredAccount {
   is_active: boolean
   store_id?: string | null  // TikTok GMV Max용 Store ID (자동 감지)
   _shopeeRowIds?: string[]  // 쇼피 통합: shopping+inapp 두 행의 DB PK
+  _amazonRowIds?: string[]  // 아마존 통합: organic+ads+asin 세 행의 DB PK
 }
 
 interface EditingValues {
@@ -81,6 +83,7 @@ const PLATFORM_LABEL: Record<PlatformType, string> = {
   meta: '페북/인스타',
   tiktok: '틱톡',
   shopee: '쇼피',
+  amazon: '아마존',
 }
 
 const COUNTRY_OPTIONS = [
@@ -100,8 +103,13 @@ function isShopee(platform: PlatformType | ''): boolean {
   return platform === 'shopee'
 }
 
+function isAmazon(platform: PlatformType | ''): boolean {
+  return platform === 'amazon'
+}
+
 function getApiEndpoint(platform: PlatformType): string {
   if (isShopee(platform)) return '/api/admin/accounts/shopee'
+  if (isAmazon(platform)) return '/api/admin/accounts/amazon'
   return `/api/admin/accounts/${platform}`
 }
 
@@ -148,7 +156,7 @@ export function AccountManager({ brands }: AccountManagerProps) {
   const [deleteTarget, setDeleteTarget] = useState<{
     id: string
     platform: PlatformType
-    shopeeExternalId?: string  // 쇼피: 외부 account_id로 두 행 모두 삭제
+    externalAccountId?: string  // 쇼피/아마존: 외부 account_id로 모든 행 삭제
   } | null>(null)
 
   // 브랜드별 등록 계정 수
@@ -163,19 +171,21 @@ export function AccountManager({ brands }: AccountManagerProps) {
     (a) => a.brand_id === selectedBrandId
   )
 
-  // 마운트 시 Meta + TikTok + Shopee 계정 병렬 로드
+  // 마운트 시 Meta + TikTok + Shopee + Amazon 계정 병렬 로드
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [metaRes, tiktokRes, shopeeRes] = await Promise.all([
+      const [metaRes, tiktokRes, shopeeRes, amazonRes] = await Promise.all([
         fetch('/api/admin/accounts/meta'),
         fetch('/api/admin/accounts/tiktok'),
         fetch('/api/admin/accounts/shopee'),
+        fetch('/api/admin/accounts/amazon'),
       ])
-      const [metaJson, tiktokJson, shopeeJson] = await Promise.all([
+      const [metaJson, tiktokJson, shopeeJson, amazonJson] = await Promise.all([
         metaRes.json(),
         tiktokRes.json(),
         shopeeRes.json(),
+        amazonRes.json(),
       ])
 
       const metaAccounts: RegisteredAccount[] = (metaJson.accounts ?? []).map(
@@ -191,8 +201,9 @@ export function AccountManager({ brands }: AccountManagerProps) {
         platform: 'tiktok' as PlatformType,
         store_id: (a as RegisteredAccount).store_id ?? null,
       }))
+
       // shopee 계정을 brand_id + account_id 기준으로 그룹핑하여 하나의 항목으로 표시
-      type ShopeeRawAccount = {
+      type RawAccount = {
         id: string
         brand_id: string
         brand_name: string
@@ -202,7 +213,7 @@ export function AccountManager({ brands }: AccountManagerProps) {
         country: string | null
         is_active: boolean
       }
-      const shopeeByKey = new Map<string, ShopeeRawAccount[]>()
+      const shopeeByKey = new Map<string, RawAccount[]>()
       for (const row of shopeeJson.accounts ?? []) {
         const key = `${row.brand_id}__${row.account_id}`
         if (!shopeeByKey.has(key)) shopeeByKey.set(key, [])
@@ -227,7 +238,33 @@ export function AccountManager({ brands }: AccountManagerProps) {
         })
       }
 
-      setRegistered([...metaAccounts, ...tiktokAccounts, ...shopeeAccountsMapped])
+      // amazon 계정을 brand_id + account_id 기준으로 그룹핑하여 하나의 항목으로 표시
+      const amazonByKey = new Map<string, RawAccount[]>()
+      for (const row of amazonJson.accounts ?? []) {
+        const key = `${row.brand_id}__${row.account_id}`
+        if (!amazonByKey.has(key)) amazonByKey.set(key, [])
+        amazonByKey.get(key)!.push(row)
+      }
+
+      const amazonAccountsMapped: RegisteredAccount[] = []
+      for (const rows of amazonByKey.values()) {
+        // 대표 행: organic 우선, 없으면 첫 번째 행
+        const rep = rows.find((r) => r.account_type === 'organic') ?? rows[0]
+        amazonAccountsMapped.push({
+          id: rep.id,
+          brand_id: rep.brand_id,
+          brand_name: rep.brand_name,
+          platform: 'amazon' as PlatformType,
+          account_id: rep.account_id,
+          sub_brand: rep.sub_brand,
+          note: null,
+          country: rep.country,
+          is_active: rows.some((r) => r.is_active),
+          _amazonRowIds: rows.map((r) => r.id),
+        })
+      }
+
+      setRegistered([...metaAccounts, ...tiktokAccounts, ...shopeeAccountsMapped, ...amazonAccountsMapped])
     } finally {
       setLoading(false)
     }
@@ -301,13 +338,22 @@ export function AccountManager({ brands }: AccountManagerProps) {
   }
 
   // 등록 계정 삭제
-  async function deleteRegistered(id: string, platform: PlatformType, shopeeExternalId?: string) {
-    if (platform === 'shopee' && shopeeExternalId) {
+  async function deleteRegistered(id: string, platform: PlatformType, externalAccountId?: string) {
+    if (platform === 'shopee' && externalAccountId) {
       // shopee: account_id 기준으로 shopping+inapp 두 행 모두 삭제
-      const res = await fetch(`/api/admin/accounts/shopee?account_id=${shopeeExternalId}`, { method: 'DELETE' })
+      const res = await fetch(`/api/admin/accounts/shopee?account_id=${externalAccountId}`, { method: 'DELETE' })
       const json = await res.json()
       if (!json.error) {
-        setRegistered((prev) => prev.filter((a) => !(a.platform === 'shopee' && a.account_id === shopeeExternalId)))
+        setRegistered((prev) => prev.filter((a) => !(a.platform === 'shopee' && a.account_id === externalAccountId)))
+      }
+      return
+    }
+    if (platform === 'amazon' && externalAccountId) {
+      // amazon: account_id 기준으로 organic+ads+asin 세 행 모두 삭제
+      const res = await fetch(`/api/admin/accounts/amazon?account_id=${externalAccountId}`, { method: 'DELETE' })
+      const json = await res.json()
+      if (!json.error) {
+        setRegistered((prev) => prev.filter((a) => !(a.platform === 'amazon' && a.account_id === externalAccountId)))
       }
       return
     }
@@ -361,6 +407,10 @@ export function AccountManager({ brands }: AccountManagerProps) {
       await toggleMetaAccount(account.id, !account.is_active)
     } else if (account.platform === 'tiktok') {
       await toggleTiktokAccount(account.id, !account.is_active)
+    } else if (account.platform === 'amazon') {
+      // amazon: 연결된 모든 행(organic+ads+asin) 토글
+      const ids = account._amazonRowIds ?? [account.id]
+      await Promise.all(ids.map((rid) => toggleAmazonAccount(rid, !account.is_active)))
     } else {
       // shopee: 연결된 모든 행(shopping+inapp) 토글
       const ids = account._shopeeRowIds ?? [account.id]
@@ -463,6 +513,7 @@ export function AccountManager({ brands }: AccountManagerProps) {
                           <SelectItem value="meta">페북/인스타</SelectItem>
                           <SelectItem value="tiktok">틱톡</SelectItem>
                           <SelectItem value="shopee">쇼피</SelectItem>
+                          <SelectItem value="amazon">아마존</SelectItem>
                         </SelectContent>
                       </Select>
                     </TableCell>
@@ -696,8 +747,10 @@ export function AccountManager({ brands }: AccountManagerProps) {
                                   setDeleteTarget({
                                     id: account.id,
                                     platform: account.platform,
-                                    shopeeExternalId:
-                                      account.platform === 'shopee' ? account.account_id : undefined,
+                                    externalAccountId:
+                                      account.platform === 'shopee' || account.platform === 'amazon'
+                                        ? account.account_id
+                                        : undefined,
                                   })
                                 }
                               >
@@ -735,7 +788,7 @@ export function AccountManager({ brands }: AccountManagerProps) {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
                 if (deleteTarget)
-                  deleteRegistered(deleteTarget.id, deleteTarget.platform, deleteTarget.shopeeExternalId)
+                  deleteRegistered(deleteTarget.id, deleteTarget.platform, deleteTarget.externalAccountId)
                 setDeleteTarget(null)
               }}
             >
