@@ -105,61 +105,81 @@ function MonthlyKpi({ m }: { m: ShopeeMonthlyData }) {
       <CardContent>
         <div className="grid grid-cols-4 gap-3">
           <ShopeeKpiCard
-            label="지출금액 (한화)"
-            curr={m.spend_krw}
-            prev={m.prev_spend_krw}
-            format="krw"
-            goodUp={false}
-          />
-          <ShopeeKpiCard
-            label="매출 (한화)"
-            curr={m.revenue_krw}
-            prev={m.prev_revenue_krw}
+            label="Sales (한화)"
+            curr={m.sales_krw ?? null}
+            prev={m.prev_sales_krw ?? null}
             format="krw"
             goodUp
           />
-          <ShopeeKpiCard label="ROAS" curr={m.roas} prev={m.prev_roas} format="pct" goodUp />
           <ShopeeKpiCard
-            label="구매(전환)수"
-            curr={m.purchases}
-            prev={m.prev_purchases}
+            label="Orders"
+            curr={m.orders ?? null}
+            prev={m.prev_orders ?? null}
             format="num"
             goodUp
           />
           <ShopeeKpiCard
-            label="전환율"
-            curr={m.conversion_rate}
-            prev={m.prev_conversion_rate}
+            label="Product Clicks"
+            curr={m.product_clicks ?? null}
+            prev={m.prev_product_clicks ?? null}
+            format="num"
+            goodUp
+          />
+          <ShopeeKpiCard
+            label="Visitors"
+            curr={m.visitors ?? null}
+            prev={m.prev_visitors ?? null}
+            format="num"
+            goodUp
+          />
+          <ShopeeKpiCard
+            label="CVR"
+            curr={m.cvr ?? null}
+            prev={m.prev_cvr ?? null}
             format="pct"
             goodUp
           />
           <ShopeeKpiCard
-            label="노출수"
-            curr={m.impressions}
-            prev={m.prev_impressions}
+            label="Units Sold"
+            curr={m.units_sold ?? null}
+            prev={m.prev_units_sold ?? null}
             format="num"
             goodUp
           />
           <ShopeeKpiCard
-            label="클릭수"
-            curr={m.clicks}
-            prev={m.prev_clicks}
+            label="Sales per Buyer (한화)"
+            curr={m.sales_per_buyer ?? null}
+            prev={m.prev_sales_per_buyer ?? null}
+            format="krw"
+            goodUp
+          />
+          <ShopeeKpiCard
+            label="New Buyers"
+            curr={m.new_buyers ?? null}
+            prev={m.prev_new_buyers ?? null}
             format="num"
             goodUp
           />
           <ShopeeKpiCard
-            label="클릭당 비용(CPC) (한화)"
-            curr={m.cpc_krw}
-            prev={m.prev_cpc_krw}
+            label="Existing Buyers"
+            curr={m.existing_buyers ?? null}
+            prev={m.prev_existing_buyers ?? null}
+            format="num"
+            goodUp
+          />
+          <ShopeeKpiCard
+            label="광고비 (인앱)"
+            curr={m.ad_spend_inapp_krw ?? null}
+            prev={m.prev_ad_spend_inapp_krw ?? null}
             format="krw"
             goodUp={false}
           />
           <ShopeeKpiCard
-            label="클릭률(CTR)"
-            curr={m.ctr}
-            prev={m.prev_ctr}
-            format="pct"
-            goodUp
+            label="광고비 (메타)"
+            curr={m.ad_spend_meta ?? null}
+            prev={m.prev_ad_spend_meta ?? null}
+            format="krw"
+            goodUp={false}
           />
         </div>
       </CardContent>

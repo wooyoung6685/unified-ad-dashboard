@@ -124,8 +124,26 @@ export type ShopeeInappRow = {
   conversions: number | null
   clicks: number | null
   impressions: number | null
+  items_sold?: number | null
 }
 
+export type ShopeeShoppingRow = {
+  date: string
+  sales_krw: number | null
+  orders: number | null
+  product_clicks: number | null
+  visitors: number | null
+  buyers: number | null
+  new_buyers: number | null
+  existing_buyers: number | null
+}
+
+export type MetaSpendRow = {
+  date: string
+  spend: number | null
+}
+
+// 기존 calcShopeeAgg는 주간/breakdown 계산에 계속 사용
 function calcShopeeAgg(rows: ShopeeInappRow[]) {
   const spend_krw = sumRows(rows.map((r) => r.expense_krw))
   const revenue_krw = sumRows(rows.map((r) => r.gmv_krw))
@@ -145,23 +163,59 @@ function calcShopeeAgg(rows: ShopeeInappRow[]) {
   }
 }
 
+function calcShopeeMonthlyAgg(
+  shoppingRows: ShopeeShoppingRow[],
+  inappRows: ShopeeInappRow[],
+  metaRows: MetaSpendRow[],
+) {
+  const sales_krw = sumRows(shoppingRows.map((r) => r.sales_krw))
+  const orders = sumRows(shoppingRows.map((r) => r.orders))
+  const product_clicks = sumRows(shoppingRows.map((r) => r.product_clicks))
+  const visitors = sumRows(shoppingRows.map((r) => r.visitors))
+  const buyers = sumRows(shoppingRows.map((r) => r.buyers))
+  const new_buyers = sumRows(shoppingRows.map((r) => r.new_buyers))
+  const existing_buyers = sumRows(shoppingRows.map((r) => r.existing_buyers))
+  const units_sold = sumRows(inappRows.map((r) => r.items_sold))
+  const ad_spend_inapp_krw = sumRows(inappRows.map((r) => r.expense_krw))
+  const ad_spend_meta = sumRows(metaRows.map((r) => r.spend))
+  return {
+    sales_krw: sales_krw || null,
+    orders: orders || null,
+    product_clicks: product_clicks || null,
+    visitors: visitors || null,
+    cvr: divOrNull(orders * 100, visitors),
+    units_sold: units_sold || null,
+    sales_per_buyer: divOrNull(sales_krw, buyers),
+    new_buyers: new_buyers || null,
+    existing_buyers: existing_buyers || null,
+    ad_spend_inapp_krw: ad_spend_inapp_krw || null,
+    ad_spend_meta: ad_spend_meta || null,
+  }
+}
+
 export function aggregateShopeeMonthly(
-  rows: ShopeeInappRow[],
-  prevRows: ShopeeInappRow[],
+  curShopping: ShopeeShoppingRow[],
+  prevShopping: ShopeeShoppingRow[],
+  curInapp: ShopeeInappRow[],
+  prevInapp: ShopeeInappRow[],
+  curMeta: MetaSpendRow[],
+  prevMeta: MetaSpendRow[],
 ): ShopeeMonthlyData {
-  const cur = calcShopeeAgg(rows)
-  const prev = calcShopeeAgg(prevRows)
+  const cur = calcShopeeMonthlyAgg(curShopping, curInapp, curMeta)
+  const prev = calcShopeeMonthlyAgg(prevShopping, prevInapp, prevMeta)
   return {
     ...cur,
-    prev_spend_krw: prev.spend_krw,
-    prev_revenue_krw: prev.revenue_krw,
-    prev_roas: prev.roas,
-    prev_purchases: prev.purchases,
-    prev_conversion_rate: prev.conversion_rate,
-    prev_impressions: prev.impressions,
-    prev_clicks: prev.clicks,
-    prev_cpc_krw: prev.cpc_krw,
-    prev_ctr: prev.ctr,
+    prev_sales_krw: prev.sales_krw,
+    prev_orders: prev.orders,
+    prev_product_clicks: prev.product_clicks,
+    prev_visitors: prev.visitors,
+    prev_cvr: prev.cvr,
+    prev_units_sold: prev.units_sold,
+    prev_sales_per_buyer: prev.sales_per_buyer,
+    prev_new_buyers: prev.new_buyers,
+    prev_existing_buyers: prev.existing_buyers,
+    prev_ad_spend_inapp_krw: prev.ad_spend_inapp_krw,
+    prev_ad_spend_meta: prev.ad_spend_meta,
   }
 }
 
