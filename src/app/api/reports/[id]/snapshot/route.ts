@@ -11,6 +11,8 @@ import {
   divOrNull,
   sumRows,
   type ShopeeInappRow,
+  type ShopeeShoppingRow,
+  type MetaSpendRow,
   type TiktokDailyRow,
 } from '@/lib/reports/aggregators'
 import { groupGmvMaxByWeek, groupMetaByWeek, groupShopeeByWeek, groupTiktokByWeek } from '@/lib/reports/weeklyGrouper'
@@ -421,28 +423,104 @@ async function buildShopeeSnapshot(args: {
     prevMonthEnd,
   } = args
 
-  const [{ data: curStats }, { data: prevStats }] = await Promise.all([
+  // 이 계정의 brand_id, country 조회
+  const { data: shopeeAccount } = await supabaseAdmin
+    .from('shopee_accounts')
+    .select('brand_id, country')
+    .eq('id', internal_account_id)
+    .single()
+
+  // 같은 brand+country의 shopping 계정 및 meta 계정 조회
+  const [{ data: shoppingAccounts }, { data: metaAccounts }] = await Promise.all([
+    shopeeAccount
+      ? supabaseAdmin
+          .from('shopee_accounts')
+          .select('id')
+          .eq('brand_id', shopeeAccount.brand_id)
+          .eq('country', shopeeAccount.country)
+          .eq('account_type', 'shopping')
+      : Promise.resolve({ data: [] }),
+    shopeeAccount
+      ? supabaseAdmin
+          .from('meta_accounts')
+          .select('id')
+          .eq('brand_id', shopeeAccount.brand_id)
+          .eq('country', shopeeAccount.country)
+      : Promise.resolve({ data: [] }),
+  ])
+
+  const shoppingAccountIds = (shoppingAccounts ?? []).map((a) => a.id)
+  const metaAccountIds = (metaAccounts ?? []).map((a) => a.id)
+
+  // 모든 데이터 병렬 조회
+  const [
+    { data: curInappStats },
+    { data: prevInappStats },
+    { data: curShoppingStats },
+    { data: prevShoppingStats },
+    { data: curMetaStats },
+    { data: prevMetaStats },
+  ] = await Promise.all([
+    // inapp: 주간차트/breakdown + 월간 items_sold/expense_krw
     supabaseAdmin
       .from('shopee_inapp_stats')
-      .select('date, ads_type, expense_krw, gmv_krw, conversions, clicks, impressions')
+      .select('date, ads_type, expense_krw, gmv_krw, conversions, clicks, impressions, items_sold')
       .eq('shopee_account_id', internal_account_id)
       .gte('date', thisMonthStart)
       .lte('date', thisMonthEnd),
     supabaseAdmin
       .from('shopee_inapp_stats')
-      .select('date, ads_type, expense_krw, gmv_krw, conversions, clicks, impressions')
+      .select('date, ads_type, expense_krw, gmv_krw, conversions, clicks, impressions, items_sold')
       .eq('shopee_account_id', internal_account_id)
       .gte('date', prevMonthStart)
       .lte('date', prevMonthEnd),
+    // shopping: 월간 쇼핑 지표
+    shoppingAccountIds.length > 0
+      ? supabaseAdmin
+          .from('shopee_shopping_stats')
+          .select('date, sales_krw, orders, product_clicks, visitors, buyers, new_buyers, existing_buyers')
+          .in('shopee_account_id', shoppingAccountIds)
+          .gte('date', thisMonthStart)
+          .lte('date', thisMonthEnd)
+      : Promise.resolve({ data: [] }),
+    shoppingAccountIds.length > 0
+      ? supabaseAdmin
+          .from('shopee_shopping_stats')
+          .select('date, sales_krw, orders, product_clicks, visitors, buyers, new_buyers, existing_buyers')
+          .in('shopee_account_id', shoppingAccountIds)
+          .gte('date', prevMonthStart)
+          .lte('date', prevMonthEnd)
+      : Promise.resolve({ data: [] }),
+    // meta spend: 같은 brand+country의 메타 광고비
+    metaAccountIds.length > 0
+      ? supabaseAdmin
+          .from('meta_daily_stats')
+          .select('date, spend')
+          .in('meta_account_id', metaAccountIds)
+          .gte('date', thisMonthStart)
+          .lte('date', thisMonthEnd)
+      : Promise.resolve({ data: [] }),
+    metaAccountIds.length > 0
+      ? supabaseAdmin
+          .from('meta_daily_stats')
+          .select('date, spend')
+          .in('meta_account_id', metaAccountIds)
+          .gte('date', prevMonthStart)
+          .lte('date', prevMonthEnd)
+      : Promise.resolve({ data: [] }),
   ])
 
-  const curRows: ShopeeInappRow[] = curStats ?? []
-  const prevRows: ShopeeInappRow[] = prevStats ?? []
+  const curRows: ShopeeInappRow[] = curInappStats ?? []
+  const prevRows: ShopeeInappRow[] = prevInappStats ?? []
+  const curShopping: ShopeeShoppingRow[] = (curShoppingStats ?? []) as ShopeeShoppingRow[]
+  const prevShopping: ShopeeShoppingRow[] = (prevShoppingStats ?? []) as ShopeeShoppingRow[]
+  const curMeta: MetaSpendRow[] = (curMetaStats ?? []) as MetaSpendRow[]
+  const prevMeta: MetaSpendRow[] = (prevMetaStats ?? []) as MetaSpendRow[]
 
-  const monthly = aggregateShopeeMonthly(curRows, prevRows)
+  const monthly = aggregateShopeeMonthly(curShopping, prevShopping, curRows, prevRows, curMeta, prevMeta)
   const weekly = groupShopeeByWeek(curRows, year, month)
 
-  // ads_type별 브레이크다운
+  // ads_type별 브레이크다운 (기존 inapp 데이터 기반 유지)
   const ADS_TYPES: Array<{ type: 'shop_ad' | 'product_ad'; label: string }> = [
     { type: 'shop_ad', label: 'Shop Ads' },
     { type: 'product_ad', label: 'Product Ads' },
@@ -644,6 +722,7 @@ async function buildTiktokSnapshot(args: {
         ctr: null,
         cpc: null,
         cpm: null,
+        conversions: null,
         purchases: c.orders,
         revenue: c.gross_revenue,
         roas: c.roi,

@@ -150,7 +150,13 @@ export function ReportDetail({ report, role, creatorEmail }: Props) {
             </CardContent>
           </Card>
         ) : snapshot.platform === 'meta' ? (
-          <MetaReportDetail data={snapshot.data} title={title} />
+          <MetaReportDetail
+            data={snapshot.data}
+            title={title}
+            role={role}
+            reportId={report.id}
+            filters={report.filters}
+          />
         ) : snapshot.platform === 'tiktok' ? (
           <TiktokReportDetail
             data={snapshot.data}
@@ -159,6 +165,7 @@ export function ReportDetail({ report, role, creatorEmail }: Props) {
             role={role}
             insightMemo={report.insight_memo}
             insightMemoGmvMax={report.insight_memo_gmv_max}
+            filters={report.filters}
           />
         ) : snapshot.platform === 'shopee_inapp' ? (
           <ShopeeReportDetail data={snapshot.data} title={title} />

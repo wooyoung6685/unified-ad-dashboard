@@ -1,5 +1,6 @@
 'use client'
 
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
@@ -10,14 +11,26 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { fmtDec, fmtKRW, fmtNum, fmtPct } from '@/lib/format'
+import {
+  DEFAULT_META_WIDGETS,
+  META_FILTER_OPTIONS,
+  META_RANK_OPTIONS,
+  applyWidgetConfig,
+  getWidgetAutoTitle,
+  getWidgetSubtitle,
+} from '@/lib/creative-widget-defaults'
 import type {
+  CreativeWidgetConfig,
   MetaAdsetData,
   MetaCampaignData,
   MetaCreativeData,
   MetaMonthlyData,
   MetaReportData,
   MetaWeeklyData,
+  ReportFilters,
 } from '@/types/database'
+import { Settings, SlidersHorizontal, X } from 'lucide-react'
+import { useState } from 'react'
 import {
   Bar,
   CartesianGrid,
@@ -29,10 +42,15 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import { CreativeWidgetDialog } from './creative-widget-dialog'
+import { FilterDialog } from './filter-dialog'
 
 interface Props {
   data: MetaReportData
   title: string
+  role?: 'admin' | 'viewer'
+  reportId?: string
+  filters?: ReportFilters | null
 }
 
 // ── 헬퍼 ─────────────────────────────────────────
@@ -382,12 +400,26 @@ function CampCell({
 }
 
 // 섹션 5: 캠페인 성과
-function CampaignTable({ campaigns }: { campaigns: MetaCampaignData[] }) {
+function CampaignTable({
+  campaigns,
+  onFilterClick,
+}: {
+  campaigns: MetaCampaignData[]
+  onFilterClick?: () => void
+}) {
   if (campaigns.length === 0) return null
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">🎯 캠페인 성과 분석 (Meta)</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base">🎯 캠페인 성과 분석 (Meta)</CardTitle>
+          {onFilterClick && (
+            <Button variant="outline" size="sm" onClick={onFilterClick}>
+              <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
+              필터
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
@@ -455,12 +487,26 @@ function CampaignTable({ campaigns }: { campaigns: MetaCampaignData[] }) {
 }
 
 // 섹션 6: 광고세트 성과
-function AdsetTable({ adsets }: { adsets: MetaAdsetData[] }) {
+function AdsetTable({
+  adsets,
+  onFilterClick,
+}: {
+  adsets: MetaAdsetData[]
+  onFilterClick?: () => void
+}) {
   if (adsets.length === 0) return null
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">📂 광고세트 성과 분석 (Meta)</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base">📂 광고세트 성과 분석 (Meta)</CardTitle>
+          {onFilterClick && (
+            <Button variant="outline" size="sm" onClick={onFilterClick}>
+              <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
+              필터
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
@@ -601,48 +647,192 @@ function CreativeCard({ creative, rank }: { creative: MetaCreativeData; rank: nu
   )
 }
 
+// Meta 소재 지표 accessor
+function metaMetricAccessor(item: MetaCreativeData, metric: string): number {
+  const m = metric as keyof MetaCreativeData
+  return (item[m] as number | null) ?? 0
+}
+
 // 섹션 6: 소재 성과
-function CreativeSection({ creatives }: { creatives: MetaCreativeData[] }) {
+function CreativeSection({
+  creatives,
+  widgets,
+  onWidgetsChange,
+  isAdmin,
+}: {
+  creatives: MetaCreativeData[]
+  widgets: CreativeWidgetConfig[]
+  onWidgetsChange: (widgets: CreativeWidgetConfig[]) => void
+  isAdmin: boolean
+}) {
+  const [addDialogOpen, setAddDialogOpen] = useState(false)
+  const [editingWidget, setEditingWidget] = useState<CreativeWidgetConfig | undefined>()
+
   if (creatives.length === 0) return null
 
-  const byCartValue = [...creatives]
-    .sort((a, b) => (b.revenue ?? 0) - (a.revenue ?? 0))
-    .slice(0, 3)
+  const handleAdd = (config: CreativeWidgetConfig) => {
+    if (widgets.length >= 10) return
+    onWidgetsChange([...widgets, config])
+  }
 
-  const byRoas = [...creatives]
-    .sort((a, b) => (b.roas ?? 0) - (a.roas ?? 0))
-    .slice(0, 3)
+  const handleEdit = (config: CreativeWidgetConfig) => {
+    onWidgetsChange(widgets.map((w) => (w.id === config.id ? config : w)))
+  }
+
+  const handleDelete = (id: string) => {
+    onWidgetsChange(widgets.filter((w) => w.id !== id))
+  }
+
+  const openEdit = (widget: CreativeWidgetConfig) => {
+    setEditingWidget(widget)
+  }
 
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">🎨 소재 성과 분석 (Meta)</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base">🎨 소재 성과 분석 (Meta)</CardTitle>
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAddDialogOpen(true)}
+              disabled={widgets.length >= 10}
+            >
+              + 리스트 추가
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
-        <div>
-          <p className="mb-3 text-sm font-semibold">구매전환값 Best 3 (전체 대상)</p>
-          <div className="grid grid-cols-3 gap-4">
-            {byCartValue.map((c, i) => (
-              <CreativeCard key={c.ad_id} creative={c} rank={i + 1} />
-            ))}
-          </div>
-        </div>
-        <div>
-          <p className="mb-3 text-sm font-semibold">ROAS Best 3 (전체 대상)</p>
-          <div className="grid grid-cols-3 gap-4">
-            {byRoas.map((c, i) => (
-              <CreativeCard key={c.ad_id} creative={c} rank={i + 1} />
-            ))}
-          </div>
-        </div>
+        {widgets.map((widget) => {
+          const items = applyWidgetConfig(creatives, widget, metaMetricAccessor)
+          const displayTitle =
+            widget.title ?? getWidgetAutoTitle(widget, META_RANK_OPTIONS)
+          const subtitle = getWidgetSubtitle(widget)
+          return (
+            <div key={widget.id}>
+              <div className="mb-3 flex items-center gap-2">
+                <p className="text-sm font-semibold">
+                  {displayTitle}
+                </p>
+                <span className="text-xs text-muted-foreground">({subtitle})</span>
+                {isAdmin && (
+                  <>
+                    <button
+                      onClick={() => openEdit(widget)}
+                      className="ml-auto text-muted-foreground hover:text-foreground"
+                      title="위젯 설정"
+                    >
+                      <Settings className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(widget.id)}
+                      className="text-muted-foreground hover:text-destructive"
+                      title="위젯 삭제"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </>
+                )}
+              </div>
+              {items.length === 0 ? (
+                <p className="text-sm text-muted-foreground">조건에 맞는 소재가 없습니다.</p>
+              ) : (
+                <div className="grid grid-cols-3 gap-4">
+                  {items.map((c, i) => (
+                    <CreativeCard key={c.ad_id} creative={c} rank={i + 1} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
       </CardContent>
+
+      {/* 위젯 추가 다이얼로그 */}
+      <CreativeWidgetDialog
+        open={addDialogOpen}
+        onOpenChange={setAddDialogOpen}
+        onApply={handleAdd}
+        rankByOptions={META_RANK_OPTIONS}
+        filterMetricOptions={META_FILTER_OPTIONS}
+      />
+
+      {/* 위젯 수정 다이얼로그 */}
+      <CreativeWidgetDialog
+        open={!!editingWidget}
+        onOpenChange={(open) => { if (!open) setEditingWidget(undefined) }}
+        onApply={handleEdit}
+        initialConfig={editingWidget}
+        rankByOptions={META_RANK_OPTIONS}
+        filterMetricOptions={META_FILTER_OPTIONS}
+      />
     </Card>
   )
 }
 
 // ── 메인 컴포넌트 ──────────────────────────────────
 
-export function MetaReportDetail({ data, title }: Props) {
+export function MetaReportDetail({ data, title, role, reportId, filters: initialFilters }: Props) {
+  const isAdmin = role === 'admin'
+
+  // 필터 상태 (null = 전체 표시)
+  const [campaignFilter, setCampaignFilter] = useState<string[] | null>(
+    initialFilters?.meta_campaign_ids ?? null,
+  )
+  const [adsetFilter, setAdsetFilter] = useState<string[] | null>(
+    initialFilters?.meta_adset_ids ?? null,
+  )
+  const [currentFilters, setCurrentFilters] = useState<ReportFilters>(initialFilters ?? {})
+  const [creativeWidgets, setCreativeWidgets] = useState<CreativeWidgetConfig[]>(
+    initialFilters?.meta_creative_widgets ?? DEFAULT_META_WIDGETS,
+  )
+
+  // 다이얼로그 열림 상태
+  const [campaignDialogOpen, setCampaignDialogOpen] = useState(false)
+  const [adsetDialogOpen, setAdsetDialogOpen] = useState(false)
+
+  // 필터 저장 (PATCH API 호출)
+  const saveFilters = async (updated: ReportFilters) => {
+    if (!reportId) return
+    await fetch(`/api/reports/${reportId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filters: updated }),
+    })
+    setCurrentFilters(updated)
+  }
+
+  const handleCampaignApply = async (ids: string[] | null) => {
+    setCampaignFilter(ids)
+    await saveFilters({ ...currentFilters, meta_campaign_ids: ids })
+  }
+
+  const handleAdsetApply = async (ids: string[] | null) => {
+    setAdsetFilter(ids)
+    await saveFilters({ ...currentFilters, meta_adset_ids: ids })
+  }
+
+  const handleCreativeWidgetsChange = async (widgets: CreativeWidgetConfig[]) => {
+    setCreativeWidgets(widgets)
+    await saveFilters({ ...currentFilters, meta_creative_widgets: widgets })
+  }
+
+  // 필터 적용
+  const filteredCampaigns = campaignFilter
+    ? data.campaigns.filter((c) => campaignFilter.includes(c.campaign_id))
+    : data.campaigns
+
+  const allAdsets = data.adsets ?? []
+  const filteredAdsets = adsetFilter
+    ? allAdsets.filter((a) => adsetFilter.includes(a.adset_id))
+    : allAdsets
+
+  // 다이얼로그용 목록
+  const campaignItems = data.campaigns.map((c) => ({ id: c.campaign_id, name: c.campaign_name }))
+  const adsetItems = allAdsets.map((a) => ({ id: a.adset_id, name: a.adset_name }))
+
   return (
     <div className="flex flex-col gap-6">
       {/* 섹션 1: 리포트 제목 */}
@@ -662,13 +852,44 @@ export function MetaReportDetail({ data, title }: Props) {
       <WeeklyTable weekly={data.weekly} />
 
       {/* 섹션 5: 캠페인 성과 */}
-      <CampaignTable campaigns={data.campaigns} />
+      <CampaignTable
+        campaigns={filteredCampaigns}
+        onFilterClick={isAdmin && campaignItems.length > 0 ? () => setCampaignDialogOpen(true) : undefined}
+      />
 
       {/* 섹션 6: 광고세트 성과 */}
-      <AdsetTable adsets={data.adsets ?? []} />
+      <AdsetTable
+        adsets={filteredAdsets}
+        onFilterClick={isAdmin && adsetItems.length > 0 ? () => setAdsetDialogOpen(true) : undefined}
+      />
 
       {/* 섹션 7: 소재 성과 */}
-      <CreativeSection creatives={data.creatives} />
+      <CreativeSection
+        creatives={data.creatives}
+        widgets={creativeWidgets}
+        onWidgetsChange={handleCreativeWidgetsChange}
+        isAdmin={isAdmin}
+      />
+
+      {/* 캠페인 필터 다이얼로그 */}
+      <FilterDialog
+        open={campaignDialogOpen}
+        onOpenChange={setCampaignDialogOpen}
+        title="캠페인 선택"
+        items={campaignItems}
+        selectedIds={campaignFilter}
+        onApply={handleCampaignApply}
+      />
+
+      {/* 광고세트 필터 다이얼로그 */}
+      <FilterDialog
+        open={adsetDialogOpen}
+        onOpenChange={setAdsetDialogOpen}
+        title="광고세트 선택"
+        items={adsetItems}
+        selectedIds={adsetFilter}
+        onApply={handleAdsetApply}
+      />
     </div>
   )
 }

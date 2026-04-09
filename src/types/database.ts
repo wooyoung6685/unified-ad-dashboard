@@ -358,6 +358,40 @@ export type DashboardFilters = {
 
 // ── Reports ───────────────────────────────────
 
+// 소재 랭킹 위젯 필터 연산자
+export type FilterOperator = 'gte' | 'lte' | 'eq'
+
+// 소재 랭킹 위젯 단일 필터 조건
+export type CreativeWidgetFilterCondition = {
+  metric: string
+  operator: FilterOperator
+  value: number
+}
+
+// 소재 랭킹 위젯 설정
+export type CreativeWidgetConfig = {
+  id: string
+  title?: string
+  rankBy: string
+  sortDirection: 'desc' | 'asc'
+  topN: number
+  filters: CreativeWidgetFilterCondition[]
+}
+
+// admin이 설정하는 캠페인/세트 노출 필터
+// null 또는 키 부재 = 전체 표시, string[] = 선택된 ID만 표시
+export type ReportFilters = {
+  meta_campaign_ids?: string[] | null
+  meta_adset_ids?: string[] | null
+  tiktok_campaign_ids?: string[] | null
+  tiktok_adgroup_ids?: string[] | null
+  tiktok_gmvmax_campaign_ids?: string[] | null
+  // 소재 랭킹 위젯 설정 (없으면 플랫폼별 기본값 사용)
+  meta_creative_widgets?: CreativeWidgetConfig[] | null
+  tiktok_creative_widgets?: CreativeWidgetConfig[] | null
+  gmvmax_creative_widgets?: CreativeWidgetConfig[] | null
+}
+
 export type Report = {
   id: string
   brand_id: string
@@ -371,6 +405,7 @@ export type Report = {
   snapshot: ReportSnapshot | null
   insight_memo: string | null
   insight_memo_gmv_max: string | null
+  filters: ReportFilters | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -534,25 +569,29 @@ export type ShopeeReportData = {
 }
 
 export type ShopeeMonthlyData = {
-  spend_krw: number | null // expense_krw 합산
-  revenue_krw: number | null // gmv_krw 합산
-  roas: number | null
-  purchases: number | null // conversions 합산
-  conversion_rate: number | null // conversions / clicks * 100
-  impressions: number | null
-  clicks: number | null
-  cpc_krw: number | null // expense_krw / clicks
-  ctr: number | null
+  sales_krw: number | null // shopee_shopping_stats.sales_krw 합산
+  orders: number | null // shopee_shopping_stats.orders 합산
+  product_clicks: number | null // shopee_shopping_stats.product_clicks 합산
+  visitors: number | null // shopee_shopping_stats.visitors 합산
+  cvr: number | null // orders / visitors * 100
+  units_sold: number | null // shopee_inapp_stats.items_sold 합산
+  sales_per_buyer: number | null // sales_krw / buyers
+  new_buyers: number | null // shopee_shopping_stats.new_buyers 합산
+  existing_buyers: number | null // shopee_shopping_stats.existing_buyers 합산
+  ad_spend_inapp_krw: number | null // shopee_inapp_stats.expense_krw 합산
+  ad_spend_meta: number | null // meta_daily_stats.spend 합산 (같은 brand+country)
   // 전월
-  prev_spend_krw: number | null
-  prev_revenue_krw: number | null
-  prev_roas: number | null
-  prev_purchases: number | null
-  prev_conversion_rate: number | null
-  prev_impressions: number | null
-  prev_clicks: number | null
-  prev_cpc_krw: number | null
-  prev_ctr: number | null
+  prev_sales_krw: number | null
+  prev_orders: number | null
+  prev_product_clicks: number | null
+  prev_visitors: number | null
+  prev_cvr: number | null
+  prev_units_sold: number | null
+  prev_sales_per_buyer: number | null
+  prev_new_buyers: number | null
+  prev_existing_buyers: number | null
+  prev_ad_spend_inapp_krw: number | null
+  prev_ad_spend_meta: number | null
 }
 
 export type ShopeeWeeklyData = {
@@ -678,6 +717,7 @@ export type TiktokCampaignRow = {
   ctr: number | null
   cpc: number | null
   cpm: number | null
+  conversions: number | null
   purchases: number | null
   revenue: number | null
   roas: number | null
@@ -696,6 +736,7 @@ export type TiktokAdgroupRow = {
   ctr: number | null
   cpc: number | null
   cpm: number | null
+  conversions: number | null
   purchases: number | null
   revenue: number | null
   roas: number | null
@@ -714,6 +755,7 @@ export type TiktokAdRow = {
   ctr: number | null
   cpc: number | null
   cpm: number | null
+  conversions: number | null
   purchases: number | null
   revenue: number | null
   roas: number | null

@@ -1,6 +1,7 @@
 'use client'
 
 import { InsightMemoCard } from './insight-memo-card'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
@@ -12,11 +13,24 @@ import {
 } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { fmtDec, fmtKRW, fmtNum, fmtPct } from '@/lib/format'
+import {
+  DEFAULT_GMVMAX_WIDGETS,
+  DEFAULT_TIKTOK_WIDGETS,
+  GMVMAX_FILTER_OPTIONS,
+  GMVMAX_RANK_OPTIONS,
+  TIKTOK_FILTER_OPTIONS,
+  TIKTOK_RANK_OPTIONS,
+  applyWidgetConfig,
+  getWidgetAutoTitle,
+  getWidgetSubtitle,
+} from '@/lib/creative-widget-defaults'
 import type {
+  CreativeWidgetConfig,
   GmvMaxCampaignRow,
   GmvMaxItemRow,
   GmvMaxMonthlyData,
   GmvMaxWeeklyData,
+  ReportFilters,
   TiktokAdRow,
   TiktokAdgroupRow,
   TiktokCampaignRow,
@@ -24,6 +38,8 @@ import type {
   TiktokReportData,
   TiktokWeeklyData,
 } from '@/types/database'
+import { Settings, SlidersHorizontal, X } from 'lucide-react'
+import { useState } from 'react'
 import {
   Bar,
   CartesianGrid,
@@ -35,6 +51,8 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import { CreativeWidgetDialog } from './creative-widget-dialog'
+import { FilterDialog } from './filter-dialog'
 
 interface Props {
   data: TiktokReportData
@@ -43,6 +61,7 @@ interface Props {
   role: 'admin' | 'viewer'
   insightMemo: string | null
   insightMemoGmvMax: string | null
+  filters?: ReportFilters | null
 }
 
 // ── 헬퍼 ─────────────────────────────────────────
@@ -326,15 +345,25 @@ function CampaignSection({
   campaigns,
   title,
   emptyMessage = '🎵 틱톡 캠페인 데이터 준비 중...',
+  onFilterClick,
 }: {
   campaigns: TiktokCampaignRow[]
   title: string
   emptyMessage?: string
+  onFilterClick?: () => void
 }) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">{title}</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base">{title}</CardTitle>
+          {onFilterClick && (
+            <Button variant="outline" size="sm" onClick={onFilterClick}>
+              <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
+              필터
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         {campaigns.length === 0 ? (
@@ -351,6 +380,7 @@ function CampaignSection({
                 <TableHead className="whitespace-nowrap">매출</TableHead>
                 <TableHead className="whitespace-nowrap">ROAS</TableHead>
                 <TableHead className="whitespace-nowrap">구매수</TableHead>
+                <TableHead className="whitespace-nowrap">전환수</TableHead>
                 <TableHead className="whitespace-nowrap">동영상 조회수</TableHead>
                 <TableHead className="whitespace-nowrap">클릭수</TableHead>
                 <TableHead className="whitespace-nowrap">CPC</TableHead>
@@ -372,6 +402,7 @@ function CampaignSection({
                   <TableCell className="whitespace-nowrap">{fmtKRW(c.revenue)}</TableCell>
                   <TableCell className="whitespace-nowrap">{fmtPct(c.roas)}</TableCell>
                   <TableCell className="whitespace-nowrap">{fmtNum(c.purchases)}</TableCell>
+                  <TableCell className="whitespace-nowrap">{fmtNum(c.conversions)}</TableCell>
                   <TableCell className="whitespace-nowrap">{fmtNum(c.video_views)}</TableCell>
                   <TableCell className="whitespace-nowrap">{fmtNum(c.clicks)}</TableCell>
                   <TableCell className="whitespace-nowrap">{fmtKRW(c.cpc)}</TableCell>
@@ -392,12 +423,26 @@ function CampaignSection({
 
 // ── 섹션 5.5: 광고그룹(세트) 테이블 ─────────────────────
 
-function AdgroupSection({ adgroups }: { adgroups: TiktokAdgroupRow[] }) {
+function AdgroupSection({
+  adgroups,
+  onFilterClick,
+}: {
+  adgroups: TiktokAdgroupRow[]
+  onFilterClick?: () => void
+}) {
   if (adgroups.length === 0) return null
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">📂 광고그룹 성과 분석 (TikTok)</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base">📂 광고그룹 성과 분석 (TikTok)</CardTitle>
+          {onFilterClick && (
+            <Button variant="outline" size="sm" onClick={onFilterClick}>
+              <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
+              필터
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
@@ -412,6 +457,7 @@ function AdgroupSection({ adgroups }: { adgroups: TiktokAdgroupRow[] }) {
                 <TableHead className="whitespace-nowrap">매출</TableHead>
                 <TableHead className="whitespace-nowrap">ROAS</TableHead>
                 <TableHead className="whitespace-nowrap">구매수</TableHead>
+                <TableHead className="whitespace-nowrap">전환수</TableHead>
                 <TableHead className="whitespace-nowrap">동영상 조회수</TableHead>
                 <TableHead className="whitespace-nowrap">클릭수</TableHead>
                 <TableHead className="whitespace-nowrap">CPC</TableHead>
@@ -438,6 +484,7 @@ function AdgroupSection({ adgroups }: { adgroups: TiktokAdgroupRow[] }) {
                   <TableCell className="whitespace-nowrap">{fmtKRW(a.revenue)}</TableCell>
                   <TableCell className="whitespace-nowrap">{fmtPct(a.roas)}</TableCell>
                   <TableCell className="whitespace-nowrap">{fmtNum(a.purchases)}</TableCell>
+                  <TableCell className="whitespace-nowrap">{fmtNum(a.conversions)}</TableCell>
                   <TableCell className="whitespace-nowrap">{fmtNum(a.video_views)}</TableCell>
                   <TableCell className="whitespace-nowrap">{fmtNum(a.clicks)}</TableCell>
                   <TableCell className="whitespace-nowrap">{fmtKRW(a.cpc)}</TableCell>
@@ -504,6 +551,10 @@ function TiktokCreativeCard({ ad, rank }: { ad: TiktokAdRow; rank: number }) {
             <p className="text-xs text-muted-foreground">구매수</p>
             <p className="text-sm font-semibold">{fmtNum(ad.purchases)}</p>
           </div>
+          <div>
+            <p className="text-xs text-muted-foreground">전환수</p>
+            <p className="text-sm font-semibold">{fmtNum(ad.conversions)}</p>
+          </div>
           <div className="col-span-2">
             <p className="text-xs text-muted-foreground">동영상 조회수</p>
             <p className="text-sm font-semibold">{fmtNum(ad.video_views)}</p>
@@ -514,7 +565,26 @@ function TiktokCreativeCard({ ad, rank }: { ad: TiktokAdRow; rank: number }) {
   )
 }
 
-function CreativeSection({ ads }: { ads: TiktokAdRow[] }) {
+// TikTok 소재 지표 accessor
+function tiktokMetricAccessor(item: TiktokAdRow, metric: string): number {
+  const m = metric as keyof TiktokAdRow
+  return (item[m] as number | null) ?? 0
+}
+
+function CreativeSection({
+  ads,
+  widgets,
+  onWidgetsChange,
+  isAdmin,
+}: {
+  ads: TiktokAdRow[]
+  widgets: CreativeWidgetConfig[]
+  onWidgetsChange: (widgets: CreativeWidgetConfig[]) => void
+  isAdmin: boolean
+}) {
+  const [addDialogOpen, setAddDialogOpen] = useState(false)
+  const [editingWidget, setEditingWidget] = useState<CreativeWidgetConfig | undefined>()
+
   if (ads.length === 0) {
     return (
       <Card>
@@ -530,37 +600,94 @@ function CreativeSection({ ads }: { ads: TiktokAdRow[] }) {
     )
   }
 
-  const byRevenue = [...ads].sort((a, b) => (b.revenue ?? 0) - (a.revenue ?? 0)).slice(0, 3)
-  const byRoas = [...ads].sort((a, b) => (b.roas ?? 0) - (a.roas ?? 0)).slice(0, 3)
+  const handleAdd = (config: CreativeWidgetConfig) => {
+    if (widgets.length >= 10) return
+    onWidgetsChange([...widgets, config])
+  }
+
+  const handleEdit = (config: CreativeWidgetConfig) => {
+    onWidgetsChange(widgets.map((w) => (w.id === config.id ? config : w)))
+  }
+
+  const handleDelete = (id: string) => {
+    onWidgetsChange(widgets.filter((w) => w.id !== id))
+  }
 
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">🎨 소재 성과 분석 (TikTok)</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base">🎨 소재 성과 분석 (TikTok)</CardTitle>
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAddDialogOpen(true)}
+              disabled={widgets.length >= 10}
+            >
+              + 리스트 추가
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
-
-        {/* 매출 Best 3 */}
-        <div>
-          <p className="mb-3 text-sm font-semibold">매출 Best 3 (전체 대상)</p>
-          <div className="grid grid-cols-3 gap-4">
-            {byRevenue.map((ad, i) => (
-              <TiktokCreativeCard key={ad.ad_id} ad={ad} rank={i + 1} />
-            ))}
-          </div>
-        </div>
-
-        {/* ROAS Best 3 */}
-        <div>
-          <p className="mb-3 text-sm font-semibold">ROAS Best 3 (전체 대상)</p>
-          <div className="grid grid-cols-3 gap-4">
-            {byRoas.map((ad, i) => (
-              <TiktokCreativeCard key={ad.ad_id} ad={ad} rank={i + 1} />
-            ))}
-          </div>
-        </div>
-
+        {widgets.map((widget) => {
+          const items = applyWidgetConfig(ads, widget, tiktokMetricAccessor)
+          const displayTitle = widget.title ?? getWidgetAutoTitle(widget, TIKTOK_RANK_OPTIONS)
+          const subtitle = getWidgetSubtitle(widget)
+          return (
+            <div key={widget.id}>
+              <div className="mb-3 flex items-center gap-2">
+                <p className="text-sm font-semibold">{displayTitle}</p>
+                <span className="text-xs text-muted-foreground">({subtitle})</span>
+                {isAdmin && (
+                  <>
+                    <button
+                      onClick={() => setEditingWidget(widget)}
+                      className="ml-auto text-muted-foreground hover:text-foreground"
+                      title="위젯 설정"
+                    >
+                      <Settings className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(widget.id)}
+                      className="text-muted-foreground hover:text-destructive"
+                      title="위젯 삭제"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </>
+                )}
+              </div>
+              {items.length === 0 ? (
+                <p className="text-sm text-muted-foreground">조건에 맞는 소재가 없습니다.</p>
+              ) : (
+                <div className="grid grid-cols-3 gap-4">
+                  {items.map((ad, i) => (
+                    <TiktokCreativeCard key={ad.ad_id} ad={ad} rank={i + 1} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
       </CardContent>
+
+      <CreativeWidgetDialog
+        open={addDialogOpen}
+        onOpenChange={setAddDialogOpen}
+        onApply={handleAdd}
+        rankByOptions={TIKTOK_RANK_OPTIONS}
+        filterMetricOptions={TIKTOK_FILTER_OPTIONS}
+      />
+      <CreativeWidgetDialog
+        open={!!editingWidget}
+        onOpenChange={(open) => { if (!open) setEditingWidget(undefined) }}
+        onApply={handleEdit}
+        initialConfig={editingWidget}
+        rankByOptions={TIKTOK_RANK_OPTIONS}
+        filterMetricOptions={TIKTOK_FILTER_OPTIONS}
+      />
     </Card>
   )
 }
@@ -745,11 +872,25 @@ function GmvMaxWeeklyTable({ weekly }: { weekly: GmvMaxWeeklyData[] }) {
 
 // ── GMV Max 캠페인 테이블 ────────────────────────
 
-function GmvMaxCampaignSection({ campaigns }: { campaigns: GmvMaxCampaignRow[] }) {
+function GmvMaxCampaignSection({
+  campaigns,
+  onFilterClick,
+}: {
+  campaigns: GmvMaxCampaignRow[]
+  onFilterClick?: () => void
+}) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">🎯 캠페인 성과 분석 (GMV Max)</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base">🎯 캠페인 성과 분석 (GMV Max)</CardTitle>
+          {onFilterClick && (
+            <Button variant="outline" size="sm" onClick={onFilterClick}>
+              <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
+              필터
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         {campaigns.length === 0 ? (
@@ -853,7 +994,26 @@ function GmvMaxItemCard({ item, rank }: { item: GmvMaxItemRow; rank: number }) {
   )
 }
 
-function GmvMaxCreativeSection({ items }: { items: GmvMaxItemRow[] }) {
+// GMV Max 소재 지표 accessor
+function gmvMaxMetricAccessor(item: GmvMaxItemRow, metric: string): number {
+  const m = metric as keyof GmvMaxItemRow
+  return (item[m] as number | null) ?? 0
+}
+
+function GmvMaxCreativeSection({
+  items,
+  widgets,
+  onWidgetsChange,
+  isAdmin,
+}: {
+  items: GmvMaxItemRow[]
+  widgets: CreativeWidgetConfig[]
+  onWidgetsChange: (widgets: CreativeWidgetConfig[]) => void
+  isAdmin: boolean
+}) {
+  const [addDialogOpen, setAddDialogOpen] = useState(false)
+  const [editingWidget, setEditingWidget] = useState<CreativeWidgetConfig | undefined>()
+
   if (items.length === 0) {
     return (
       <Card>
@@ -869,37 +1029,94 @@ function GmvMaxCreativeSection({ items }: { items: GmvMaxItemRow[] }) {
     )
   }
 
-  const byRevenue = [...items].sort((a, b) => (b.gross_revenue ?? 0) - (a.gross_revenue ?? 0)).slice(0, 3)
-  const byRoi = [...items].sort((a, b) => (b.roi ?? 0) - (a.roi ?? 0)).slice(0, 3)
+  const handleAdd = (config: CreativeWidgetConfig) => {
+    if (widgets.length >= 10) return
+    onWidgetsChange([...widgets, config])
+  }
+
+  const handleEdit = (config: CreativeWidgetConfig) => {
+    onWidgetsChange(widgets.map((w) => (w.id === config.id ? config : w)))
+  }
+
+  const handleDelete = (id: string) => {
+    onWidgetsChange(widgets.filter((w) => w.id !== id))
+  }
 
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">🎨 소재 성과 분석 (GMV Max)</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base">🎨 소재 성과 분석 (GMV Max)</CardTitle>
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAddDialogOpen(true)}
+              disabled={widgets.length >= 10}
+            >
+              + 리스트 추가
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
-
-        {/* 매출 Best 3 */}
-        <div>
-          <p className="mb-3 text-sm font-semibold">매출 Best 3</p>
-          <div className="grid grid-cols-3 gap-4">
-            {byRevenue.map((item, i) => (
-              <GmvMaxItemCard key={item.item_id} item={item} rank={i + 1} />
-            ))}
-          </div>
-        </div>
-
-        {/* ROI Best 3 */}
-        <div>
-          <p className="mb-3 text-sm font-semibold">ROI Best 3</p>
-          <div className="grid grid-cols-3 gap-4">
-            {byRoi.map((item, i) => (
-              <GmvMaxItemCard key={item.item_id} item={item} rank={i + 1} />
-            ))}
-          </div>
-        </div>
-
+        {widgets.map((widget) => {
+          const widgetItems = applyWidgetConfig(items, widget, gmvMaxMetricAccessor)
+          const displayTitle = widget.title ?? getWidgetAutoTitle(widget, GMVMAX_RANK_OPTIONS)
+          const subtitle = getWidgetSubtitle(widget)
+          return (
+            <div key={widget.id}>
+              <div className="mb-3 flex items-center gap-2">
+                <p className="text-sm font-semibold">{displayTitle}</p>
+                <span className="text-xs text-muted-foreground">({subtitle})</span>
+                {isAdmin && (
+                  <>
+                    <button
+                      onClick={() => setEditingWidget(widget)}
+                      className="ml-auto text-muted-foreground hover:text-foreground"
+                      title="위젯 설정"
+                    >
+                      <Settings className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(widget.id)}
+                      className="text-muted-foreground hover:text-destructive"
+                      title="위젯 삭제"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </>
+                )}
+              </div>
+              {widgetItems.length === 0 ? (
+                <p className="text-sm text-muted-foreground">조건에 맞는 소재가 없습니다.</p>
+              ) : (
+                <div className="grid grid-cols-3 gap-4">
+                  {widgetItems.map((item, i) => (
+                    <GmvMaxItemCard key={item.item_id} item={item} rank={i + 1} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
       </CardContent>
+
+      <CreativeWidgetDialog
+        open={addDialogOpen}
+        onOpenChange={setAddDialogOpen}
+        onApply={handleAdd}
+        rankByOptions={GMVMAX_RANK_OPTIONS}
+        filterMetricOptions={GMVMAX_FILTER_OPTIONS}
+      />
+      <CreativeWidgetDialog
+        open={!!editingWidget}
+        onOpenChange={(open) => { if (!open) setEditingWidget(undefined) }}
+        onApply={handleEdit}
+        initialConfig={editingWidget}
+        rankByOptions={GMVMAX_RANK_OPTIONS}
+        filterMetricOptions={GMVMAX_FILTER_OPTIONS}
+      />
     </Card>
   )
 }
@@ -908,7 +1125,16 @@ function GmvMaxCreativeSection({ items }: { items: GmvMaxItemRow[] }) {
 // 메인 컴포넌트
 // ══════════════════════════════════════════════════
 
-export function TiktokReportDetail({ data, title, reportId, role, insightMemo, insightMemoGmvMax }: Props) {
+export function TiktokReportDetail({
+  data,
+  title,
+  reportId,
+  role,
+  insightMemo,
+  insightMemoGmvMax,
+  filters: initialFilters,
+}: Props) {
+  const isAdmin = role === 'admin'
   const {
     monthly,
     weekly,
@@ -922,8 +1148,119 @@ export function TiktokReportDetail({ data, title, reportId, role, insightMemo, i
     gmvMaxItems,
   } = data
 
-  const normalCampaigns = campaigns.filter((c) => !c.isGmvMax)
+  const allNormalCampaigns = campaigns.filter((c) => !c.isGmvMax)
+  const allAdgroups = adgroups ?? []
+  const allGmvMaxCampaigns = gmvMaxCampaigns ?? []
   const showGmvMaxTab = hasGmvMax && gmvMaxMonthly != null
+
+  // 필터 상태
+  const [campaignFilter, setCampaignFilter] = useState<string[] | null>(
+    initialFilters?.tiktok_campaign_ids ?? null,
+  )
+  const [adgroupFilter, setAdgroupFilter] = useState<string[] | null>(
+    initialFilters?.tiktok_adgroup_ids ?? null,
+  )
+  const [gmvMaxCampaignFilter, setGmvMaxCampaignFilter] = useState<string[] | null>(
+    initialFilters?.tiktok_gmvmax_campaign_ids ?? null,
+  )
+  const [currentFilters, setCurrentFilters] = useState<ReportFilters>(initialFilters ?? {})
+  const [tiktokCreativeWidgets, setTiktokCreativeWidgets] = useState<CreativeWidgetConfig[]>(
+    initialFilters?.tiktok_creative_widgets ?? DEFAULT_TIKTOK_WIDGETS,
+  )
+  const [gmvmaxCreativeWidgets, setGmvmaxCreativeWidgets] = useState<CreativeWidgetConfig[]>(
+    initialFilters?.gmvmax_creative_widgets ?? DEFAULT_GMVMAX_WIDGETS,
+  )
+
+  // 다이얼로그 열림 상태
+  const [campaignDialogOpen, setCampaignDialogOpen] = useState(false)
+  const [adgroupDialogOpen, setAdgroupDialogOpen] = useState(false)
+  const [gmvMaxDialogOpen, setGmvMaxDialogOpen] = useState(false)
+
+  // 필터 저장
+  const saveFilters = async (updated: ReportFilters) => {
+    await fetch(`/api/reports/${reportId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filters: updated }),
+    })
+    setCurrentFilters(updated)
+  }
+
+  const handleCampaignApply = async (ids: string[] | null) => {
+    setCampaignFilter(ids)
+    await saveFilters({ ...currentFilters, tiktok_campaign_ids: ids })
+  }
+
+  const handleAdgroupApply = async (ids: string[] | null) => {
+    setAdgroupFilter(ids)
+    await saveFilters({ ...currentFilters, tiktok_adgroup_ids: ids })
+  }
+
+  const handleGmvMaxApply = async (ids: string[] | null) => {
+    setGmvMaxCampaignFilter(ids)
+    await saveFilters({ ...currentFilters, tiktok_gmvmax_campaign_ids: ids })
+  }
+
+  const handleTiktokCreativeWidgetsChange = async (widgets: CreativeWidgetConfig[]) => {
+    setTiktokCreativeWidgets(widgets)
+    await saveFilters({ ...currentFilters, tiktok_creative_widgets: widgets })
+  }
+
+  const handleGmvmaxCreativeWidgetsChange = async (widgets: CreativeWidgetConfig[]) => {
+    setGmvmaxCreativeWidgets(widgets)
+    await saveFilters({ ...currentFilters, gmvmax_creative_widgets: widgets })
+  }
+
+  // 필터 적용
+  const filteredCampaigns = campaignFilter
+    ? allNormalCampaigns.filter((c) => campaignFilter.includes(c.campaign_id))
+    : allNormalCampaigns
+
+  const filteredAdgroups = adgroupFilter
+    ? allAdgroups.filter((a) => adgroupFilter.includes(a.adgroup_id))
+    : allAdgroups
+
+  const filteredGmvMaxCampaigns = gmvMaxCampaignFilter
+    ? allGmvMaxCampaigns.filter((c) => gmvMaxCampaignFilter.includes(c.campaign_id))
+    : allGmvMaxCampaigns
+
+  // 다이얼로그용 목록
+  const campaignItems = allNormalCampaigns.map((c) => ({ id: c.campaign_id, name: c.campaign_name }))
+  const adgroupItems = allAdgroups.map((a) => ({ id: a.adgroup_id, name: a.adgroup_name }))
+  const gmvMaxItems2 = allGmvMaxCampaigns.map((c) => ({
+    id: c.campaign_id,
+    name: c.campaign_name ?? c.campaign_id,
+  }))
+
+  // 공통 다이얼로그 모음
+  const filterDialogs = (
+    <>
+      <FilterDialog
+        open={campaignDialogOpen}
+        onOpenChange={setCampaignDialogOpen}
+        title="캠페인 선택"
+        items={campaignItems}
+        selectedIds={campaignFilter}
+        onApply={handleCampaignApply}
+      />
+      <FilterDialog
+        open={adgroupDialogOpen}
+        onOpenChange={setAdgroupDialogOpen}
+        title="광고그룹 선택"
+        items={adgroupItems}
+        selectedIds={adgroupFilter}
+        onApply={handleAdgroupApply}
+      />
+      <FilterDialog
+        open={gmvMaxDialogOpen}
+        onOpenChange={setGmvMaxDialogOpen}
+        title="GMV Max 캠페인 선택"
+        items={gmvMaxItems2}
+        selectedIds={gmvMaxCampaignFilter}
+        onApply={handleGmvMaxApply}
+      />
+    </>
+  )
 
   // GMV Max 데이터가 없으면 탭 없이 렌더링
   if (!showGmvMaxTab) {
@@ -937,15 +1274,28 @@ export function TiktokReportDetail({ data, title, reportId, role, insightMemo, i
         <MonthlyKpi m={monthly} />
         <WeeklyCharts weekly={weekly} />
         <WeeklyTable weekly={weekly} />
-        <CampaignSection campaigns={normalCampaigns} title="🎯 캠페인 성과 분석 (TikTok)" />
-        <AdgroupSection adgroups={adgroups ?? []} />
-        <CreativeSection ads={ads} />
+        <CampaignSection
+          campaigns={filteredCampaigns}
+          title="🎯 캠페인 성과 분석 (TikTok)"
+          onFilterClick={isAdmin && campaignItems.length > 0 ? () => setCampaignDialogOpen(true) : undefined}
+        />
+        <AdgroupSection
+          adgroups={filteredAdgroups}
+          onFilterClick={isAdmin && adgroupItems.length > 0 ? () => setAdgroupDialogOpen(true) : undefined}
+        />
+        <CreativeSection
+          ads={ads}
+          widgets={tiktokCreativeWidgets}
+          onWidgetsChange={handleTiktokCreativeWidgetsChange}
+          isAdmin={isAdmin}
+        />
         <InsightMemoCard
           reportId={reportId}
           initialContent={insightMemo}
           role={role}
           fieldKey="insight_memo"
         />
+        {filterDialogs}
       </div>
     )
   }
@@ -969,9 +1319,21 @@ export function TiktokReportDetail({ data, title, reportId, role, insightMemo, i
           <MonthlyKpi m={monthly} />
           <WeeklyCharts weekly={weekly} />
           <WeeklyTable weekly={weekly} />
-          <CampaignSection campaigns={normalCampaigns} title="🎯 캠페인 성과 분석 (TikTok)" />
-          <AdgroupSection adgroups={adgroups ?? []} />
-          <CreativeSection ads={ads} />
+          <CampaignSection
+            campaigns={filteredCampaigns}
+            title="🎯 캠페인 성과 분석 (TikTok)"
+            onFilterClick={isAdmin && campaignItems.length > 0 ? () => setCampaignDialogOpen(true) : undefined}
+          />
+          <AdgroupSection
+            adgroups={filteredAdgroups}
+            onFilterClick={isAdmin && adgroupItems.length > 0 ? () => setAdgroupDialogOpen(true) : undefined}
+          />
+          <CreativeSection
+          ads={ads}
+          widgets={tiktokCreativeWidgets}
+          onWidgetsChange={handleTiktokCreativeWidgetsChange}
+          isAdmin={isAdmin}
+        />
           <InsightMemoCard
             reportId={reportId}
             initialContent={insightMemo}
@@ -986,8 +1348,16 @@ export function TiktokReportDetail({ data, title, reportId, role, insightMemo, i
           <GmvMaxMonthlyKpi m={gmvMaxMonthly} />
           <GmvMaxWeeklyCharts weekly={gmvMaxWeekly ?? []} />
           <GmvMaxWeeklyTable weekly={gmvMaxWeekly ?? []} />
-          <GmvMaxCampaignSection campaigns={gmvMaxCampaigns ?? []} />
-          <GmvMaxCreativeSection items={gmvMaxItems ?? []} />
+          <GmvMaxCampaignSection
+            campaigns={filteredGmvMaxCampaigns}
+            onFilterClick={isAdmin && gmvMaxItems2.length > 0 ? () => setGmvMaxDialogOpen(true) : undefined}
+          />
+          <GmvMaxCreativeSection
+            items={gmvMaxItems ?? []}
+            widgets={gmvmaxCreativeWidgets}
+            onWidgetsChange={handleGmvmaxCreativeWidgetsChange}
+            isAdmin={isAdmin}
+          />
           <InsightMemoCard
             reportId={reportId}
             initialContent={insightMemoGmvMax}
@@ -997,6 +1367,8 @@ export function TiktokReportDetail({ data, title, reportId, role, insightMemo, i
           />
         </TabsContent>
       </Tabs>
+
+      {filterDialogs}
     </div>
   )
 }

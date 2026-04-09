@@ -38,7 +38,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   if (authError) return authError
 
   const body = await req.json()
-  const { title, insight_memo, insight_memo_gmv_max } = body
+  const { title, insight_memo, insight_memo_gmv_max, filters } = body
 
   const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }
 
@@ -61,6 +61,13 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: 'insight_memo_gmv_max 형식이 잘못되었습니다.' }, { status: 400 })
     }
     updateData.insight_memo_gmv_max = insight_memo_gmv_max
+  }
+
+  if (filters !== undefined) {
+    if (filters !== null && (typeof filters !== 'object' || Array.isArray(filters))) {
+      return NextResponse.json({ error: 'filters 형식이 잘못되었습니다.' }, { status: 400 })
+    }
+    updateData.filters = filters
   }
 
   if (Object.keys(updateData).length === 1) {
