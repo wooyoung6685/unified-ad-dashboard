@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import type {
+  AmazonAccount,
   Brand,
   MetaAccount,
   ShopeeAccount,
@@ -21,7 +22,7 @@ import { DateRangePicker } from '../daily/date-range-picker'
 interface AccountOption {
   id: string
   label: string
-  type: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp'
+  type: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp' | 'amazon_organic'
   brandId: string
 }
 
@@ -32,6 +33,7 @@ interface SummaryFilterBarProps {
   metaAccounts: (MetaAccount & { brands: { name: string } | null })[]
   tiktokAccounts: (TiktokAccount & { brands: { name: string } | null })[]
   shopeeAccounts: (ShopeeAccount & { brands: { name: string } | null })[]
+  amazonAccounts: (AmazonAccount & { brands: { name: string } | null })[]
   isFetching: boolean
   onChange: (filters: SummaryFilters) => void
   onSearch: () => void
@@ -44,6 +46,7 @@ export function SummaryFilterBar({
   metaAccounts,
   tiktokAccounts,
   shopeeAccounts,
+  amazonAccounts,
   isFetching,
   onChange,
   onSearch,
@@ -83,6 +86,25 @@ export function SummaryFilterBar({
           id: a.id,
           label: [a.sub_brand, '쇼피', a.country].filter(Boolean).join('_'),
           type: (a.account_type === 'shopping' ? 'shopee_shopping' : 'shopee_inapp') as 'shopee_shopping' | 'shopee_inapp',
+          brandId: a.brand_id,
+        })
+      }
+      return result
+    })(),
+    // account_id 기준 중복 제거 (organic 행 우선)
+    ...(() => {
+      const seen = new Set<string>()
+      const result: AccountOption[] = []
+      const sorted = [...amazonAccounts.filter(brandFilter)].sort((a) =>
+        a.account_type === 'organic' ? -1 : 1
+      )
+      for (const a of sorted) {
+        if (seen.has(a.account_id)) continue
+        seen.add(a.account_id)
+        result.push({
+          id: a.id,
+          label: [a.account_name || null, '아마존', a.country].filter(Boolean).join('_'),
+          type: 'amazon_organic' as const,
           brandId: a.brand_id,
         })
       }

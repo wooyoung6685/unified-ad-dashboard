@@ -10,6 +10,11 @@ import type {
 import { useDashboardData } from '@/components/layout/dashboard-data-provider'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { MetaAnalyticsCharts } from './analysis-charts'
+import { AmazonAdsAnalyticsCharts } from './amazon-ads-analytics-charts'
+import { AmazonAdsKpiSection } from './amazon-ads-kpi-section'
+import { AmazonAdsSummaryChart } from './amazon-ads-summary-chart'
+import { AmazonCombinedKpi } from './amazon-combined-kpi'
+import { AmazonOrganicAnalyticsCharts } from './amazon-organic-analytics-charts'
 import { GmvMaxAnalyticsCharts } from './gmvmax-analytics-charts'
 import { ShopeeInappAnalyticsCharts } from './shopee-inapp-analytics-charts'
 import { ShopeeShoppingAnalyticsCharts } from './shopee-shopping-analytics-charts'
@@ -32,7 +37,7 @@ async function fetchSummaryStats(filters: SummaryFilters): Promise<SummaryRespon
 }
 
 export function SummaryShell() {
-  const { role, initialBrandId, brands, metaAccounts, tiktokAccounts, shopeeAccounts } =
+  const { role, initialBrandId, brands, metaAccounts, tiktokAccounts, shopeeAccounts, amazonAccounts } =
     useDashboardData()
   const today = new Date().toISOString().slice(0, 10)
 
@@ -50,6 +55,9 @@ export function SummaryShell() {
     'revenue',
     'roas',
   ])
+
+  // Amazon 광고 선택 지표
+  const [selectedAdsMetrics, setSelectedAdsMetrics] = useState<string[]>(['cost', 'sales', 'acos'])
 
   const [activeTab, setActiveTab] = useState<'campaign' | 'gmv_max'>('gmv_max')
 
@@ -72,8 +80,13 @@ export function SummaryShell() {
           ? ['spend', 'revenue']
           : newFilters.accountType === 'tiktok'
             ? ['spend', 'impressions']
-            : ['spend', 'revenue', 'roas']
+            : (newFilters.accountType === 'amazon_organic' || newFilters.accountType === 'amazon_ads' || newFilters.accountType === 'amazon_asin')
+              ? ['revenue', 'purchases']
+              : ['spend', 'revenue', 'roas']
       setSelectedMetrics(defaultMetrics)
+      if (newFilters.accountType === 'amazon_organic' || newFilters.accountType === 'amazon_ads' || newFilters.accountType === 'amazon_asin') {
+        setSelectedAdsMetrics(['cost', 'sales', 'acos'])
+      }
       setActiveTab(newFilters.accountType === 'tiktok' ? 'campaign' : 'gmv_max')
     }
     setFilters(newFilters)
@@ -87,6 +100,14 @@ export function SummaryShell() {
   // FIFO 선택 로직: 최대 3개, 초과 시 가장 오래된 것 제거
   function handleMetricSelect(key: string) {
     setSelectedMetrics((prev) => {
+      if (prev.includes(key)) return prev.filter((k) => k !== key)
+      if (prev.length < 3) return [...prev, key]
+      return [...prev.slice(1), key]
+    })
+  }
+
+  function handleAdsMetricSelect(key: string) {
+    setSelectedAdsMetrics((prev) => {
       if (prev.includes(key)) return prev.filter((k) => k !== key)
       if (prev.length < 3) return [...prev, key]
       return [...prev.slice(1), key]
@@ -114,6 +135,7 @@ export function SummaryShell() {
         metaAccounts={metaAccounts}
         tiktokAccounts={tiktokAccounts}
         shopeeAccounts={shopeeAccounts}
+        amazonAccounts={amazonAccounts}
         isFetching={isFetching}
         onChange={handleFiltersChange}
         onSearch={handleSearch}
@@ -278,6 +300,74 @@ export function SummaryShell() {
                 hasKrw={data.shopeeExtra?.hasKrw ?? true}
                 currency={data.shopeeExtra?.currency ?? null}
               />
+            </div>
+          )}
+        </>
+      ) : (filters.accountType === 'amazon_organic' || filters.accountType === 'amazon_ads' || filters.accountType === 'amazon_asin') ? (
+        <>
+          {/* Amazon: 통합 KPI + 오가닉 + 광고 섹션 */}
+          {!data && !isFetching && (
+            <div className="text-muted-foreground rounded-lg border py-12 text-center text-sm">
+              계정을 선택하고 조회하기 버튼을 눌러주세요
+            </div>
+          )}
+
+          {data && data.platform === 'amazon' && (
+            <div className="space-y-8">
+              {/* 1. 통합 핵심 지표 */}
+              <AmazonCombinedKpi
+                totals={data.combinedTotals ?? null}
+                isLoading={isFetching}
+              />
+
+              {/* 2. 오가닉 섹션 */}
+              <div className="space-y-6">
+                <h2 className="text-base font-semibold">📦 오가닉 (Organic)</h2>
+                <KpiSection
+                  totals={data.organicTotals ?? null}
+                  accountType="amazon_organic"
+                  selectedMetrics={selectedMetrics}
+                  onSelect={handleMetricSelect}
+                  isLoading={isFetching}
+                  amazonExtra={data.amazonExtra}
+                />
+                <div className="space-y-2">
+                  <h3 className="text-muted-foreground text-xs font-semibold uppercase tracking-widest">
+                    일별 추이
+                  </h3>
+                  <div className="bg-card rounded-lg border p-4">
+                    <SummaryChart
+                      data={data.organicDailyData ?? []}
+                      selectedMetrics={selectedMetrics}
+                      platform="amazon_organic"
+                    />
+                  </div>
+                </div>
+                <AmazonOrganicAnalyticsCharts data={data.organicDailyData ?? []} />
+              </div>
+
+              {/* 3. 광고 섹션 */}
+              <div className="space-y-6">
+                <h2 className="text-base font-semibold">📢 광고 (Sponsored Ads)</h2>
+                <AmazonAdsKpiSection
+                  totals={data.adsTotals ?? null}
+                  selectedMetrics={selectedAdsMetrics}
+                  onSelect={handleAdsMetricSelect}
+                  isLoading={isFetching}
+                />
+                <div className="space-y-2">
+                  <h3 className="text-muted-foreground text-xs font-semibold uppercase tracking-widest">
+                    일별 추이
+                  </h3>
+                  <div className="bg-card rounded-lg border p-4">
+                    <AmazonAdsSummaryChart
+                      data={data.adsDailyData ?? []}
+                      selectedMetrics={selectedAdsMetrics}
+                    />
+                  </div>
+                </div>
+                <AmazonAdsAnalyticsCharts data={data.adsDailyData ?? []} />
+              </div>
             </div>
           )}
         </>

@@ -1,11 +1,18 @@
 'use client'
 
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import type { GmvMaxSummaryTotals, SummaryTotals } from '@/types/database'
+import type { AmazonAdsSummaryTotals, GmvMaxSummaryTotals, SummaryTotals } from '@/types/database'
 import {
   Banknote,
   DollarSign,
+  Info,
   MousePointer,
   RefreshCw,
   ShoppingCart,
@@ -19,6 +26,7 @@ type MetricDef = {
   label: string
   format: MetricFormat
   icon?: React.ElementType
+  tooltip?: string
 }
 
 // Meta 효율 지표 (8개)
@@ -118,14 +126,31 @@ const SHOPEE_INAPP_RAW: MetricDef[] = [
   { key: 'clicks',      label: '클릭',       format: 'number' },
 ]
 
+// Amazon 오가닉 효율 지표 (3개)
+const AMAZON_ORGANIC_EFFICIENCY: MetricDef[] = [
+  { key: 'order_conversion_rate', label: '전환율', format: 'percent', icon: RefreshCw, tooltip: '주문수 ÷ 세션수 × 100. 방문자 중 실제 구매로 이어진 비율입니다. 아마존은 구매 의도가 높아 보통 10~15%대입니다.' },
+  { key: 'aov', label: 'AOV (객단가)', format: 'currency', icon: Banknote, tooltip: 'Average Order Value = 매출 ÷ 주문수. 주문 1건당 평균 구매 금액입니다.' },
+  { key: 'buy_box_percentage', label: '바이박스 비율', format: 'percent', icon: TrendingUp, tooltip: '아마존 상품 페이지 우측의 "장바구니 담기" 버튼을 차지한 비율. 아마존 전체 판매의 80% 이상이 바이박스를 통해 발생하므로, 낮으면 매출이 급감할 수 있습니다.' },
+]
+
+// Amazon 오가닉 원본 지표 (5개)
+const AMAZON_ORGANIC_RAW: MetricDef[] = [
+  { key: 'revenue', label: '매출', format: 'currency' },
+  { key: 'purchases', label: '주문수', format: 'number' },
+  { key: 'impressions', label: '세션수', format: 'number', tooltip: '아마존에서 트래픽의 기본 단위. 동일 방문자가 하루에 여러 번 방문해도 1세션으로 집계됩니다.' },
+  { key: 'clicks', label: '페이지뷰', format: 'number', tooltip: '상품 상세 페이지가 조회된 총 횟수. 세션 내에서 여러 번 클릭하면 복수로 집계됩니다.' },
+  { key: 'unit_session_percentage', label: '상품세션비율', format: 'percent', tooltip: '판매된 상품 수 ÷ 세션수 × 100. 세션당 평균 구매 상품 수를 나타냅니다.' },
+]
+
 // currency 형식 지표 중 환율 미설정 시 현지통화 표시 대상
 const SHOPEE_SHOPPING_CURRENCY_KEYS = new Set(['spend', 'revenue', 'aov', 'cpc', 'cancelled_sales', 'refunded_sales'])
 const SHOPEE_INAPP_CURRENCY_KEYS = new Set(['spend', 'revenue', 'cpa', 'cpc'])
+const AMAZON_ORGANIC_CURRENCY_KEYS = new Set(['revenue', 'aov'])
 
 function formatValue(
   v: number | null,
   fmt: MetricFormat,
-  opts?: { hasKrw?: boolean; currency?: string | null }
+  opts?: { hasKrw?: boolean; currency?: string | null; isAmazon?: boolean }
 ): string {
   if (v === null) return '-'
   switch (fmt) {
@@ -136,6 +161,9 @@ function formatValue(
     case 'number2':
       return v.toFixed(2)
     case 'currency':
+      if (opts?.isAmazon) {
+        return `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      }
       if (opts?.hasKrw === false && opts.currency) {
         return `${opts.currency} ${Math.round(v).toLocaleString('ko-KR')}`
       }
@@ -154,6 +182,7 @@ interface KpiBoxProps {
   disabled?: boolean
   isLoading: boolean
   note?: string
+  tooltip?: string
 }
 
 function KpiBox({
@@ -165,6 +194,7 @@ function KpiBox({
   disabled,
   isLoading,
   note,
+  tooltip,
 }: KpiBoxProps) {
   return (
     <button
@@ -197,6 +227,16 @@ function KpiBox({
         >
           {label}
         </span>
+        {tooltip && (
+          <Tooltip>
+            <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
+              <Info className={cn('size-3 shrink-0 cursor-help', selected ? 'text-zinc-500' : 'text-muted-foreground/60')} />
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-64 text-xs leading-relaxed">
+              {tooltip}
+            </TooltipContent>
+          </Tooltip>
+        )}
       </div>
       {isLoading ? (
         <Skeleton className="h-6 w-20" />
@@ -220,12 +260,13 @@ function KpiBox({
 }
 
 interface KpiSectionProps {
-  totals: SummaryTotals | GmvMaxSummaryTotals | null
-  accountType: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp'
+  totals: SummaryTotals | GmvMaxSummaryTotals | AmazonAdsSummaryTotals | null
+  accountType: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp' | 'amazon_organic'
   selectedMetrics: string[]
   onSelect: (key: string) => void
   isLoading: boolean
   shopeeExtra?: { currency: string | null; hasKrw: boolean }
+  amazonExtra?: { currency: string | null }
   isGmvMax?: boolean
 }
 
@@ -236,6 +277,7 @@ export function KpiSection({
   onSelect,
   isLoading,
   shopeeExtra,
+  amazonExtra,
   isGmvMax,
 }: KpiSectionProps) {
   const efficiencyMetrics = isGmvMax
@@ -246,7 +288,9 @@ export function KpiSection({
         ? TIKTOK_EFFICIENCY
         : accountType === 'shopee_shopping'
           ? SHOPEE_SHOPPING_EFFICIENCY
-          : SHOPEE_INAPP_EFFICIENCY
+          : accountType === 'amazon_organic'
+            ? AMAZON_ORGANIC_EFFICIENCY
+            : SHOPEE_INAPP_EFFICIENCY
   const rawMetrics = isGmvMax
     ? GMV_MAX_RAW
     : accountType === 'meta'
@@ -255,16 +299,24 @@ export function KpiSection({
         ? TIKTOK_RAW
         : accountType === 'shopee_shopping'
           ? SHOPEE_SHOPPING_RAW
-          : SHOPEE_INAPP_RAW
+          : accountType === 'amazon_organic'
+            ? AMAZON_ORGANIC_RAW
+            : SHOPEE_INAPP_RAW
 
+  const isAmazon = accountType === 'amazon_organic'
   // shopee 계열: 환율 미설정 시 현지통화 포맷 옵션
   const isShopee = accountType === 'shopee_shopping' || accountType === 'shopee_inapp'
-  const fmtOpts =
-    isShopee && shopeeExtra
-      ? { hasKrw: shopeeExtra.hasKrw, currency: shopeeExtra.currency }
-      : undefined
+  const fmtOpts: { hasKrw?: boolean; currency?: string | null; isAmazon?: boolean } | undefined =
+    isAmazon
+      ? { isAmazon: true }
+      : isShopee && shopeeExtra
+        ? { hasKrw: shopeeExtra.hasKrw, currency: shopeeExtra.currency }
+        : undefined
 
   const getNote = (key: string, format: MetricFormat) => {
+    if (isAmazon && format === 'currency' && AMAZON_ORGANIC_CURRENCY_KEYS.has(key)) {
+      return amazonExtra?.currency ?? 'USD'
+    }
     if (!shopeeExtra || shopeeExtra.hasKrw) return undefined
     if (
       accountType === 'shopee_shopping' &&
@@ -284,47 +336,51 @@ export function KpiSection({
   }
 
   return (
-    <div className="space-y-6">
-      {/* 효율 지표 */}
-      <div className="space-y-2">
-        <h3 className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
-          효율 지표 (Calculated)
-        </h3>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          {efficiencyMetrics.map(({ key, label, format, icon }) => (
-            <KpiBox
-              key={key}
-              label={label}
-              value={formatValue(totals ? ((totals as Record<string, number | null>)[key] ?? null) : null, format, fmtOpts)}
-              icon={icon}
-              selected={selectedMetrics.includes(key)}
-              onClick={() => onSelect(key)}
-              isLoading={isLoading}
-              note={getNote(key, format)}
-            />
-          ))}
+    <TooltipProvider>
+      <div className="space-y-6">
+        {/* 효율 지표 */}
+        <div className="space-y-2">
+          <h3 className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
+            효율 지표 (Calculated)
+          </h3>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {efficiencyMetrics.map(({ key, label, format, icon, tooltip }) => (
+              <KpiBox
+                key={key}
+                label={label}
+                value={formatValue(totals ? ((totals as Record<string, number | null>)[key] ?? null) : null, format, fmtOpts)}
+                icon={icon}
+                selected={selectedMetrics.includes(key)}
+                onClick={() => onSelect(key)}
+                isLoading={isLoading}
+                note={getNote(key, format)}
+                tooltip={tooltip}
+              />
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* 원본 데이터 */}
-      <div className="space-y-2">
-        <h3 className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
-          원본 데이터 (Raw Data)
-        </h3>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          {rawMetrics.map(({ key, label, format }) => (
-            <KpiBox
-              key={key}
-              label={label}
-              value={formatValue(totals ? ((totals as Record<string, number | null>)[key] ?? null) : null, format, fmtOpts)}
-              selected={selectedMetrics.includes(key)}
-              onClick={() => onSelect(key)}
-              isLoading={isLoading}
-              note={getNote(key, format)}
-            />
-          ))}
+        {/* 원본 데이터 */}
+        <div className="space-y-2">
+          <h3 className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
+            원본 데이터 (Raw Data)
+          </h3>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {rawMetrics.map(({ key, label, format, tooltip }) => (
+              <KpiBox
+                key={key}
+                label={label}
+                value={formatValue(totals ? ((totals as Record<string, number | null>)[key] ?? null) : null, format, fmtOpts)}
+                selected={selectedMetrics.includes(key)}
+                onClick={() => onSelect(key)}
+                isLoading={isLoading}
+                note={getNote(key, format)}
+                tooltip={tooltip}
+              />
+            ))}
+          </div>
         </div>
       </div>
-    </div>
+    </TooltipProvider>
   )
 }

@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import type { GmvMaxSummaryDayData, GmvMaxSummaryTotals, SummaryDayData, SummaryTotals } from '@/types/database'
+import type { AmazonAdsSummaryDayData, AmazonAdsSummaryTotals, AmazonCombinedTotals, GmvMaxSummaryDayData, GmvMaxSummaryTotals, SummaryDayData, SummaryTotals } from '@/types/database'
 import { NextRequest, NextResponse } from 'next/server'
 
 // 계산 지표 산출 (0으로 나누기 방지)
@@ -43,6 +43,12 @@ export async function GET(req: NextRequest) {
     | 'meta'
     | 'tiktok'
     | 'shopee'
+    | 'shopee_shopping'
+    | 'shopee_inapp'
+    | 'amazon'
+    | 'amazon_organic'
+    | 'amazon_ads'
+    | 'amazon_asin'
     | null
   const startDate = searchParams.get('start_date') ?? ''
   const endDate = searchParams.get('end_date') ?? ''
@@ -567,6 +573,232 @@ export async function GET(req: NextRequest) {
       shoppingTotals,
       inappDailyData,
       inappTotals,
+    })
+  } else if (
+    accountType === 'amazon' ||
+    accountType === 'amazon_organic' ||
+    accountType === 'amazon_ads' ||
+    accountType === 'amazon_asin'
+  ) {
+    // 전달된 accountId로 amazon_accounts 조회하여 외부 account_id 획득
+    const { data: refAcct } = await supabase
+      .from('amazon_accounts')
+      .select('account_id, brand_id')
+      .eq('id', accountId)
+      .single()
+
+    if (!refAcct) return NextResponse.json({ error: '아마존 계정을 찾을 수 없습니다.' }, { status: 404 })
+
+    const { account_id: externalAccountId, brand_id: bId } = refAcct
+
+    // 같은 account_id + brand_id의 organic/ads 계정 ID 조회
+    const { data: allAmazonAccts } = await supabase
+      .from('amazon_accounts')
+      .select('id, account_type')
+      .eq('account_id', externalAccountId)
+      .eq('brand_id', bId)
+
+    const organicAccountIds = (allAmazonAccts ?? [])
+      .filter((a) => a.account_type === 'organic')
+      .map((a) => a.id)
+    const adsAccountIds = (allAmazonAccts ?? [])
+      .filter((a) => a.account_type === 'ads')
+      .map((a) => a.id)
+
+    // ── 오가닉 데이터 ──────────────────────────────────────────────────
+    let organicDailyData: SummaryDayData[] = []
+    let organicTotals: SummaryTotals = buildEmptyTotals()
+    let organicCurrency: string | null = null
+
+    if (organicAccountIds.length > 0) {
+      let orgQuery = supabase
+        .from('amazon_organic_stats')
+        .select('date, ordered_product_sales, orders, sessions, page_views, buy_box_percentage, unit_session_percentage, currency')
+        .in('amazon_account_id', organicAccountIds)
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: true })
+      if (brandId && brandId !== 'all') orgQuery = orgQuery.eq('brand_id', brandId)
+
+      const { data: orgData } = await orgQuery
+      const orgRows = orgData ?? []
+
+      organicCurrency = (orgRows[0]?.currency as string | null) ?? null
+
+      // 날짜별 집계 (같은 날짜에 여러 행이 있을 수 있음)
+      const byDate: Record<string, { sales: number; orders: number; sessions: number; page_views: number; buy_box_pct: number | null; unit_session_pct: number | null }> = {}
+      for (const r of orgRows) {
+        if (!byDate[r.date]) byDate[r.date] = { sales: 0, orders: 0, sessions: 0, page_views: 0, buy_box_pct: null, unit_session_pct: null }
+        const d = byDate[r.date]
+        d.sales += (r.ordered_product_sales as number | null) ?? 0
+        d.orders += (r.orders as number | null) ?? 0
+        d.sessions += (r.sessions as number | null) ?? 0
+        d.page_views += (r.page_views as number | null) ?? 0
+        // 백분율 지표는 마지막 값 사용 (계정 1개 기준)
+        if (r.buy_box_percentage != null) d.buy_box_pct = r.buy_box_percentage as number
+        if (r.unit_session_percentage != null) d.unit_session_pct = r.unit_session_percentage as number
+      }
+
+      organicDailyData = Object.entries(byDate)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, d]) => {
+          const revenue = d.sales || null
+          const purchases = d.orders || null
+          const impressions = d.sessions || null  // sessions → impressions 매핑
+          const clicks = d.page_views || null      // page_views → clicks 매핑
+          const conversion_rate = d.sessions > 0 ? (d.orders / d.sessions) * 100 : null
+          const aov = d.orders > 0 ? d.sales / d.orders : null
+          return {
+            date, spend: null, revenue, purchases, clicks, impressions,
+            reach: null, add_to_cart: null, content_views: null, outbound_clicks: null,
+            video_views: null, views_2s: null, views_6s: null, views_25pct: null, views_100pct: null,
+            roas: null, frequency: null, ctr: null, cpc: null, cpa: null, cpm: null,
+            aov, purchase_rate: null,
+            order_conversion_rate: conversion_rate,
+            buy_box_percentage: d.buy_box_pct,
+            unit_session_percentage: d.unit_session_pct,
+          }
+        })
+
+      const dateEntries = Object.values(byDate)
+      const orgSum = dateEntries.reduce(
+        (acc, d) => ({
+          sales: acc.sales + d.sales,
+          orders: acc.orders + d.orders,
+          sessions: acc.sessions + d.sessions,
+          page_views: acc.page_views + d.page_views,
+        }),
+        { sales: 0, orders: 0, sessions: 0, page_views: 0 }
+      )
+
+      // buy_box_percentage, unit_session_percentage: null이 아닌 값들의 평균
+      const bbValues = dateEntries.map((d) => d.buy_box_pct).filter((v): v is number => v != null)
+      const usValues = dateEntries.map((d) => d.unit_session_pct).filter((v): v is number => v != null)
+      const avgBuyBox = bbValues.length > 0 ? bbValues.reduce((a, b) => a + b, 0) / bbValues.length : null
+      const avgUnitSession = usValues.length > 0 ? usValues.reduce((a, b) => a + b, 0) / usValues.length : null
+
+      organicTotals = {
+        ...buildEmptyTotals(),
+        revenue: orgSum.sales || null,
+        purchases: orgSum.orders || null,
+        impressions: orgSum.sessions || null,
+        clicks: orgSum.page_views || null,
+        aov: orgSum.orders > 0 ? orgSum.sales / orgSum.orders : null,
+        order_conversion_rate: orgSum.sessions > 0 ? (orgSum.orders / orgSum.sessions) * 100 : null,
+        buy_box_percentage: avgBuyBox,
+        unit_session_percentage: avgUnitSession,
+      }
+    }
+
+    // ── 광고 데이터 ────────────────────────────────────────────────────
+    let adsDailyData: AmazonAdsSummaryDayData[] = []
+    let adsTotals: AmazonAdsSummaryTotals = {
+      cost: null, sales: null, impressions: null, clicks: null,
+      purchases: null, purchases_new_to_brand: null,
+      acos: null, roas: null, cpc: null, ctr: null, cost_per_purchase: null,
+    }
+    let adsCurrency: string | null = null
+
+    if (adsAccountIds.length > 0) {
+      let adsQuery = supabase
+        .from('amazon_ads_stats')
+        .select('date, impressions, clicks, cost, purchases, purchases_new_to_brand, sales, currency')
+        .in('amazon_account_id', adsAccountIds)
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: true })
+      if (brandId && brandId !== 'all') adsQuery = adsQuery.eq('brand_id', brandId)
+
+      const { data: adsData } = await adsQuery
+      const adsRows = adsData ?? []
+
+      adsCurrency = (adsRows[0]?.currency as string | null) ?? null
+
+      // 날짜별 집계
+      const byDate: Record<string, { impressions: number; clicks: number; cost: number; purchases: number; purchases_ntb: number; sales: number }> = {}
+      for (const r of adsRows) {
+        if (!byDate[r.date]) byDate[r.date] = { impressions: 0, clicks: 0, cost: 0, purchases: 0, purchases_ntb: 0, sales: 0 }
+        const d = byDate[r.date]
+        d.impressions += (r.impressions as number | null) ?? 0
+        d.clicks += (r.clicks as number | null) ?? 0
+        d.cost += (r.cost as number | null) ?? 0
+        d.purchases += (r.purchases as number | null) ?? 0
+        d.purchases_ntb += (r.purchases_new_to_brand as number | null) ?? 0
+        d.sales += (r.sales as number | null) ?? 0
+      }
+
+      adsDailyData = Object.entries(byDate)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, d]) => ({
+          date,
+          cost: d.cost || null,
+          sales: d.sales || null,
+          impressions: d.impressions || null,
+          clicks: d.clicks || null,
+          purchases: d.purchases || null,
+          purchases_new_to_brand: d.purchases_ntb || null,
+          acos: d.sales > 0 ? (d.cost / d.sales) * 100 : null,
+          roas: d.cost > 0 ? d.sales / d.cost : null,
+          cpc: d.clicks > 0 ? d.cost / d.clicks : null,
+          ctr: d.impressions > 0 ? (d.clicks / d.impressions) * 100 : null,
+          cost_per_purchase: d.purchases > 0 ? d.cost / d.purchases : null,
+        }))
+
+      const adsSum = Object.values(byDate).reduce(
+        (acc, d) => ({
+          cost: acc.cost + d.cost,
+          sales: acc.sales + d.sales,
+          impressions: acc.impressions + d.impressions,
+          clicks: acc.clicks + d.clicks,
+          purchases: acc.purchases + d.purchases,
+          purchases_ntb: acc.purchases_ntb + d.purchases_ntb,
+        }),
+        { cost: 0, sales: 0, impressions: 0, clicks: 0, purchases: 0, purchases_ntb: 0 }
+      )
+      adsTotals = {
+        cost: adsSum.cost || null,
+        sales: adsSum.sales || null,
+        impressions: adsSum.impressions || null,
+        clicks: adsSum.clicks || null,
+        purchases: adsSum.purchases || null,
+        purchases_new_to_brand: adsSum.purchases_ntb || null,
+        acos: adsSum.sales > 0 ? (adsSum.cost / adsSum.sales) * 100 : null,
+        roas: adsSum.cost > 0 ? adsSum.sales / adsSum.cost : null,
+        cpc: adsSum.clicks > 0 ? adsSum.cost / adsSum.clicks : null,
+        ctr: adsSum.impressions > 0 ? (adsSum.clicks / adsSum.impressions) * 100 : null,
+        cost_per_purchase: adsSum.purchases > 0 ? adsSum.cost / adsSum.purchases : null,
+      }
+    }
+
+    // ── 통합 지표 계산 ─────────────────────────────────────────────────
+    const organicSales = organicTotals.revenue
+    const adSales = adsTotals.sales
+    const adCost = adsTotals.cost
+    const totalSales = (organicSales ?? 0) + (adSales ?? 0) || null
+
+    const combinedTotals: AmazonCombinedTotals = {
+      total_sales: totalSales,
+      organic_sales: organicSales,
+      ad_sales: adSales,
+      ad_cost: adCost,
+      tacos: organicSales && organicSales > 0 && adCost != null ? (adCost / organicSales) * 100 : null,
+      ad_sales_ratio: totalSales && totalSales > 0 && adSales != null ? (adSales / totalSales) * 100 : null,
+      total_orders: organicTotals.purchases,
+      total_sessions: organicTotals.impressions,
+    }
+
+    const currency = organicCurrency ?? adsCurrency
+
+    return NextResponse.json({
+      platform: 'amazon',
+      dailyData: organicDailyData,  // 하위호환용
+      totals: organicTotals,
+      organicDailyData,
+      organicTotals,
+      adsDailyData,
+      adsTotals,
+      combinedTotals,
+      amazonExtra: { currency },
     })
   }
 }

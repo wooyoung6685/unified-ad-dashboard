@@ -1,6 +1,6 @@
 'use client'
 
-import { fmtDec, fmtKRW, fmtNum, fmtPct } from '@/lib/format'
+import { fmtDec, fmtKRW, fmtNum, fmtPct, fmtUSD } from '@/lib/format'
 import type { GmvMaxSummaryDayData, SummaryDayData } from '@/types/database'
 import {
   CartesianGrid,
@@ -33,7 +33,10 @@ const METRIC_META: Record<string, { label: string; format: string }> = {
   views_25pct: { label: '25% 동영상 조회수', format: 'number' },
   views_100pct: { label: '100% 동영상 조회수', format: 'number' },
   cpm: { label: 'CPM', format: 'currency' },
-  aov: { label: '객단가 (KRW)', format: 'currency' },
+  aov: { label: '객단가', format: 'currency' },
+  // Amazon 오가닉 전용 지표
+  buy_box_percentage: { label: '바이박스 비율', format: 'percent' },
+  unit_session_percentage: { label: '상품세션비율', format: 'percent' },
   // GMV Max 전용 지표
   cost: { label: '비용', format: 'currency' },
   gross_revenue: { label: '매출', format: 'currency' },
@@ -68,9 +71,16 @@ const PLATFORM_LABEL_OVERRIDES: Record<string, Record<string, string>> = {
     revenue: '매출 GMV (KRW)',
     purchases: '구매(전환)수',
   },
+  amazon_organic: {
+    impressions: '세션수',
+    clicks: '페이지뷰',
+    purchases: '주문수',
+    revenue: '매출 (USD)',
+    aov: '객단가 (USD)',
+  },
 }
 
-function formatTick(value: number, key: string): string {
+function formatTick(value: number, key: string, platform?: string | null): string {
   switch (METRIC_META[key]?.format) {
     case 'percent':
       return fmtPct(value)
@@ -79,6 +89,7 @@ function formatTick(value: number, key: string): string {
     case 'decimal':
       return fmtDec(value)
     case 'currency':
+      if (platform === 'amazon_organic') return fmtUSD(value)
       return fmtKRW(value)
     default:
       return fmtNum(value)
@@ -123,7 +134,7 @@ function CustomTooltip({
 interface SummaryChartProps {
   data: SummaryDayData[] | GmvMaxSummaryDayData[]
   selectedMetrics: string[]
-  platform: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp' | null
+  platform: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp' | 'amazon_organic' | null
 }
 
 const COLORS = ['#3b82f6', '#22c55e', '#F59E0B', '#6366F1']
@@ -170,7 +181,7 @@ export function SummaryChart({ data, selectedMetrics, platform }: SummaryChartPr
         {/* 좌측 Y축 */}
         <YAxis
           yAxisId="left"
-          tickFormatter={(v: number) => formatTick(v, leftMetrics[0])}
+          tickFormatter={(v: number) => formatTick(v, leftMetrics[0], platform)}
           tick={{ fontSize: 11 }}
           width={80}
           className="text-muted-foreground"
@@ -181,7 +192,7 @@ export function SummaryChart({ data, selectedMetrics, platform }: SummaryChartPr
           <YAxis
             yAxisId="right"
             orientation="right"
-            tickFormatter={(v: number) => formatTick(v, rightMetrics[0])}
+            tickFormatter={(v: number) => formatTick(v, rightMetrics[0], platform)}
             tick={{ fontSize: 11 }}
             width={80}
             className="text-muted-foreground"
