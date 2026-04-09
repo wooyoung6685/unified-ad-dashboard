@@ -80,33 +80,6 @@ function DeltaBadge({
   )
 }
 
-function KpiCard({
-  label,
-  value,
-  prev,
-  curr,
-  goodUp = true,
-}: {
-  label: string
-  value: string
-  prev: string
-  curr: number | null
-  goodUp?: boolean
-}) {
-  return (
-    <Card>
-      <CardContent className="px-4 pb-3 pt-4">
-        <p className="mb-1 text-xs text-muted-foreground">{label}</p>
-        <p className="text-xl font-bold leading-tight">{value}</p>
-        <div className="mt-1 flex flex-wrap items-center gap-1.5">
-          <span className="text-xs text-muted-foreground">Prev: {prev}</span>
-          <DeltaBadge curr={curr} prev={null} goodUp={goodUp} />
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
 // DeltaBadge를 prev 값 기반으로 사용하는 전용 카드
 function MetaKpiCard({
   label,
@@ -458,7 +431,7 @@ function CampaignTable({
                     : null)
                 return (
                   <TableRow key={c.campaign_id}>
-                    <TableCell className="sticky left-0 z-10 max-w-[200px] whitespace-nowrap bg-white font-medium after:absolute after:right-0 after:top-0 after:h-full after:w-px after:bg-border dark:bg-background">
+                    <TableCell className="sticky left-0 z-10 max-w-50 whitespace-nowrap bg-white font-medium after:absolute after:right-0 after:top-0 after:h-full after:w-px after:bg-border dark:bg-background">
                       <span className="block truncate" title={c.campaign_name}>
                         {c.campaign_name}
                       </span>
@@ -545,12 +518,12 @@ function AdsetTable({
                     : null)
                 return (
                   <TableRow key={a.adset_id}>
-                    <TableCell className="sticky left-0 z-10 max-w-[200px] whitespace-nowrap bg-white font-medium after:absolute after:right-0 after:top-0 after:h-full after:w-px after:bg-border dark:bg-background">
+                    <TableCell className="sticky left-0 z-10 max-w-50 whitespace-nowrap bg-white font-medium after:absolute after:right-0 after:top-0 after:h-full after:w-px after:bg-border dark:bg-background">
                       <span className="block truncate" title={a.adset_name}>
                         {a.adset_name}
                       </span>
                     </TableCell>
-                    <TableCell className="max-w-[160px] whitespace-nowrap">
+                    <TableCell className="max-w-40 whitespace-nowrap">
                       <span className="block truncate text-xs text-muted-foreground" title={a.campaign_name}>
                         {a.campaign_name}
                       </span>

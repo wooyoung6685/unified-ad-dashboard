@@ -101,7 +101,7 @@ export function CreativeWidgetDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[640px] gap-0 p-0">
+      <DialogContent className="max-w-160 gap-0 p-0">
         {/* 헤더 */}
         <DialogHeader className="border-b px-6 py-5">
           <DialogTitle className="text-lg font-bold">소재 랭킹 위젯 설정</DialogTitle>
@@ -127,7 +127,7 @@ export function CreativeWidgetDialog({
                 정렬 기준 (Rank By) <span className="text-red-500">*</span>
               </label>
               <Select value={rankBy} onValueChange={setRankBy}>
-                <SelectTrigger className="!h-12 w-full rounded-lg">
+                <SelectTrigger className="h-12! w-full rounded-lg">
                   <SelectValue placeholder="정렬 기준 선택" />
                 </SelectTrigger>
                 <SelectContent>
@@ -172,7 +172,7 @@ export function CreativeWidgetDialog({
                         value={f.metric}
                         onValueChange={(v) => handleFilterChange(i, 'metric', v)}
                       >
-                        <SelectTrigger className="!h-11 w-full text-sm">
+                        <SelectTrigger className="h-11! w-full text-sm">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -191,7 +191,7 @@ export function CreativeWidgetDialog({
                           handleFilterChange(i, 'operator', v as FilterOperator)
                         }
                       >
-                        <SelectTrigger className="!h-11 w-full text-sm">
+                        <SelectTrigger className="h-11! w-full text-sm">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -217,7 +217,7 @@ export function CreativeWidgetDialog({
                         onClick={() => handleRemoveFilter(i)}
                         className="flex h-9 w-9 items-center justify-center rounded-md text-red-400 transition-colors hover:text-red-600"
                       >
-                        <MinusCircle className="h-[18px] w-[18px]" />
+                        <MinusCircle className="h-4.5 w-4.5" />
                       </button>
                     </div>
                   ))}

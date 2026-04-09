@@ -55,7 +55,7 @@ export const InsightMemoEditor = forwardRef<InsightMemoEditorHandle, Props>(
     if (!editable && !content) {
       return (
         <div className="rounded-md border">
-          <p className="min-h-[120px] px-4 py-3 text-sm text-muted-foreground">
+          <p className="min-h-30 px-4 py-3 text-sm text-muted-foreground">
             내용을 입력하려면 [수정하기] 버튼을 누르세요.
           </p>
         </div>
@@ -67,7 +67,7 @@ export const InsightMemoEditor = forwardRef<InsightMemoEditorHandle, Props>(
       return (
         <div className="ql-snow rounded-md border">
           <div
-            className="ql-editor min-h-[120px]"
+            className="ql-editor min-h-30"
             dangerouslySetInnerHTML={{ __html: content }}
           />
         </div>

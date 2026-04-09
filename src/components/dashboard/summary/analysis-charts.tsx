@@ -53,7 +53,7 @@ function EmptyState() {
 function CostTooltip({ active, payload, label }: any) {
   if (!active || !payload || !payload.length) return null
 
-  const fmt = (name: string, value: any) => {
+  const fmt = (_name: string, value: any) => {
     if (value === null || value === undefined) return '-'
     return `₩${Math.round(value).toLocaleString()}`
   }
@@ -104,7 +104,7 @@ function CustomFunnel({ data }: { data: ReturnType<typeof buildFunnelData> }) {
             style={{ width: `${widths[i]}%`, minWidth: 100 }}
           >
             <div
-              className="flex h-[52px] cursor-default items-center justify-between rounded-xl px-4 shadow-sm transition-all duration-200 group-hover:shadow-md group-hover:brightness-105"
+              className="flex h-13 cursor-default items-center justify-between rounded-xl px-4 shadow-sm transition-all duration-200 group-hover:shadow-md group-hover:brightness-105"
               style={{
                 background: `linear-gradient(135deg, ${FUNNEL_GRADIENTS[i].from}, ${FUNNEL_GRADIENTS[i].to})`,
               }}
@@ -118,7 +118,7 @@ function CustomFunnel({ data }: { data: ReturnType<typeof buildFunnelData> }) {
             </div>
             {/* hover 툴팁: 마지막 항목은 위쪽으로 표시 */}
             <div
-              className={`invisible absolute left-1/2 z-20 min-w-[180px] -translate-x-1/2 rounded-lg border border-gray-100 bg-white px-3.5 py-2.5 opacity-0 shadow-lg transition-all duration-150 group-hover:visible group-hover:opacity-100 ${
+              className={`invisible absolute left-1/2 z-20 min-w-45 -translate-x-1/2 rounded-lg border border-gray-100 bg-white px-3.5 py-2.5 opacity-0 shadow-lg transition-all duration-150 group-hover:visible group-hover:opacity-100 ${
                 i === data.length - 1
                   ? 'bottom-full mb-2'
                   : 'top-full mt-2'

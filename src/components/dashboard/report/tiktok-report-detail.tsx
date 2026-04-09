@@ -393,7 +393,7 @@ function CampaignSection({
             <TableBody>
               {campaigns.map((c) => (
                 <TableRow key={c.campaign_id}>
-                  <TableCell className="sticky left-0 z-10 max-w-[200px] whitespace-nowrap bg-white font-medium after:absolute after:right-0 after:top-0 after:h-full after:w-px after:bg-border dark:bg-background">
+                  <TableCell className="sticky left-0 z-10 max-w-50 whitespace-nowrap bg-white font-medium after:absolute after:right-0 after:top-0 after:h-full after:w-px after:bg-border dark:bg-background">
                     <span className="block truncate" title={c.campaign_name}>
                       {c.campaign_name}
                     </span>
@@ -470,12 +470,12 @@ function AdgroupSection({
             <TableBody>
               {adgroups.map((a) => (
                 <TableRow key={a.adgroup_id}>
-                  <TableCell className="sticky left-0 z-10 max-w-[200px] whitespace-nowrap bg-white font-medium after:absolute after:right-0 after:top-0 after:h-full after:w-px after:bg-border dark:bg-background">
+                  <TableCell className="sticky left-0 z-10 max-w-50 whitespace-nowrap bg-white font-medium after:absolute after:right-0 after:top-0 after:h-full after:w-px after:bg-border dark:bg-background">
                     <span className="block truncate" title={a.adgroup_name}>
                       {a.adgroup_name}
                     </span>
                   </TableCell>
-                  <TableCell className="max-w-[160px] whitespace-nowrap">
+                  <TableCell className="max-w-40 whitespace-nowrap">
                     <span className="block truncate text-xs text-muted-foreground" title={a.campaign_name}>
                       {a.campaign_name}
                     </span>
@@ -915,7 +915,7 @@ function GmvMaxCampaignSection({
               <TableBody>
                 {campaigns.map((c) => (
                   <TableRow key={c.campaign_id}>
-                    <TableCell className="sticky left-0 z-10 max-w-[200px] whitespace-nowrap bg-white font-medium after:absolute after:right-0 after:top-0 after:h-full after:w-px after:bg-border dark:bg-background">
+                    <TableCell className="sticky left-0 z-10 max-w-50 whitespace-nowrap bg-white font-medium after:absolute after:right-0 after:top-0 after:h-full after:w-px after:bg-border dark:bg-background">
                       <span className="block truncate" title={c.campaign_name ?? c.campaign_id}>
                         {c.campaign_name ?? c.campaign_id}
                       </span>

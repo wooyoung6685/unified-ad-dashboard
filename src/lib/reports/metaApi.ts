@@ -88,7 +88,6 @@ export async function fetchMetaCampaigns(
   const json = await res.json()
   if (json.error) throw new Error(`Meta 캠페인 API 오류: ${json.error.message}`)
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (json.data ?? []).map((row: any): MetaCampaignCurrent => {
     const spend = parseFloat(row.spend ?? '0')
     const impressions = parseFloat(row.impressions ?? '0')
@@ -208,7 +207,6 @@ export async function fetchMetaAdsets(
   const json = await res.json()
   if (json.error) throw new Error(`Meta 광고세트 API 오류: ${json.error.message}`)
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (json.data ?? []).map((row: any): MetaAdsetCurrent => {
     const spend = parseFloat(row.spend ?? '0')
     const impressions = parseFloat(row.impressions ?? '0')
@@ -310,7 +308,6 @@ export async function fetchMetaCreatives(
   const insightsJson = await insightsRes.json()
   if (insightsJson.error) throw new Error(`Meta 소재 API 오류: ${insightsJson.error.message}`)
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const adRows: any[] = insightsJson.data ?? []
   if (adRows.length === 0) return []
 
@@ -463,7 +460,6 @@ export async function fetchMetaCreatives(
   }
 
   // Step 3: 인사이트 + 썸네일 병합
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return adRows.map((row: any): MetaCreativeData => {
     const spend = parseFloat(row.spend ?? '0')
     const clicks = parseFloat(row.clicks ?? '0')
