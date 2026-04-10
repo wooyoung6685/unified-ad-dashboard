@@ -20,14 +20,13 @@ CREATE TABLE IF NOT EXISTS amazon_ads_keyword_stats (
 ALTER TABLE amazon_ads_keyword_stats ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "amazon_ads_keyword_stats_select" ON amazon_ads_keyword_stats FOR SELECT USING (
-  brand_id IN (SELECT brand_id FROM user_profiles WHERE id = auth.uid())
-  OR EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin')
+  brand_id = get_my_brand_id() OR get_my_role() = 'admin'
 );
 CREATE POLICY "amazon_ads_keyword_stats_insert" ON amazon_ads_keyword_stats FOR INSERT WITH CHECK (
-  EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin')
+  get_my_role() = 'admin'
 );
 CREATE POLICY "amazon_ads_keyword_stats_update" ON amazon_ads_keyword_stats FOR UPDATE USING (
-  EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin')
+  get_my_role() = 'admin'
 );
 
 CREATE INDEX idx_amazon_ads_keyword_stats_account_date ON amazon_ads_keyword_stats(amazon_account_id, date);

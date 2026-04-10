@@ -258,7 +258,7 @@ function WeeklyTable({ weekly }: { weekly: AmazonWeeklyData[] }) {
             <TableBody>
               {weekly.map((w) => (
                 <TableRow key={w.week}>
-                  <TableCell className="whitespace-nowrap text-xs font-medium border-r">W{w.week}</TableCell>
+                  <TableCell className="whitespace-nowrap text-xs font-medium border-r">{w.week}주차</TableCell>
                   <TableCell className="whitespace-nowrap text-xs border-r">{w.date_range}</TableCell>
                   <TableCell className="whitespace-nowrap text-xs">{fmtUSD(w.organic_sales)}</TableCell>
                   <TableCell className="whitespace-nowrap text-xs">{fmtNum(w.orders)}</TableCell>
@@ -286,7 +286,7 @@ function WeeklyTable({ weekly }: { weekly: AmazonWeeklyData[] }) {
 
 function WeeklyCharts({ weekly }: { weekly: AmazonWeeklyData[] }) {
   const chartData = weekly.map((w) => ({
-    label: `W${w.week}`,
+    label: `${w.week}주차`,
     organic_sales: w.organic_sales,
     sessions: w.sessions,
     orders: w.orders,
@@ -316,7 +316,9 @@ function WeeklyCharts({ weekly }: { weekly: AmazonWeeklyData[] }) {
                   tickFormatter={(v: number) => v >= 1000 ? `$${(v / 1000).toFixed(0)}K` : `$${v}`} />
                 <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} width={50}
                   tickFormatter={(v: number) => fmtCompact(v)} />
-                <Tooltip />
+                <Tooltip formatter={(value, name) =>
+                  name === '매출' ? fmtUSD(value as number) : fmtNum(value as number)
+                } />
                 <Legend verticalAlign="top" height={30} />
                 <Bar yAxisId="left" dataKey="organic_sales" name="매출" fill="#9CA3AF" radius={[2, 2, 0, 0]}>
                   <LabelList dataKey="organic_sales" position="top" fontSize={10}
@@ -337,7 +339,9 @@ function WeeklyCharts({ weekly }: { weekly: AmazonWeeklyData[] }) {
                 <YAxis yAxisId="left" orientation="left" tick={{ fontSize: 11 }} width={50} />
                 <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} width={50}
                   tickFormatter={(v: number) => `${v.toFixed(1)}%`} />
-                <Tooltip />
+                <Tooltip formatter={(value, name) =>
+                  name === '전환율' ? `${Number(value).toFixed(2)}%` : fmtNum(value as number)
+                } />
                 <Legend verticalAlign="top" height={30} />
                 <Bar yAxisId="left" dataKey="orders" name="구매수" fill="#9CA3AF" radius={[2, 2, 0, 0]}>
                   <LabelList dataKey="orders" position="top" fontSize={10} />
@@ -358,7 +362,9 @@ function WeeklyCharts({ weekly }: { weekly: AmazonWeeklyData[] }) {
                   tickFormatter={(v: number) => v >= 1000 ? `$${(v / 1000).toFixed(0)}K` : `$${v}`} />
                 <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} width={50}
                   tickFormatter={(v: number) => `${v.toFixed(0)}%`} />
-                <Tooltip />
+                <Tooltip formatter={(value, name) =>
+                  name === 'ROAS' ? `${Number(value).toFixed(0)}%` : fmtUSD(value as number)
+                } />
                 <Legend verticalAlign="top" height={30} />
                 <Bar yAxisId="left" dataKey="ad_cost" name="광고비" fill="#9CA3AF" radius={[2, 2, 0, 0]} />
                 <Bar yAxisId="left" dataKey="ad_sales" name="광고매출" fill="#6B7280" radius={[2, 2, 0, 0]} />
@@ -378,7 +384,9 @@ function WeeklyCharts({ weekly }: { weekly: AmazonWeeklyData[] }) {
                   tickFormatter={(v: number) => `$${v.toFixed(2)}`} />
                 <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} width={50}
                   tickFormatter={(v: number) => `${v.toFixed(2)}%`} />
-                <Tooltip />
+                <Tooltip formatter={(value, name) =>
+                  name === 'CTR' ? `${Number(value).toFixed(2)}%` : fmtUSD(value as number)
+                } />
                 <Legend verticalAlign="top" height={30} />
                 <Bar yAxisId="right" dataKey="ad_ctr" name="CTR" fill="#9CA3AF" radius={[2, 2, 0, 0]}>
                   <LabelList dataKey="ad_ctr" position="top" fontSize={10}
@@ -445,10 +453,12 @@ function HorizontalBarChart({
 // ── 섹션 5: 키워드 분석 ──────────────────────────────
 
 function KeywordSection({ keywords }: { keywords: AmazonKeywordData[] }) {
+  const filtered = keywords.filter((kw) => !kw.keyword.startsWith('B0'))
+  if (filtered.length === 0) return null
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">키워드 분석 (Top {keywords.length})</CardTitle>
+        <CardTitle className="text-base">키워드 분석 (Top {filtered.length})</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-2 gap-4">
@@ -463,7 +473,7 @@ function KeywordSection({ keywords }: { keywords: AmazonKeywordData[] }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {keywords.map((kw, i) => (
+                {filtered.map((kw, i) => (
                   <TableRow key={kw.keyword}>
                     <TableCell className="whitespace-nowrap text-xs">{i + 1}</TableCell>
                     <TableCell className="text-xs">{kw.keyword}</TableCell>
@@ -476,7 +486,7 @@ function KeywordSection({ keywords }: { keywords: AmazonKeywordData[] }) {
 
           {/* 수평 바 차트 */}
           <HorizontalBarChart
-            data={[...keywords].reverse()}
+            data={[...filtered].reverse()}
             dataKey="impressions"
             nameKey="keyword"
             title="키워드별 노출수"
@@ -507,7 +517,7 @@ function DailySection({ daily }: { daily: AmazonDailyData[] }) {
       <CardContent>
         <div className="grid grid-cols-2 gap-4">
           {/* 테이블 */}
-          <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+          <div className="overflow-x-auto max-h-150 overflow-y-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -565,7 +575,7 @@ function ProductSection({ products }: { products: AmazonProductData[] }) {
       <CardContent>
         <div className="grid grid-cols-2 gap-4">
           {/* 테이블 */}
-          <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+          <div className="overflow-x-auto max-h-150 overflow-y-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -577,7 +587,7 @@ function ProductSection({ products }: { products: AmazonProductData[] }) {
               <TableBody>
                 {products.map((p) => (
                   <TableRow key={p.child_asin ?? p.title}>
-                    <TableCell className="text-xs max-w-[200px] truncate" title={p.title}>{p.title}</TableCell>
+                    <TableCell className="text-xs max-w-50 truncate" title={p.title}>{p.title}</TableCell>
                     <TableCell className="whitespace-nowrap text-right text-xs">{fmtUSD(p.sales)}</TableCell>
                     <TableCell className="whitespace-nowrap text-right text-xs">{fmtNum(p.quantity)}</TableCell>
                   </TableRow>
