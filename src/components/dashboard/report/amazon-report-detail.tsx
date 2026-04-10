@@ -562,9 +562,21 @@ function DailySection({ daily }: { daily: AmazonDailyData[] }) {
 // ── 섹션 7: 제품별 데이터 ──────────────────────────────
 
 function ProductSection({ products }: { products: AmazonProductData[] }) {
+  // 공통 브랜드 접두사 자동 제거 (모든 제품이 같은 첫 단어로 시작하면 제거)
+  const firstWords = products.map((p) => p.title.split(' ')[0]?.toLowerCase() ?? '')
+  const commonPrefix = firstWords.length > 1 && firstWords.every((w) => w === firstWords[0]) ? firstWords[0] : null
+
+  function shortenTitle(title: string, maxLen: number): string {
+    let name = title
+    if (commonPrefix && name.toLowerCase().startsWith(commonPrefix)) {
+      name = name.slice(commonPrefix.length).trim()
+    }
+    return name.length > maxLen ? `${name.slice(0, maxLen)}...` : name
+  }
+
   const productData = products.map((p) => ({
     ...p,
-    shortTitle: p.title.length > 30 ? `${p.title.slice(0, 30)}...` : p.title,
+    shortTitle: shortenTitle(p.title, 25),
   }))
 
   return (
@@ -587,7 +599,7 @@ function ProductSection({ products }: { products: AmazonProductData[] }) {
               <TableBody>
                 {products.map((p) => (
                   <TableRow key={p.child_asin ?? p.title}>
-                    <TableCell className="text-xs max-w-50 truncate" title={p.title}>{p.title}</TableCell>
+                    <TableCell className="text-xs max-w-50 truncate" title={p.title}>{shortenTitle(p.title, 45)}</TableCell>
                     <TableCell className="whitespace-nowrap text-right text-xs">{fmtUSD(p.sales)}</TableCell>
                     <TableCell className="whitespace-nowrap text-right text-xs">{fmtNum(p.quantity)}</TableCell>
                   </TableRow>
