@@ -2,7 +2,7 @@ import { fetchGmvMaxDailyReport } from '@/lib/tiktok/gmvMax'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { getTokenForCurrentUser } from '@/lib/tokens'
-import type { ShopeeInappStat, ShopeeInappDayRow, ShopeeShoppingStat } from '@/types/database'
+import type { AmazonAdsStat, AmazonAsinStat, AmazonOrganicStat, ShopeeInappStat, ShopeeInappDayRow, ShopeeShoppingStat } from '@/types/database'
 import { NextRequest, NextResponse } from 'next/server'
 
 // 인앱 stats를 날짜별로 합산
@@ -71,6 +71,12 @@ export async function GET(req: NextRequest) {
     | 'meta'
     | 'tiktok'
     | 'shopee'
+    | 'shopee_shopping'
+    | 'shopee_inapp'
+    | 'amazon'
+    | 'amazon_organic'
+    | 'amazon_ads'
+    | 'amazon_asin'
     | null
   const startDate = searchParams.get('start_date') ?? ''
   const endDate = searchParams.get('end_date') ?? ''
@@ -315,5 +321,82 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({ platform: 'shopee', shopping_rows, inapp_rows })
+  } else if (
+    accountType === 'amazon' ||
+    accountType === 'amazon_organic' ||
+    accountType === 'amazon_ads' ||
+    accountType === 'amazon_asin'
+  ) {
+    // 전달된 accountId로 amazon_accounts 조회하여 외부 account_id 획득
+    const { data: refAcct } = await supabase
+      .from('amazon_accounts')
+      .select('account_id, brand_id')
+      .eq('id', accountId)
+      .single()
+
+    if (!refAcct) return NextResponse.json({ error: '아마존 계정을 찾을 수 없습니다.' }, { status: 404 })
+
+    const { account_id: externalAccountId, brand_id: bId } = refAcct
+
+    // 같은 account_id의 organic/ads/asin 계정 PK 조회
+    const { data: allAmazonAccts } = await supabase
+      .from('amazon_accounts')
+      .select('id, account_type')
+      .eq('account_id', externalAccountId)
+      .eq('brand_id', bId)
+
+    const organicIds = (allAmazonAccts ?? []).filter((a) => a.account_type === 'organic').map((a) => a.id)
+    const adsIds = (allAmazonAccts ?? []).filter((a) => a.account_type === 'ads').map((a) => a.id)
+    const asinIds = (allAmazonAccts ?? []).filter((a) => a.account_type === 'asin').map((a) => a.id)
+
+    // 오가닉 데이터 조회
+    let organic_rows: AmazonOrganicStat[] = []
+    if (organicIds.length > 0) {
+      let organicQuery = supabase
+        .from('amazon_organic_stats')
+        .select('*')
+        .in('amazon_account_id', organicIds)
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: true })
+      if (brandId && brandId !== 'all') organicQuery = organicQuery.eq('brand_id', brandId)
+
+      const { data: organicData } = await organicQuery
+      organic_rows = (organicData ?? []) as AmazonOrganicStat[]
+    }
+
+    // 광고 데이터 조회
+    let ads_rows: AmazonAdsStat[] = []
+    if (adsIds.length > 0) {
+      let adsQuery = supabase
+        .from('amazon_ads_stats')
+        .select('*')
+        .in('amazon_account_id', adsIds)
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: true })
+      if (brandId && brandId !== 'all') adsQuery = adsQuery.eq('brand_id', brandId)
+
+      const { data: adsData } = await adsQuery
+      ads_rows = (adsData ?? []) as AmazonAdsStat[]
+    }
+
+    // ASIN 데이터 조회
+    let asin_rows: AmazonAsinStat[] = []
+    if (asinIds.length > 0) {
+      let asinQuery = supabase
+        .from('amazon_asin_stats')
+        .select('*')
+        .in('amazon_account_id', asinIds)
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: true })
+      if (brandId && brandId !== 'all') asinQuery = asinQuery.eq('brand_id', brandId)
+
+      const { data: asinData } = await asinQuery
+      asin_rows = (asinData ?? []) as AmazonAsinStat[]
+    }
+
+    return NextResponse.json({ platform: 'amazon', organic_rows, ads_rows, asin_rows })
   }
 }

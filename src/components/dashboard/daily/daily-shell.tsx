@@ -12,6 +12,8 @@ import {
 } from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
 import type {
+  AmazonAdsStat,
+  AmazonOrganicStat,
   DailyFilters,
   GmvMaxDailyRow,
   MetaDailyStatFull,
@@ -20,6 +22,9 @@ import type {
   TiktokDailyStatFull,
 } from '@/types/database'
 import { useDashboardData } from '@/components/layout/dashboard-data-provider'
+import { AmazonAdsTable } from './amazon-ads-table'
+import { AmazonOrganicTable } from './amazon-organic-table'
+import { AmazonUploadArea } from './amazon-upload-area'
 import { DailyFilterBar } from './daily-filter-bar'
 import { DailyFetchButton } from './daily-fetch-button'
 import { MetaDailyTable } from './meta-daily-table'
@@ -33,6 +38,7 @@ type DailyApiResponse =
   | { platform: 'meta'; rows: MetaDailyStatFull[] }
   | { platform: 'tiktok'; rows: TiktokDailyStatFull[]; gmvMaxRows: GmvMaxDailyRow[] | null }
   | { platform: 'shopee'; shopping_rows: ShopeeShoppingStat[]; inapp_rows: ShopeeInappDayRow[] }
+  | { platform: 'amazon'; organic_rows: AmazonOrganicStat[]; ads_rows: AmazonAdsStat[] }
 
 async function fetchDailyStats(filters: DailyFilters): Promise<DailyApiResponse> {
   const params = new URLSearchParams({
@@ -48,7 +54,7 @@ async function fetchDailyStats(filters: DailyFilters): Promise<DailyApiResponse>
 }
 
 export function DailyShell() {
-  const { role, initialBrandId, brands, metaAccounts, tiktokAccounts, shopeeAccounts } =
+  const { role, initialBrandId, brands, metaAccounts, tiktokAccounts, shopeeAccounts, amazonAccounts } =
     useDashboardData()
   const today = new Date().toISOString().slice(0, 10)
 
@@ -81,6 +87,7 @@ export function DailyShell() {
   }
 
   const isShopee = filters.accountType === 'shopee_shopping' || filters.accountType === 'shopee_inapp'
+  const isAmazon = filters.accountType === 'amazon_organic' || filters.accountType === 'amazon_ads' || filters.accountType === 'amazon_asin'
 
   // 선택된 shopee 계정 정보 (대표 행)
   const selectedShopeeAccount = isShopee
@@ -100,10 +107,33 @@ export function DailyShell() {
       )
     : null
 
+  // 선택된 amazon 계정 정보 (대표 행)
+  const selectedAmazonAccount = isAmazon
+    ? amazonAccounts.find((a) => a.id === filters.accountId)
+    : null
+
+  // 업로드용: 같은 account_id의 organic/ads/asin 각각의 DB PK 조회
+  const amazonExternalAccountId = selectedAmazonAccount?.account_id ?? ''
+  const organicAccountForUpload = amazonExternalAccountId
+    ? amazonAccounts.find(
+        (a) => a.account_id === amazonExternalAccountId && a.account_type === 'organic'
+      )
+    : null
+  const adsAccountForUpload = amazonExternalAccountId
+    ? amazonAccounts.find(
+        (a) => a.account_id === amazonExternalAccountId && a.account_type === 'ads'
+      )
+    : null
+  const asinAccountForUpload = amazonExternalAccountId
+    ? amazonAccounts.find(
+        (a) => a.account_id === amazonExternalAccountId && a.account_type === 'asin'
+      )
+    : null
+
   // fetchButton 슬롯
   let fetchButtonSlot: React.ReactNode = undefined
   if (filters.accountId) {
-    if (isShopee) {
+    if (isShopee || isAmazon) {
       if (role === 'admin') {
         fetchButtonSlot = (
           <Button
@@ -153,14 +183,69 @@ export function DailyShell() {
         metaAccounts={metaAccounts}
         tiktokAccounts={tiktokAccounts}
         shopeeAccounts={shopeeAccounts}
+        amazonAccounts={amazonAccounts}
         isFetching={isFetching}
         onChange={handleFiltersChange}
         onSearch={handleSearch}
         fetchButton={fetchButtonSlot}
       />
 
+      {/* Amazon 파일 업로드 Dialog — 오가닉/광고/ASIN 세 업로드 영역 */}
+      <Dialog open={showUpload && isAmazon && !!selectedAmazonAccount} onOpenChange={setShowUpload}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>아마존 파일 업로드</DialogTitle>
+          </DialogHeader>
+          {selectedAmazonAccount && (
+            <div className="space-y-6">
+              {organicAccountForUpload && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">오가닉 데이터 (.csv) — BusinessReport</p>
+                  <AmazonUploadArea
+                    amazonAccountId={organicAccountForUpload.id}
+                    accountExternalId={amazonExternalAccountId}
+                    accountType="organic"
+                    onUploadSuccess={() => {
+                      handleSearch()
+                    }}
+                  />
+                </div>
+              )}
+              {organicAccountForUpload && adsAccountForUpload && <Separator />}
+              {adsAccountForUpload && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">내부광고 데이터 (.csv) — Sponsored Products</p>
+                  <AmazonUploadArea
+                    amazonAccountId={adsAccountForUpload.id}
+                    accountExternalId={amazonExternalAccountId}
+                    accountType="ads"
+                    onUploadSuccess={() => {
+                      handleSearch()
+                    }}
+                  />
+                </div>
+              )}
+              {adsAccountForUpload && asinAccountForUpload && <Separator />}
+              {asinAccountForUpload && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">제품별 데이터 (.csv) — ASIN Report</p>
+                  <AmazonUploadArea
+                    amazonAccountId={asinAccountForUpload.id}
+                    accountExternalId={amazonExternalAccountId}
+                    accountType="asin"
+                    onUploadSuccess={() => {
+                      handleSearch()
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Shopee 파일 업로드 Dialog — 쇼핑몰/인앱 두 업로드 영역 */}
-      <Dialog open={showUpload && !!selectedShopeeAccount} onOpenChange={setShowUpload}>
+      <Dialog open={showUpload && isShopee && !!selectedShopeeAccount} onOpenChange={setShowUpload}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>쇼피 파일 업로드</DialogTitle>
@@ -211,6 +296,31 @@ export function DailyShell() {
               <TiktokDailyTable rows={data.rows as TiktokDailyStatFull[]} />
               {data.gmvMaxRows && data.gmvMaxRows.length > 0 && (
                 <TiktokGmvMaxDailyTable rows={data.gmvMaxRows} />
+              )}
+            </>
+          ) : data.platform === 'amazon' ? (
+            // amazon: 오가닉 + 광고 테이블 세로 나란히
+            <>
+              {data.organic_rows.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">오가닉</p>
+                  <div className="rounded-lg border">
+                    <AmazonOrganicTable rows={data.organic_rows} />
+                  </div>
+                </div>
+              )}
+              {data.ads_rows.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">내부광고</p>
+                  <div className="rounded-lg border">
+                    <AmazonAdsTable rows={data.ads_rows} />
+                  </div>
+                </div>
+              )}
+              {data.organic_rows.length === 0 && data.ads_rows.length === 0 && (
+                <div className="text-muted-foreground rounded-lg border py-12 text-center text-sm">
+                  해당 기간에 데이터가 없습니다.
+                </div>
               )}
             </>
           ) : (

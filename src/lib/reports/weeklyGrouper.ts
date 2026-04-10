@@ -17,19 +17,25 @@ type WeekRange = {
 
 export function getWeekRanges(year: number, month: number): WeekRange[] {
   const lastDay = getDaysInMonth(new Date(year, month - 1))
-  return [
+  const ranges: WeekRange[] = [
     { week: 1, start: 1, end: 7, label: `${month}/1 - ${month}/7` },
     { week: 2, start: 8, end: 14, label: `${month}/8 - ${month}/14` },
     { week: 3, start: 15, end: 21, label: `${month}/15 - ${month}/21` },
-    { week: 4, start: 22, end: lastDay, label: `${month}/22 - ${month}/${lastDay}` },
+    { week: 4, start: 22, end: 28, label: `${month}/22 - ${month}/28` },
   ]
+  // 28일 초과 월은 5주차 추가 (29일~말일)
+  if (lastDay > 28) {
+    ranges.push({ week: 5, start: 29, end: lastDay, label: `${month}/29 - ${month}/${lastDay}` })
+  }
+  return ranges
 }
 
 export function getWeekNumber(day: number): number {
   if (day <= 7) return 1
   if (day <= 14) return 2
   if (day <= 21) return 3
-  return 4
+  if (day <= 28) return 4
+  return 5
 }
 
 export function groupMetaByWeek(
