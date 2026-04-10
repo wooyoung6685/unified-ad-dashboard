@@ -35,8 +35,30 @@ import type {
   ShopeeAdsBreakdownData,
 } from '@/types/database'
 
+import sharp from 'sharp'
+
 // Hobby 플랜 최대 60초 (Pro 플랜으로 업그레이드 시 300으로 늘릴 수 있음)
 export const maxDuration = 60
+
+// 썸네일 리사이징 설정
+const THUMB_MAX_WIDTH = 400
+const THUMB_JPEG_QUALITY = 80
+
+// 이미지를 400px 이하 JPEG로 압축 (실패 시 원본 그대로 반환)
+async function compressThumb(
+  buffer: ArrayBuffer,
+): Promise<{ data: Buffer | ArrayBuffer; contentType: string; ext: string }> {
+  try {
+    const compressed = await sharp(Buffer.from(buffer))
+      .resize(THUMB_MAX_WIDTH, THUMB_MAX_WIDTH, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: THUMB_JPEG_QUALITY })
+      .toBuffer()
+    return { data: compressed, contentType: 'image/jpeg', ext: 'jpg' }
+  } catch (err) {
+    console.warn('[thumb] 리사이징 실패, 원본 사용:', err)
+    return { data: buffer, contentType: 'image/jpeg', ext: 'jpg' }
+  }
+}
 
 const CDN_FETCH_HEADERS = {
   'User-Agent':
@@ -138,14 +160,13 @@ async function uploadThumb(
     const res = await fetchCdnImage(targetUrl)
     if (!res) return null
 
-    const buffer = await res.arrayBuffer()
-    const contentType = res.headers.get('content-type') ?? 'image/jpeg'
-    const ext = contentType.includes('png') ? 'png' : 'jpg'
+    const rawBuffer = await res.arrayBuffer()
+    const { data: compressed, contentType, ext } = await compressThumb(rawBuffer)
     const path = `meta/${adId}.${ext}`
 
     const { error } = await supabaseAdmin.storage
       .from('report-thumbnails')
-      .upload(path, buffer, { contentType, upsert: true })
+      .upload(path, compressed, { contentType, upsert: true })
     if (error) {
       console.error(`[thumb] Supabase upload 실패 path=${path}`, error.message)
       return null
@@ -182,14 +203,13 @@ async function uploadTiktokThumb(
     const res = await fetchCdnImage(url)
     if (!res) return null
 
-    const buffer = await res.arrayBuffer()
-    const contentType = res.headers.get('content-type') ?? 'image/jpeg'
-    const ext = contentType.includes('png') ? 'png' : 'jpg'
+    const rawBuffer = await res.arrayBuffer()
+    const { data: compressed, contentType, ext } = await compressThumb(rawBuffer)
     const path = `tiktok/${adId}.${ext}`
 
     const { error } = await supabaseAdmin.storage
       .from('report-thumbnails')
-      .upload(path, buffer, { contentType, upsert: true })
+      .upload(path, compressed, { contentType, upsert: true })
     if (error) {
       console.error(`[thumb] Supabase upload 실패 path=${path}`, error.message)
       return null
