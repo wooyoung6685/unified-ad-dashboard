@@ -8,6 +8,7 @@ import { ArrowLeft, Check, Download, Pencil, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { InsightMemoCard } from './insight-memo-card'
+import { AmazonReportDetail } from './amazon-report-detail'
 import { MetaReportDetail } from './meta-report-detail'
 import { ShopeeReportDetail } from './shopee-report-detail'
 import { TiktokReportDetail } from './tiktok-report-detail'
@@ -169,6 +170,8 @@ export function ReportDetail({ report, role, creatorEmail }: Props) {
           />
         ) : snapshot.platform === 'shopee_inapp' ? (
           <ShopeeReportDetail data={snapshot.data} title={title} />
+        ) : snapshot.platform === 'amazon' ? (
+          <AmazonReportDetail data={snapshot.data} title={title} />
         ) : null}
       </div>
 

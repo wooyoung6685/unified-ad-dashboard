@@ -25,7 +25,15 @@ import {
 } from '@/lib/reports/metaApi'
 import { fetchTiktokCampaigns, fetchTiktokAdgroups, fetchTiktokAds } from '@/lib/reports/tiktokApi'
 import { fetchGmvMaxCampaignReport, fetchGmvMaxItems } from '@/lib/tiktok/gmvMax'
-import type { ReportSnapshot, ShopeeAdsBreakdownData } from '@/types/database'
+import type {
+  AmazonDailyData,
+  AmazonKeywordData,
+  AmazonMonthlyData,
+  AmazonProductData,
+  AmazonWeeklyData,
+  ReportSnapshot,
+  ShopeeAdsBreakdownData,
+} from '@/types/database'
 
 // Hobby 플랜 최대 60초 (Pro 플랜으로 업그레이드 시 300으로 늘릴 수 있음)
 export const maxDuration = 60
@@ -216,7 +224,7 @@ export async function POST(_req: NextRequest, { params }: RouteContext) {
   }
 
   const { platform, internal_account_id, year, month } = report as {
-    platform: 'meta' | 'shopee_inapp' | 'tiktok'
+    platform: 'meta' | 'shopee_inapp' | 'tiktok' | 'amazon'
     internal_account_id: string | null
     year: number
     month: number
@@ -252,6 +260,16 @@ export async function POST(_req: NextRequest, { params }: RouteContext) {
       })
     } else if (platform === 'tiktok') {
       snapshot = await buildTiktokSnapshot({
+        internal_account_id,
+        year,
+        month,
+        thisMonthStart,
+        thisMonthEnd,
+        prevMonthStart,
+        prevMonthEnd,
+      })
+    } else if (platform === 'amazon') {
+      snapshot = await buildAmazonSnapshot({
         internal_account_id,
         year,
         month,
@@ -782,4 +800,276 @@ async function buildTiktokSnapshot(args: {
       ...(gmvMaxItems.length > 0 && { gmvMaxItems }),
     },
   }
+}
+
+// ── Amazon 스냅샷 빌더 ─────────────────────────────────────────────────────
+
+async function buildAmazonSnapshot(args: {
+  internal_account_id: string
+  year: number
+  month: number
+  thisMonthStart: string
+  thisMonthEnd: string
+  prevMonthStart: string
+  prevMonthEnd: string
+}): Promise<ReportSnapshot> {
+  const { internal_account_id, year, month, thisMonthStart, thisMonthEnd, prevMonthStart, prevMonthEnd } = args
+
+  // 1. 이 계정의 account_id, brand_id 조회
+  const { data: amazonAccount } = await supabaseAdmin
+    .from('amazon_accounts')
+    .select('account_id, brand_id')
+    .eq('id', internal_account_id)
+    .single()
+
+  if (!amazonAccount) throw new Error('Amazon 계정을 찾을 수 없습니다.')
+
+  const { account_id: externalAccountId, brand_id: bId } = amazonAccount
+
+  // 2. 같은 account_id의 organic/ads/asin 계정 조회
+  const { data: allAccts } = await supabaseAdmin
+    .from('amazon_accounts')
+    .select('id, account_type')
+    .eq('account_id', externalAccountId)
+    .eq('brand_id', bId)
+
+  const organicIds = (allAccts ?? []).filter(a => a.account_type === 'organic').map(a => a.id)
+  const adsIds = (allAccts ?? []).filter(a => a.account_type === 'ads').map(a => a.id)
+  const asinIds = (allAccts ?? []).filter(a => a.account_type === 'asin').map(a => a.id)
+
+  // 3. 모든 데이터 병렬 조회 (당월 + 전월)
+  const [
+    { data: curOrganic },
+    { data: prevOrganic },
+    { data: curAds },
+    { data: prevAds },
+    { data: curAsin },
+    { data: keywordRows },
+  ] = await Promise.all([
+    organicIds.length > 0
+      ? supabaseAdmin
+          .from('amazon_organic_stats')
+          .select('date, ordered_product_sales, orders, sessions, page_views, buy_box_percentage, unit_session_percentage, currency')
+          .in('amazon_account_id', organicIds)
+          .gte('date', thisMonthStart)
+          .lte('date', thisMonthEnd)
+          .order('date', { ascending: true })
+      : Promise.resolve({ data: [] }),
+    organicIds.length > 0
+      ? supabaseAdmin
+          .from('amazon_organic_stats')
+          .select('date, ordered_product_sales, orders, sessions, page_views')
+          .in('amazon_account_id', organicIds)
+          .gte('date', prevMonthStart)
+          .lte('date', prevMonthEnd)
+      : Promise.resolve({ data: [] }),
+    adsIds.length > 0
+      ? supabaseAdmin
+          .from('amazon_ads_stats')
+          .select('date, cost, sales, impressions, clicks, purchases, purchases_new_to_brand, currency')
+          .in('amazon_account_id', adsIds)
+          .gte('date', thisMonthStart)
+          .lte('date', thisMonthEnd)
+          .order('date', { ascending: true })
+      : Promise.resolve({ data: [] }),
+    adsIds.length > 0
+      ? supabaseAdmin
+          .from('amazon_ads_stats')
+          .select('date, cost, sales, impressions, clicks, purchases')
+          .in('amazon_account_id', adsIds)
+          .gte('date', prevMonthStart)
+          .lte('date', prevMonthEnd)
+      : Promise.resolve({ data: [] }),
+    asinIds.length > 0
+      ? supabaseAdmin
+          .from('amazon_asin_stats')
+          .select('date, parent_asin, child_asin, title, ordered_product_sales, total_order_items, sessions, orders')
+          .in('amazon_account_id', asinIds)
+          .gte('date', thisMonthStart)
+          .lte('date', thisMonthEnd)
+      : Promise.resolve({ data: [] }),
+    adsIds.length > 0
+      ? supabaseAdmin
+          .from('amazon_ads_keyword_stats')
+          .select('keyword, impressions')
+          .in('amazon_account_id', adsIds)
+          .gte('date', thisMonthStart)
+          .lte('date', thisMonthEnd)
+      : Promise.resolve({ data: [] }),
+  ])
+
+  const organicRows = curOrganic ?? []
+  const prevOrganicRows = prevOrganic ?? []
+  const adsRows = curAds ?? []
+  const prevAdsRows = prevAds ?? []
+  const asinRows = curAsin ?? []
+
+  // 4. monthly 계산
+  const sumOrg = {
+    sales: organicRows.reduce((s, r) => s + ((r.ordered_product_sales as number) ?? 0), 0),
+    orders: organicRows.reduce((s, r) => s + ((r.orders as number) ?? 0), 0),
+    sessions: organicRows.reduce((s, r) => s + ((r.sessions as number) ?? 0), 0),
+  }
+  const sumPrevOrg = {
+    sales: prevOrganicRows.reduce((s, r) => s + ((r.ordered_product_sales as number) ?? 0), 0),
+    orders: prevOrganicRows.reduce((s, r) => s + ((r.orders as number) ?? 0), 0),
+    sessions: prevOrganicRows.reduce((s, r) => s + ((r.sessions as number) ?? 0), 0),
+  }
+  const sumAd = {
+    cost: adsRows.reduce((s, r) => s + ((r.cost as number) ?? 0), 0),
+    sales: adsRows.reduce((s, r) => s + ((r.sales as number) ?? 0), 0),
+    impressions: adsRows.reduce((s, r) => s + ((r.impressions as number) ?? 0), 0),
+    clicks: adsRows.reduce((s, r) => s + ((r.clicks as number) ?? 0), 0),
+  }
+  const sumPrevAd = {
+    cost: prevAdsRows.reduce((s, r) => s + ((r.cost as number) ?? 0), 0),
+    sales: prevAdsRows.reduce((s, r) => s + ((r.sales as number) ?? 0), 0),
+    impressions: prevAdsRows.reduce((s, r) => s + ((r.impressions as number) ?? 0), 0),
+    clicks: prevAdsRows.reduce((s, r) => s + ((r.clicks as number) ?? 0), 0),
+  }
+
+  const monthly: AmazonMonthlyData = {
+    organic_sales: sumOrg.sales || null,
+    orders: sumOrg.orders || null,
+    sessions: sumOrg.sessions || null,
+    conversion_rate: sumOrg.sessions > 0 ? (sumOrg.orders / sumOrg.sessions) * 100 : null,
+    aov: sumOrg.orders > 0 ? sumOrg.sales / sumOrg.orders : null,
+    ad_cost: sumAd.cost || null,
+    ad_sales: sumAd.sales || null,
+    ad_roas: sumAd.cost > 0 ? sumAd.sales / sumAd.cost : null,
+    ad_impressions: sumAd.impressions || null,
+    ad_clicks: sumAd.clicks || null,
+    ad_cpc: sumAd.clicks > 0 ? sumAd.cost / sumAd.clicks : null,
+    ad_ctr: sumAd.impressions > 0 ? (sumAd.clicks / sumAd.impressions) * 100 : null,
+    prev_organic_sales: sumPrevOrg.sales || null,
+    prev_orders: sumPrevOrg.orders || null,
+    prev_sessions: sumPrevOrg.sessions || null,
+    prev_conversion_rate: sumPrevOrg.sessions > 0 ? (sumPrevOrg.orders / sumPrevOrg.sessions) * 100 : null,
+    prev_aov: sumPrevOrg.orders > 0 ? sumPrevOrg.sales / sumPrevOrg.orders : null,
+    prev_ad_cost: sumPrevAd.cost || null,
+    prev_ad_sales: sumPrevAd.sales || null,
+    prev_ad_roas: sumPrevAd.cost > 0 ? sumPrevAd.sales / sumPrevAd.cost : null,
+    prev_ad_impressions: sumPrevAd.impressions || null,
+    prev_ad_clicks: sumPrevAd.clicks || null,
+    prev_ad_cpc: sumPrevAd.clicks > 0 ? sumPrevAd.cost / sumPrevAd.clicks : null,
+    prev_ad_ctr: sumPrevAd.impressions > 0 ? (sumPrevAd.clicks / sumPrevAd.impressions) * 100 : null,
+  }
+
+  // 5. weekly 계산
+  function getWeekNumber(dateStr: string): number {
+    const day = new Date(dateStr).getDate()
+    return Math.ceil(day / 7)
+  }
+  function getWeekRange(yr: number, mo: number, week: number): string {
+    const start = (week - 1) * 7 + 1
+    const lastDay = new Date(yr, mo, 0).getDate()
+    const end = Math.min(week * 7, lastDay)
+    const m = String(mo).padStart(2, '0')
+    return `${yr}-${m}-${String(start).padStart(2, '0')} ~ ${yr}-${m}-${String(end).padStart(2, '0')}`
+  }
+
+  const orgByWeek: Record<number, { sales: number; orders: number; sessions: number }> = {}
+  for (const r of organicRows) {
+    const w = getWeekNumber(r.date)
+    if (!orgByWeek[w]) orgByWeek[w] = { sales: 0, orders: 0, sessions: 0 }
+    orgByWeek[w].sales += (r.ordered_product_sales as number) ?? 0
+    orgByWeek[w].orders += (r.orders as number) ?? 0
+    orgByWeek[w].sessions += (r.sessions as number) ?? 0
+  }
+
+  const adByWeek: Record<number, { cost: number; sales: number; impressions: number; clicks: number }> = {}
+  for (const r of adsRows) {
+    const w = getWeekNumber(r.date)
+    if (!adByWeek[w]) adByWeek[w] = { cost: 0, sales: 0, impressions: 0, clicks: 0 }
+    adByWeek[w].cost += (r.cost as number) ?? 0
+    adByWeek[w].sales += (r.sales as number) ?? 0
+    adByWeek[w].impressions += (r.impressions as number) ?? 0
+    adByWeek[w].clicks += (r.clicks as number) ?? 0
+  }
+
+  const weekNumbers = [...new Set([...Object.keys(orgByWeek), ...Object.keys(adByWeek)].map(Number))].sort((a, b) => a - b)
+  const weekly: AmazonWeeklyData[] = weekNumbers.map(w => {
+    const o = orgByWeek[w] ?? { sales: 0, orders: 0, sessions: 0 }
+    const a = adByWeek[w] ?? { cost: 0, sales: 0, impressions: 0, clicks: 0 }
+    return {
+      week: w,
+      date_range: getWeekRange(year, month, w),
+      organic_sales: o.sales || null,
+      orders: o.orders || null,
+      sessions: o.sessions || null,
+      conversion_rate: o.sessions > 0 ? (o.orders / o.sessions) * 100 : null,
+      aov: o.orders > 0 ? o.sales / o.orders : null,
+      ad_cost: a.cost || null,
+      ad_sales: a.sales || null,
+      ad_roas: a.cost > 0 ? a.sales / a.cost : null,
+      ad_impressions: a.impressions || null,
+      ad_clicks: a.clicks || null,
+      ad_cpc: a.clicks > 0 ? a.cost / a.clicks : null,
+      ad_ctr: a.impressions > 0 ? (a.clicks / a.impressions) * 100 : null,
+    }
+  })
+
+  // 6. keywords 계산 (B0 제외, Top 15)
+  let keywords: AmazonKeywordData[] = []
+  if (keywordRows && keywordRows.length > 0) {
+    const keywordMap: Record<string, number> = {}
+    for (const r of keywordRows) {
+      const kw = (r.keyword as string) ?? ''
+      if (kw.startsWith('B0')) continue
+      if (!kw.trim()) continue
+      keywordMap[kw] = (keywordMap[kw] ?? 0) + ((r.impressions as number) ?? 0)
+    }
+    keywords = Object.entries(keywordMap)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 15)
+      .map(([keyword, impressions]) => ({ keyword, impressions }))
+  }
+
+  // 7. daily 계산
+  const daily: AmazonDailyData[] = organicRows.map(r => ({
+    date: r.date,
+    organic_sales: (r.ordered_product_sales as number) ?? null,
+    orders: (r.orders as number) ?? null,
+    sessions: (r.sessions as number) ?? null,
+    conversion_rate: ((r.sessions as number) ?? 0) > 0
+      ? (((r.orders as number) ?? 0) / ((r.sessions as number) ?? 1)) * 100
+      : null,
+  }))
+
+  // 8. products 계산 (child_asin 기준 집계)
+  const productMap: Record<string, {
+    title: string; parent_asin: string | null; child_asin: string;
+    sales: number; quantity: number
+  }> = {}
+
+  for (const r of asinRows) {
+    const key = (r.child_asin as string) ?? 'unknown'
+    if (!productMap[key]) {
+      productMap[key] = {
+        title: (r.title as string) ?? '',
+        parent_asin: (r.parent_asin as string) ?? null,
+        child_asin: key,
+        sales: 0,
+        quantity: 0,
+      }
+    }
+    productMap[key].sales += (r.ordered_product_sales as number) ?? 0
+    productMap[key].quantity += (r.total_order_items as number) ?? 0
+  }
+
+  const products: AmazonProductData[] = Object.values(productMap)
+    .filter(p => p.sales > 0)
+    .sort((a, b) => b.sales - a.sales)
+    .map(p => ({
+      title: p.title,
+      parent_asin: p.parent_asin,
+      child_asin: p.child_asin,
+      sales: p.sales || null,
+      quantity: p.quantity || null,
+    }))
+
+  return {
+    platform: 'amazon',
+    data: { monthly, weekly, keywords, daily, products },
+  } as ReportSnapshot
 }
