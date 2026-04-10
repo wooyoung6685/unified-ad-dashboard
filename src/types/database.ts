@@ -537,6 +537,8 @@ export type Report = {
   snapshot: ReportSnapshot | null
   insight_memo: string | null
   insight_memo_gmv_max: string | null
+  insight_memo_title: string | null
+  insight_memo_gmv_max_title: string | null
   filters: ReportFilters | null
   created_by: string | null
   created_at: string

@@ -61,6 +61,8 @@ interface Props {
   role: 'admin' | 'viewer'
   insightMemo: string | null
   insightMemoGmvMax: string | null
+  insightMemoTitle?: string | null
+  insightMemoGmvMaxTitle?: string | null
   filters?: ReportFilters | null
 }
 
@@ -1132,6 +1134,8 @@ export function TiktokReportDetail({
   role,
   insightMemo,
   insightMemoGmvMax,
+  insightMemoTitle,
+  insightMemoGmvMaxTitle,
   filters: initialFilters,
 }: Props) {
   const isAdmin = role === 'admin'
@@ -1292,6 +1296,8 @@ export function TiktokReportDetail({
         <InsightMemoCard
           reportId={reportId}
           initialContent={insightMemo}
+          initialTitle={insightMemoTitle}
+          titleFieldKey="insight_memo_title"
           role={role}
           fieldKey="insight_memo"
         />
@@ -1337,6 +1343,8 @@ export function TiktokReportDetail({
           <InsightMemoCard
             reportId={reportId}
             initialContent={insightMemo}
+            initialTitle={insightMemoTitle}
+            titleFieldKey="insight_memo_title"
             role={role}
             label="일반 캠페인 인사이트 & 메모"
             fieldKey="insight_memo"
@@ -1361,6 +1369,8 @@ export function TiktokReportDetail({
           <InsightMemoCard
             reportId={reportId}
             initialContent={insightMemoGmvMax}
+            initialTitle={insightMemoGmvMaxTitle}
+            titleFieldKey="insight_memo_gmv_max_title"
             role={role}
             label="GMV Max 인사이트 & 메모"
             fieldKey="insight_memo_gmv_max"

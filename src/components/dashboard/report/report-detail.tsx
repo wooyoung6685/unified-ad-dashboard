@@ -166,6 +166,8 @@ export function ReportDetail({ report, role, creatorEmail }: Props) {
             role={role}
             insightMemo={report.insight_memo}
             insightMemoGmvMax={report.insight_memo_gmv_max}
+            insightMemoTitle={report.insight_memo_title}
+            insightMemoGmvMaxTitle={report.insight_memo_gmv_max_title}
             filters={report.filters}
           />
         ) : snapshot.platform === 'shopee_inapp' ? (
@@ -180,6 +182,8 @@ export function ReportDetail({ report, role, creatorEmail }: Props) {
         <InsightMemoCard
           reportId={report.id}
           initialContent={report.insight_memo}
+          initialTitle={report.insight_memo_title}
+          titleFieldKey="insight_memo_title"
           role={role}
         />
       )}
