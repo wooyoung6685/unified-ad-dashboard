@@ -486,7 +486,7 @@ function KeywordSection({ keywords }: { keywords: AmazonKeywordData[] }) {
 
           {/* 수평 바 차트 */}
           <HorizontalBarChart
-            data={[...filtered].reverse()}
+            data={[...filtered].sort((a, b) => (b.impressions ?? 0) - (a.impressions ?? 0))}
             dataKey="impressions"
             nameKey="keyword"
             title="키워드별 노출수"
@@ -529,7 +529,7 @@ function DailySection({ daily }: { daily: AmazonDailyData[] }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {daily.map((d) => {
+                {[...daily].sort((a, b) => a.date.localeCompare(b.date)).map((d) => {
                   const date = new Date(d.date)
                   return (
                     <TableRow key={d.date}>
@@ -547,7 +547,7 @@ function DailySection({ daily }: { daily: AmazonDailyData[] }) {
 
           {/* 수평 바 차트 */}
           <HorizontalBarChart
-            data={[...dailyWithLabel].reverse() as unknown as Record<string, unknown>[]}
+            data={[...dailyWithLabel].sort((a, b) => a.date.localeCompare(b.date)) as unknown as Record<string, unknown>[]}
             dataKey="organic_sales"
             nameKey="label"
             title="일별 매출"
@@ -610,7 +610,7 @@ function ProductSection({ products }: { products: AmazonProductData[] }) {
 
           {/* 수평 바 차트 */}
           <HorizontalBarChart
-            data={[...productData].reverse() as unknown as Record<string, unknown>[]}
+            data={[...productData].sort((a, b) => (b.sales ?? 0) - (a.sales ?? 0)) as unknown as Record<string, unknown>[]}
             dataKey="sales"
             nameKey="shortTitle"
             title="제품별 매출"
