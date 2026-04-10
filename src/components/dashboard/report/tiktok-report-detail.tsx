@@ -12,7 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { fmtDec, fmtKRW, fmtNum, fmtPct } from '@/lib/format'
+import { fmtDec, fmtKRW, fmtNum, fmtPct, formatMetricValue } from '@/lib/format'
 import {
   DEFAULT_GMVMAX_WIDGETS,
   DEFAULT_TIKTOK_WIDGETS,
@@ -21,6 +21,7 @@ import {
   TIKTOK_FILTER_OPTIONS,
   TIKTOK_RANK_OPTIONS,
   applyWidgetConfig,
+  getCardMetrics,
   getWidgetAutoTitle,
   getWidgetSubtitle,
 } from '@/lib/creative-widget-defaults'
@@ -506,12 +507,22 @@ function AdgroupSection({
 
 // ── 섹션 6: 소재 성과 ────────────────────────────
 
-function TiktokCreativeCard({ ad, rank }: { ad: TiktokAdRow; rank: number }) {
+function TiktokCreativeCard({
+  ad,
+  rank,
+  rankBy,
+}: {
+  ad: TiktokAdRow
+  rank: number
+  rankBy: string
+}) {
   const thumbSrc = ad.thumbnail_url
     ? ad.thumbnail_url.includes('ibyteimg.com') || ad.thumbnail_url.includes('tiktokcdn.com')
       ? `/api/proxy/image?url=${encodeURIComponent(ad.thumbnail_url)}`
       : ad.thumbnail_url
     : null
+
+  const metrics = getCardMetrics('tiktok', rankBy)
 
   return (
     <Card className="overflow-hidden">
@@ -537,30 +548,25 @@ function TiktokCreativeCard({ ad, rank }: { ad: TiktokAdRow; rank: number }) {
         <p className="mb-0.5 truncate text-xs text-muted-foreground">{ad.campaign_name}</p>
         <p className="mb-2 line-clamp-2 text-sm font-medium">{ad.ad_name}</p>
         <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted/50 p-3">
-          <div>
-            <p className="text-xs text-muted-foreground">지출금액</p>
-            <p className="text-sm font-semibold">{fmtKRW(ad.spend)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">매출</p>
-            <p className="text-sm font-bold text-emerald-600">{fmtKRW(ad.revenue)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">ROAS</p>
-            <p className="text-sm font-bold text-blue-600">{fmtPct(ad.roas)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">구매수</p>
-            <p className="text-sm font-semibold">{fmtNum(ad.purchases)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">전환수</p>
-            <p className="text-sm font-semibold">{fmtNum(ad.conversions)}</p>
-          </div>
-          <div className="col-span-2">
-            <p className="text-xs text-muted-foreground">동영상 조회수</p>
-            <p className="text-sm font-semibold">{fmtNum(ad.video_views)}</p>
-          </div>
+          {metrics.map((m) => (
+            <div key={m.key}>
+              <p className="text-xs text-muted-foreground">{m.label}</p>
+              <p
+                className={[
+                  'text-sm font-semibold',
+                  m.highlight === 'emerald' ? 'font-bold text-emerald-600' : '',
+                  m.highlight === 'blue' ? 'font-bold text-blue-600' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+              >
+                {formatMetricValue(
+                  (ad[m.key as keyof TiktokAdRow] as number | null) ?? null,
+                  m.format,
+                )}
+              </p>
+            </div>
+          ))}
         </div>
       </CardContent>
     </Card>
@@ -666,7 +672,7 @@ function CreativeSection({
               ) : (
                 <div className="grid grid-cols-3 gap-4">
                   {items.map((ad, i) => (
-                    <TiktokCreativeCard key={ad.ad_id} ad={ad} rank={i + 1} />
+                    <TiktokCreativeCard key={ad.ad_id} ad={ad} rank={i + 1} rankBy={widget.rankBy} />
                   ))}
                 </div>
               )}
@@ -940,12 +946,22 @@ function GmvMaxCampaignSection({
 
 // ── GMV Max 소재(item) 카드 ──────────────────────
 
-function GmvMaxItemCard({ item, rank }: { item: GmvMaxItemRow; rank: number }) {
+function GmvMaxItemCard({
+  item,
+  rank,
+  rankBy,
+}: {
+  item: GmvMaxItemRow
+  rank: number
+  rankBy: string
+}) {
   const thumbSrc = item.thumbnail_url
     ? item.thumbnail_url.includes('ibyteimg.com') || item.thumbnail_url.includes('tiktokcdn.com')
       ? `/api/proxy/image?url=${encodeURIComponent(item.thumbnail_url)}`
       : item.thumbnail_url
     : null
+
+  const metrics = getCardMetrics('gmvmax', rankBy)
 
   return (
     <Card className="overflow-hidden">
@@ -974,22 +990,25 @@ function GmvMaxItemCard({ item, rank }: { item: GmvMaxItemRow; rank: number }) {
           <p className="mb-2 truncate text-xs text-muted-foreground">ID: {item.item_id}</p>
         )}
         <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted/50 p-3">
-          <div>
-            <p className="text-xs text-muted-foreground">비용</p>
-            <p className="text-sm font-semibold">{fmtKRW(item.cost)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">매출</p>
-            <p className="text-sm font-bold text-emerald-600">{fmtKRW(item.gross_revenue)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">ROI</p>
-            <p className="text-sm font-bold text-blue-600">{fmtPct(item.roi)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">주문수</p>
-            <p className="text-sm font-semibold">{fmtNum(item.orders)}</p>
-          </div>
+          {metrics.map((m) => (
+            <div key={m.key}>
+              <p className="text-xs text-muted-foreground">{m.label}</p>
+              <p
+                className={[
+                  'text-sm font-semibold',
+                  m.highlight === 'emerald' ? 'font-bold text-emerald-600' : '',
+                  m.highlight === 'blue' ? 'font-bold text-blue-600' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+              >
+                {formatMetricValue(
+                  (item[m.key as keyof GmvMaxItemRow] as number | null) ?? null,
+                  m.format,
+                )}
+              </p>
+            </div>
+          ))}
         </div>
       </CardContent>
     </Card>
@@ -1095,7 +1114,7 @@ function GmvMaxCreativeSection({
               ) : (
                 <div className="grid grid-cols-3 gap-4">
                   {widgetItems.map((item, i) => (
-                    <GmvMaxItemCard key={item.item_id} item={item} rank={i + 1} />
+                    <GmvMaxItemCard key={item.item_id} item={item} rank={i + 1} rankBy={widget.rankBy} />
                   ))}
                 </div>
               )}

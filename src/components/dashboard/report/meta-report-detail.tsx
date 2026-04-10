@@ -10,12 +10,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { fmtDec, fmtKRW, fmtNum, fmtPct } from '@/lib/format'
+import { fmtDec, fmtKRW, fmtNum, fmtPct, formatMetricValue } from '@/lib/format'
 import {
   DEFAULT_META_WIDGETS,
   META_FILTER_OPTIONS,
   META_RANK_OPTIONS,
   applyWidgetConfig,
+  getCardMetrics,
   getWidgetAutoTitle,
   getWidgetSubtitle,
 } from '@/lib/creative-widget-defaults'
@@ -568,12 +569,22 @@ function RankBadge({ rank }: { rank: number }) {
 }
 
 // 소재 카드
-function CreativeCard({ creative, rank }: { creative: MetaCreativeData; rank: number }) {
+function CreativeCard({
+  creative,
+  rank,
+  rankBy,
+}: {
+  creative: MetaCreativeData
+  rank: number
+  rankBy: string
+}) {
   const thumbSrc = creative.thumbnail_url
     ? creative.thumbnail_url.includes('fbcdn.net') || creative.thumbnail_url.includes('cdninstagram.com')
       ? `/api/proxy/image?url=${encodeURIComponent(creative.thumbnail_url)}`
       : creative.thumbnail_url
     : null
+
+  const metrics = getCardMetrics('meta', rankBy)
 
   return (
     <Card className="overflow-hidden">
@@ -598,22 +609,25 @@ function CreativeCard({ creative, rank }: { creative: MetaCreativeData; rank: nu
         <p className="mb-0.5 truncate text-xs text-muted-foreground">{creative.campaign_name}</p>
         <p className="mb-2 line-clamp-2 text-sm font-medium">{creative.ad_name}</p>
         <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted/50 p-3">
-          <div>
-            <p className="text-xs text-muted-foreground">지출금액</p>
-            <p className="text-sm font-semibold">{fmtKRW(creative.spend)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">매출</p>
-            <p className="text-sm font-bold text-emerald-600">{fmtKRW(creative.revenue)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">ROAS</p>
-            <p className="text-sm font-bold text-blue-600">{fmtPct(creative.roas)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">CPC</p>
-            <p className="text-sm font-semibold">{fmtKRW(creative.cpc)}</p>
-          </div>
+          {metrics.map((m) => (
+            <div key={m.key}>
+              <p className="text-xs text-muted-foreground">{m.label}</p>
+              <p
+                className={[
+                  'text-sm font-semibold',
+                  m.highlight === 'emerald' ? 'font-bold text-emerald-600' : '',
+                  m.highlight === 'blue' ? 'font-bold text-blue-600' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+              >
+                {formatMetricValue(
+                  (creative[m.key as keyof MetaCreativeData] as number | null) ?? null,
+                  m.format,
+                )}
+              </p>
+            </div>
+          ))}
         </div>
       </CardContent>
     </Card>
@@ -714,7 +728,7 @@ function CreativeSection({
               ) : (
                 <div className="grid grid-cols-3 gap-4">
                   {items.map((c, i) => (
-                    <CreativeCard key={c.ad_id} creative={c} rank={i + 1} />
+                    <CreativeCard key={c.ad_id} creative={c} rank={i + 1} rankBy={widget.rankBy} />
                   ))}
                 </div>
               )}

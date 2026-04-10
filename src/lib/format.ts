@@ -24,3 +24,10 @@ export const fmtUSD = (v: number | null) =>
   v == null
     ? '-'
     : `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+// 지표 포맷 타입별 공용 포맷 함수
+export function formatMetricValue(v: number | null, format: 'krw' | 'pct' | 'num'): string {
+  if (format === 'krw') return fmtKRW(v)
+  if (format === 'pct') return fmtPct(v)
+  return fmtNum(v)
+}
