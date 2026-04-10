@@ -528,7 +528,7 @@ export type Report = {
   id: string
   brand_id: string
   title: string
-  platform: 'meta' | 'shopee_inapp' | 'tiktok'
+  platform: 'meta' | 'shopee_inapp' | 'tiktok' | 'amazon'
   country: string | null
   internal_account_id: string | null
   year: number
@@ -551,6 +551,7 @@ export type ReportSnapshot =
   | { platform: 'meta'; data: MetaReportData }
   | { platform: 'shopee_inapp'; data: ShopeeReportData }
   | { platform: 'tiktok'; data: TiktokReportData }
+  | { platform: 'amazon'; data: AmazonReportData }
 
 // ── Meta ──────────────────────────────────────
 
@@ -966,4 +967,82 @@ export type GmvMaxItemRow = {
   orders: number | null
   cost_per_order: number | null
   thumbnail_url: string | null
+}
+
+// ── Amazon Report ──────────────────────────────
+
+export type AmazonReportData = {
+  monthly: AmazonMonthlyData
+  weekly: AmazonWeeklyData[]
+  keywords: AmazonKeywordData[]
+  daily: AmazonDailyData[]
+  products: AmazonProductData[]
+}
+
+export type AmazonMonthlyData = {
+  // 오가닉 (Organic)
+  organic_sales: number | null
+  orders: number | null
+  sessions: number | null
+  conversion_rate: number | null
+  aov: number | null
+  // 내부광고 (Ads)
+  ad_cost: number | null
+  ad_sales: number | null
+  ad_roas: number | null
+  ad_impressions: number | null
+  ad_clicks: number | null
+  ad_cpc: number | null
+  ad_ctr: number | null
+  // 전월 (Prev)
+  prev_organic_sales: number | null
+  prev_orders: number | null
+  prev_sessions: number | null
+  prev_conversion_rate: number | null
+  prev_aov: number | null
+  prev_ad_cost: number | null
+  prev_ad_sales: number | null
+  prev_ad_roas: number | null
+  prev_ad_impressions: number | null
+  prev_ad_clicks: number | null
+  prev_ad_cpc: number | null
+  prev_ad_ctr: number | null
+}
+
+export type AmazonWeeklyData = {
+  week: number
+  date_range: string
+  organic_sales: number | null
+  orders: number | null
+  sessions: number | null
+  conversion_rate: number | null
+  aov: number | null
+  ad_cost: number | null
+  ad_sales: number | null
+  ad_roas: number | null
+  ad_impressions: number | null
+  ad_clicks: number | null
+  ad_cpc: number | null
+  ad_ctr: number | null
+}
+
+export type AmazonKeywordData = {
+  keyword: string
+  impressions: number
+}
+
+export type AmazonDailyData = {
+  date: string
+  organic_sales: number | null
+  orders: number | null
+  sessions: number | null
+  conversion_rate: number | null
+}
+
+export type AmazonProductData = {
+  title: string
+  parent_asin: string | null
+  child_asin: string | null
+  sales: number | null
+  quantity: number | null
 }
