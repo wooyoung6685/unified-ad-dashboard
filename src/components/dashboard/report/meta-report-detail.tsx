@@ -32,6 +32,7 @@ import type {
 } from '@/types/database'
 import { Settings, SlidersHorizontal, X } from 'lucide-react'
 import { useState } from 'react'
+import { useRepairThumbnails } from '@/hooks/use-reports'
 import {
   Bar,
   CartesianGrid,
@@ -578,6 +579,8 @@ function CreativeCard({
   rank: number
   rankBy: string
 }) {
+  const [imgError, setImgError] = useState(false)
+
   const thumbSrc = creative.thumbnail_url
     ? creative.thumbnail_url.includes('fbcdn.net') || creative.thumbnail_url.includes('cdninstagram.com')
       ? `/api/proxy/image?url=${encodeURIComponent(creative.thumbnail_url)}`
@@ -589,12 +592,13 @@ function CreativeCard({
   return (
     <Card className="overflow-hidden">
       <div className="relative w-full overflow-hidden bg-gray-100" style={{ paddingBottom: '100%' }}>
-        {thumbSrc ? (
+        {thumbSrc && !imgError ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={thumbSrc}
             alt={creative.ad_name}
             className="absolute inset-0 h-full w-full object-cover"
+            onError={() => setImgError(true)}
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
@@ -646,14 +650,17 @@ function CreativeSection({
   widgets,
   onWidgetsChange,
   isAdmin,
+  reportId,
 }: {
   creatives: MetaCreativeData[]
   widgets: CreativeWidgetConfig[]
   onWidgetsChange: (widgets: CreativeWidgetConfig[]) => void
   isAdmin: boolean
+  reportId?: string
 }) {
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [editingWidget, setEditingWidget] = useState<CreativeWidgetConfig | undefined>()
+  const repairMutation = useRepairThumbnails()
 
   if (creatives.length === 0) return null
 
@@ -680,14 +687,24 @@ function CreativeSection({
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">🎨 소재 성과 분석 (Meta)</CardTitle>
           {isAdmin && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setAddDialogOpen(true)}
-              disabled={widgets.length >= 10}
-            >
-              + 리스트 추가
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => reportId && repairMutation.mutate({ id: reportId, section: 'meta' })}
+                disabled={!reportId || repairMutation.isPending}
+              >
+                {repairMutation.isPending ? '복구 중...' : '🔧 썸네일 복구'}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setAddDialogOpen(true)}
+                disabled={widgets.length >= 10}
+              >
+                + 리스트 추가
+              </Button>
+            </div>
           )}
         </div>
       </CardHeader>
@@ -856,6 +873,7 @@ export function MetaReportDetail({ data, title, role, reportId, filters: initial
         widgets={creativeWidgets}
         onWidgetsChange={handleCreativeWidgetsChange}
         isAdmin={isAdmin}
+        reportId={reportId}
       />
 
       {/* 캠페인 필터 다이얼로그 */}

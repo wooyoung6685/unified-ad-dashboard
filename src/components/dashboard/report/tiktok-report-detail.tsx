@@ -41,6 +41,7 @@ import type {
 } from '@/types/database'
 import { Settings, SlidersHorizontal, X } from 'lucide-react'
 import { useState } from 'react'
+import { useRepairThumbnails } from '@/hooks/use-reports'
 import {
   Bar,
   CartesianGrid,
@@ -516,8 +517,10 @@ function TiktokCreativeCard({
   rank: number
   rankBy: string
 }) {
+  const [imgError, setImgError] = useState(false)
+
   const thumbSrc = ad.thumbnail_url
-    ? ad.thumbnail_url.includes('ibyteimg.com') || ad.thumbnail_url.includes('tiktokcdn.com')
+    ? ad.thumbnail_url.includes('ibyteimg.com') || ad.thumbnail_url.includes('tiktokcdn')
       ? `/api/proxy/image?url=${encodeURIComponent(ad.thumbnail_url)}`
       : ad.thumbnail_url
     : null
@@ -527,12 +530,13 @@ function TiktokCreativeCard({
   return (
     <Card className="overflow-hidden">
       <div className="relative w-full overflow-hidden bg-gray-100" style={{ paddingBottom: '100%' }}>
-        {thumbSrc ? (
+        {thumbSrc && !imgError ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={thumbSrc}
             alt={ad.ad_name}
             className="absolute inset-0 h-full w-full object-cover"
+            onError={() => setImgError(true)}
           />
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-muted-foreground">
@@ -584,14 +588,17 @@ function CreativeSection({
   widgets,
   onWidgetsChange,
   isAdmin,
+  reportId,
 }: {
   ads: TiktokAdRow[]
   widgets: CreativeWidgetConfig[]
   onWidgetsChange: (widgets: CreativeWidgetConfig[]) => void
   isAdmin: boolean
+  reportId?: string
 }) {
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [editingWidget, setEditingWidget] = useState<CreativeWidgetConfig | undefined>()
+  const repairMutation = useRepairThumbnails()
 
   if (ads.length === 0) {
     return (
@@ -627,14 +634,24 @@ function CreativeSection({
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">🎨 소재 성과 분석 (TikTok)</CardTitle>
           {isAdmin && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setAddDialogOpen(true)}
-              disabled={widgets.length >= 10}
-            >
-              + 리스트 추가
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => reportId && repairMutation.mutate({ id: reportId, section: 'tiktok' })}
+                disabled={!reportId || repairMutation.isPending}
+              >
+                {repairMutation.isPending ? '복구 중...' : '🔧 썸네일 복구'}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setAddDialogOpen(true)}
+                disabled={widgets.length >= 10}
+              >
+                + 리스트 추가
+              </Button>
+            </div>
           )}
         </div>
       </CardHeader>
@@ -955,8 +972,10 @@ function GmvMaxItemCard({
   rank: number
   rankBy: string
 }) {
+  const [imgError, setImgError] = useState(false)
+
   const thumbSrc = item.thumbnail_url
-    ? item.thumbnail_url.includes('ibyteimg.com') || item.thumbnail_url.includes('tiktokcdn.com')
+    ? item.thumbnail_url.includes('ibyteimg.com') || item.thumbnail_url.includes('tiktokcdn')
       ? `/api/proxy/image?url=${encodeURIComponent(item.thumbnail_url)}`
       : item.thumbnail_url
     : null
@@ -966,12 +985,13 @@ function GmvMaxItemCard({
   return (
     <Card className="overflow-hidden">
       <div className="relative w-full overflow-hidden bg-gray-100" style={{ paddingBottom: '100%' }}>
-        {thumbSrc ? (
+        {thumbSrc && !imgError ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={thumbSrc}
             alt={item.item_id}
             className="absolute inset-0 h-full w-full object-cover"
+            onError={() => setImgError(true)}
           />
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-muted-foreground">
@@ -1026,14 +1046,17 @@ function GmvMaxCreativeSection({
   widgets,
   onWidgetsChange,
   isAdmin,
+  reportId,
 }: {
   items: GmvMaxItemRow[]
   widgets: CreativeWidgetConfig[]
   onWidgetsChange: (widgets: CreativeWidgetConfig[]) => void
   isAdmin: boolean
+  reportId?: string
 }) {
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [editingWidget, setEditingWidget] = useState<CreativeWidgetConfig | undefined>()
+  const repairMutation = useRepairThumbnails()
 
   if (items.length === 0) {
     return (
@@ -1069,14 +1092,24 @@ function GmvMaxCreativeSection({
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">🎨 소재 성과 분석 (GMV Max)</CardTitle>
           {isAdmin && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setAddDialogOpen(true)}
-              disabled={widgets.length >= 10}
-            >
-              + 리스트 추가
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => reportId && repairMutation.mutate({ id: reportId, section: 'gmvmax' })}
+                disabled={!reportId || repairMutation.isPending}
+              >
+                {repairMutation.isPending ? '복구 중...' : '🔧 썸네일 복구'}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setAddDialogOpen(true)}
+                disabled={widgets.length >= 10}
+              >
+                + 리스트 추가
+              </Button>
+            </div>
           )}
         </div>
       </CardHeader>
@@ -1311,6 +1344,7 @@ export function TiktokReportDetail({
           widgets={tiktokCreativeWidgets}
           onWidgetsChange={handleTiktokCreativeWidgetsChange}
           isAdmin={isAdmin}
+          reportId={reportId}
         />
         <InsightMemoCard
           reportId={reportId}
@@ -1354,11 +1388,12 @@ export function TiktokReportDetail({
             onFilterClick={isAdmin && adgroupItems.length > 0 ? () => setAdgroupDialogOpen(true) : undefined}
           />
           <CreativeSection
-          ads={ads}
-          widgets={tiktokCreativeWidgets}
-          onWidgetsChange={handleTiktokCreativeWidgetsChange}
-          isAdmin={isAdmin}
-        />
+            ads={ads}
+            widgets={tiktokCreativeWidgets}
+            onWidgetsChange={handleTiktokCreativeWidgetsChange}
+            isAdmin={isAdmin}
+            reportId={reportId}
+          />
           <InsightMemoCard
             reportId={reportId}
             initialContent={insightMemo}
@@ -1384,6 +1419,7 @@ export function TiktokReportDetail({
             widgets={gmvmaxCreativeWidgets}
             onWidgetsChange={handleGmvmaxCreativeWidgetsChange}
             isAdmin={isAdmin}
+            reportId={reportId}
           />
           <InsightMemoCard
             reportId={reportId}

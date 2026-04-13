@@ -691,6 +691,8 @@ export type MetaCreativeData = {
   purchases: number | null
   add_to_cart: number | null
   add_to_cart_value: number | null
+  impressions: number | null
+  ctr: number | null
   cpc: number | null
   clicks: number | null
 }

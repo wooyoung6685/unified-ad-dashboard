@@ -27,7 +27,8 @@ export const fmtUSD = (v: number | null) =>
 
 // 지표 포맷 타입별 공용 포맷 함수
 export function formatMetricValue(v: number | null, format: 'krw' | 'pct' | 'num'): string {
-  if (format === 'krw') return fmtKRW(v)
-  if (format === 'pct') return fmtPct(v)
-  return fmtNum(v)
+  const val = v ?? 0
+  if (format === 'krw') return fmtKRW(val)
+  if (format === 'pct') return fmtPct(val)
+  return fmtNum(val)
 }
