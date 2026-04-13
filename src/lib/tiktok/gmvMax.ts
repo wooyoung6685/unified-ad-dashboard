@@ -203,7 +203,7 @@ export async function fetchGmvMaxCampaignReport(params: {
 // 3단계 드릴다운: campaign_id → item_group_id → item_id
 // item_id는 TikTok 영상 ID (item_id="-1"은 오가닉 전환으로 제외)
 
-async function fetchOembedData(itemId: string): Promise<{ thumbnail_url: string | null; title: string | null }> {
+export async function fetchOembedData(itemId: string): Promise<{ thumbnail_url: string | null; title: string | null }> {
   try {
     const url = `https://www.tiktok.com/oembed?url=https://www.tiktok.com/video/${itemId}`
     const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } })
