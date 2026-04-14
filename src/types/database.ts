@@ -335,11 +335,66 @@ export type AmazonAsinStat = {
   created_at: string
 }
 
+// ── Qoo10 ────────────────────────────────────
+
+export type Qoo10Account = {
+  id: string
+  brand_id: string
+  account_id: string        // 브랜드명 입력
+  account_name: string
+  account_type: 'ads' | 'organic'
+  country: string | null
+  is_active: boolean
+  created_at: string
+}
+
+export type Qoo10AdsStat = {
+  id: string
+  qoo10_account_id: string
+  brand_id: string
+  date: string
+  product_name: string | null
+  product_code: string | null
+  ad_name: string | null
+  cost: number | null
+  sales: number | null
+  roas: number | null
+  impressions: number | null
+  clicks: number | null
+  ctr: number | null
+  carts: number | null
+  cart_conversion_rate: number | null
+  purchases: number | null
+  purchase_conversion_rate: number | null
+  created_at: string
+}
+
+export type Qoo10OrganicVisitorStat = {
+  id: string
+  qoo10_account_id: string
+  brand_id: string
+  date: string
+  visitors: number | null
+  add_to_cart: number | null
+  created_at: string
+}
+
+export type Qoo10OrganicTransactionStat = {
+  id: string
+  qoo10_account_id: string
+  brand_id: string
+  date: string
+  product_name: string | null
+  transaction_amount: number | null
+  transaction_quantity: number | null
+  created_at: string
+}
+
 // 일별 페이지 필터
 export type DailyFilters = {
   brandId: string
   accountId: string
-  accountType: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp' | 'amazon_organic' | 'amazon_ads' | 'amazon_asin'
+  accountType: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp' | 'amazon_organic' | 'amazon_ads' | 'amazon_asin' | 'qoo10_ads' | 'qoo10_organic'
   startDate: string
   endDate: string
 }
@@ -347,7 +402,7 @@ export type DailyFilters = {
 export type SummaryFilters = {
   brandId: string
   accountId: string
-  accountType: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp' | 'amazon_organic' | 'amazon_ads' | 'amazon_asin'
+  accountType: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp' | 'amazon_organic' | 'amazon_ads' | 'amazon_asin' | 'qoo10_ads' | 'qoo10_organic'
   startDate: string
   endDate: string
 }
@@ -441,7 +496,7 @@ export type AmazonCombinedTotals = {
 }
 
 export type SummaryResponse = {
-  platform: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp' | 'amazon'
+  platform: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp' | 'amazon' | 'qoo10'
   dailyData: SummaryDayData[]
   totals: SummaryTotals
   shopeeExtra?: {
@@ -528,7 +583,7 @@ export type Report = {
   id: string
   brand_id: string
   title: string
-  platform: 'meta' | 'shopee_inapp' | 'tiktok' | 'amazon'
+  platform: 'meta' | 'shopee_inapp' | 'tiktok' | 'amazon' | 'qoo10'
   country: string | null
   internal_account_id: string | null
   year: number
@@ -554,6 +609,7 @@ export type ReportSnapshot =
   | { platform: 'shopee_inapp'; data: ShopeeReportData }
   | { platform: 'tiktok'; data: TiktokReportData }
   | { platform: 'amazon'; data: AmazonReportData }
+  | { platform: 'qoo10'; data: Record<string, unknown> }
 
 // ── Meta ──────────────────────────────────────
 

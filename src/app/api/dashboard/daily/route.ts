@@ -2,7 +2,7 @@ import { fetchGmvMaxDailyReport } from '@/lib/tiktok/gmvMax'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { getTokenForCurrentUser } from '@/lib/tokens'
-import type { AmazonAdsStat, AmazonAsinStat, AmazonOrganicStat, ShopeeInappStat, ShopeeInappDayRow, ShopeeShoppingStat } from '@/types/database'
+import type { AmazonAdsStat, AmazonAsinStat, AmazonOrganicStat, Qoo10AdsStat, Qoo10OrganicTransactionStat, Qoo10OrganicVisitorStat, ShopeeInappDayRow, ShopeeInappStat, ShopeeShoppingStat } from '@/types/database'
 import { NextRequest, NextResponse } from 'next/server'
 
 // 인앱 stats를 날짜별로 합산
@@ -398,5 +398,102 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({ platform: 'amazon', organic_rows, ads_rows, asin_rows })
+  } else if (
+    accountType === 'qoo10' ||
+    accountType === 'qoo10_ads' ||
+    accountType === 'qoo10_organic'
+  ) {
+    // 전달된 accountId로 qoo10_accounts 조회하여 외부 account_id 획득
+    const { data: refAcct } = await supabase
+      .from('qoo10_accounts')
+      .select('account_id, brand_id')
+      .eq('id', accountId)
+      .single()
+
+    if (!refAcct) return NextResponse.json({ error: '큐텐 계정을 찾을 수 없습니다.' }, { status: 404 })
+
+    const { account_id: externalAccountId, brand_id: bId } = refAcct
+
+    // 같은 account_id의 ads/organic 계정 PK 조회
+    const { data: allQoo10Accts } = await supabase
+      .from('qoo10_accounts')
+      .select('id, account_type')
+      .eq('account_id', externalAccountId)
+      .eq('brand_id', bId)
+
+    const adsIds = (allQoo10Accts ?? []).filter((a) => a.account_type === 'ads').map((a) => a.id)
+    const organicIds = (allQoo10Accts ?? []).filter((a) => a.account_type === 'organic').map((a) => a.id)
+
+    // 광고 데이터 조회
+    let ads_rows: Qoo10AdsStat[] = []
+    if (adsIds.length > 0) {
+      let adsQuery = supabase
+        .from('qoo10_ads_stats')
+        .select('*')
+        .in('qoo10_account_id', adsIds)
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: true })
+      if (brandId && brandId !== 'all') adsQuery = adsQuery.eq('brand_id', brandId)
+      const { data } = await adsQuery
+      ads_rows = (data ?? []) as Qoo10AdsStat[]
+    }
+
+    // 오가닉 유입자 데이터 조회
+    let visitor_rows: Qoo10OrganicVisitorStat[] = []
+    if (organicIds.length > 0) {
+      let visitorQuery = supabase
+        .from('qoo10_organic_visitor_stats')
+        .select('*')
+        .in('qoo10_account_id', organicIds)
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: true })
+      if (brandId && brandId !== 'all') visitorQuery = visitorQuery.eq('brand_id', brandId)
+      const { data } = await visitorQuery
+      visitor_rows = (data ?? []) as Qoo10OrganicVisitorStat[]
+    }
+
+    // 오가닉 거래 데이터 조회
+    let transaction_rows: Qoo10OrganicTransactionStat[] = []
+    if (organicIds.length > 0) {
+      let txQuery = supabase
+        .from('qoo10_organic_transaction_stats')
+        .select('*')
+        .in('qoo10_account_id', organicIds)
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: true })
+      if (brandId && brandId !== 'all') txQuery = txQuery.eq('brand_id', brandId)
+      const { data } = await txQuery
+      transaction_rows = (data ?? []) as Qoo10OrganicTransactionStat[]
+    }
+
+    // 조회 기간에 포함되는 월 키(YYYY-MM) 목록 생성
+    const monthKeys = new Set<string>()
+    const d = new Date(startDate)
+    const end = new Date(endDate)
+    while (d <= end) {
+      monthKeys.add(d.toISOString().slice(0, 7))
+      d.setMonth(d.getMonth() + 1)
+    }
+
+    // exchange_rates에서 JP 환율 조회 (관리자/공용 fallback)
+    const { data: { user: currentUser } } = await supabase.auth.getUser()
+    const { data: rateRows } = await supabase
+      .from('exchange_rates')
+      .select('year_month, rate')
+      .eq('country', 'jp')
+      .in('year_month', Array.from(monthKeys))
+      .or(`owner_user_id.eq.${currentUser?.id ?? 'null'},owner_user_id.is.null`)
+
+    const fx_rates: Record<string, number> = {}
+    for (const r of rateRows ?? []) {
+      if (r.year_month && r.rate != null) {
+        fx_rates[r.year_month] = r.rate
+      }
+    }
+
+    return NextResponse.json({ platform: 'qoo10', ads_rows, visitor_rows, transaction_rows, fx_rates })
   }
 }

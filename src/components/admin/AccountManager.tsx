@@ -3,6 +3,7 @@
 import {
   toggleAmazonAccount,
   toggleMetaAccount,
+  toggleQoo10Account,
   toggleShopeeAccount,
   toggleTiktokAccount,
 } from '@/app/dashboard/admin/actions'
@@ -40,7 +41,7 @@ import { cn } from '@/lib/utils'
 import type { Brand } from '@/types/database'
 import { useCallback, useEffect, useState } from 'react'
 
-type PlatformType = 'meta' | 'tiktok' | 'shopee' | 'amazon'
+type PlatformType = 'meta' | 'tiktok' | 'shopee' | 'amazon' | 'qoo10'
 
 interface PendingRow {
   _key: string
@@ -66,6 +67,7 @@ interface RegisteredAccount {
   store_id?: string | null  // TikTok GMV Max용 Store ID (자동 감지)
   _shopeeRowIds?: string[]  // 쇼피 통합: shopping+inapp 두 행의 DB PK
   _amazonRowIds?: string[]  // 아마존 통합: organic+ads+asin 세 행의 DB PK
+  _qoo10RowIds?: string[]   // 큐텐 통합: ads+organic 두 행의 DB PK
 }
 
 interface EditingValues {
@@ -84,6 +86,7 @@ const PLATFORM_LABEL: Record<PlatformType, string> = {
   tiktok: '틱톡',
   shopee: '쇼피',
   amazon: '아마존',
+  qoo10: '큐텐',
 }
 
 const COUNTRY_OPTIONS = [
@@ -107,9 +110,14 @@ function isAmazon(platform: PlatformType | ''): boolean {
   return platform === 'amazon'
 }
 
+function isQoo10(platform: PlatformType | ''): boolean {
+  return platform === 'qoo10'
+}
+
 function getApiEndpoint(platform: PlatformType): string {
   if (isShopee(platform)) return '/api/admin/accounts/shopee'
   if (isAmazon(platform)) return '/api/admin/accounts/amazon'
+  if (isQoo10(platform)) return '/api/admin/accounts/qoo10'
   return `/api/admin/accounts/${platform}`
 }
 
@@ -171,21 +179,23 @@ export function AccountManager({ brands }: AccountManagerProps) {
     (a) => a.brand_id === selectedBrandId
   )
 
-  // 마운트 시 Meta + TikTok + Shopee + Amazon 계정 병렬 로드
+  // 마운트 시 Meta + TikTok + Shopee + Amazon + Qoo10 계정 병렬 로드
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [metaRes, tiktokRes, shopeeRes, amazonRes] = await Promise.all([
+      const [metaRes, tiktokRes, shopeeRes, amazonRes, qoo10Res] = await Promise.all([
         fetch('/api/admin/accounts/meta'),
         fetch('/api/admin/accounts/tiktok'),
         fetch('/api/admin/accounts/shopee'),
         fetch('/api/admin/accounts/amazon'),
+        fetch('/api/admin/accounts/qoo10'),
       ])
-      const [metaJson, tiktokJson, shopeeJson, amazonJson] = await Promise.all([
+      const [metaJson, tiktokJson, shopeeJson, amazonJson, qoo10Json] = await Promise.all([
         metaRes.json(),
         tiktokRes.json(),
         shopeeRes.json(),
         amazonRes.json(),
+        qoo10Res.json(),
       ])
 
       const metaAccounts: RegisteredAccount[] = (metaJson.accounts ?? []).map(
@@ -264,7 +274,39 @@ export function AccountManager({ brands }: AccountManagerProps) {
         })
       }
 
-      setRegistered([...metaAccounts, ...tiktokAccounts, ...shopeeAccountsMapped, ...amazonAccountsMapped])
+      // qoo10 계정을 brand_id + account_id 기준으로 그룹핑하여 하나의 항목으로 표시
+      const qoo10ByKey = new Map<string, RawAccount[]>()
+      for (const row of qoo10Json.accounts ?? []) {
+        const key = `${row.brand_id}__${row.account_id}`
+        if (!qoo10ByKey.has(key)) qoo10ByKey.set(key, [])
+        qoo10ByKey.get(key)!.push(row)
+      }
+
+      const qoo10AccountsMapped: RegisteredAccount[] = []
+      for (const rows of qoo10ByKey.values()) {
+        // 대표 행: ads 우선, 없으면 첫 번째 행
+        const rep = rows.find((r) => r.account_type === 'ads') ?? rows[0]
+        qoo10AccountsMapped.push({
+          id: rep.id,
+          brand_id: rep.brand_id,
+          brand_name: rep.brand_name,
+          platform: 'qoo10' as PlatformType,
+          account_id: rep.account_id,
+          sub_brand: rep.sub_brand,
+          note: null,
+          country: rep.country,
+          is_active: rows.some((r) => r.is_active),
+          _qoo10RowIds: rows.map((r) => r.id),
+        })
+      }
+
+      setRegistered([
+        ...metaAccounts,
+        ...tiktokAccounts,
+        ...shopeeAccountsMapped,
+        ...amazonAccountsMapped,
+        ...qoo10AccountsMapped,
+      ])
     } finally {
       setLoading(false)
     }
@@ -357,6 +399,15 @@ export function AccountManager({ brands }: AccountManagerProps) {
       }
       return
     }
+    if (platform === 'qoo10' && externalAccountId) {
+      // qoo10: account_id 기준으로 ads+organic 두 행 모두 삭제
+      const res = await fetch(`/api/admin/accounts/qoo10?account_id=${externalAccountId}`, { method: 'DELETE' })
+      const json = await res.json()
+      if (!json.error) {
+        setRegistered((prev) => prev.filter((a) => !(a.platform === 'qoo10' && a.account_id === externalAccountId)))
+      }
+      return
+    }
     const endpoint = getApiEndpoint(platform)
     const res = await fetch(`${endpoint}?id=${id}`, { method: 'DELETE' })
     const json = await res.json()
@@ -411,6 +462,10 @@ export function AccountManager({ brands }: AccountManagerProps) {
       // amazon: 연결된 모든 행(organic+ads+asin) 토글
       const ids = account._amazonRowIds ?? [account.id]
       await Promise.all(ids.map((rid) => toggleAmazonAccount(rid, !account.is_active)))
+    } else if (account.platform === 'qoo10') {
+      // qoo10: 연결된 모든 행(ads+organic) 토글
+      const ids = account._qoo10RowIds ?? [account.id]
+      await Promise.all(ids.map((rid) => toggleQoo10Account(rid, !account.is_active)))
     } else {
       // shopee: 연결된 모든 행(shopping+inapp) 토글
       const ids = account._shopeeRowIds ?? [account.id]
@@ -514,6 +569,7 @@ export function AccountManager({ brands }: AccountManagerProps) {
                           <SelectItem value="tiktok">틱톡</SelectItem>
                           <SelectItem value="shopee">쇼피</SelectItem>
                           <SelectItem value="amazon">아마존</SelectItem>
+                          <SelectItem value="qoo10">큐텐</SelectItem>
                         </SelectContent>
                       </Select>
                     </TableCell>
@@ -538,7 +594,7 @@ export function AccountManager({ brands }: AccountManagerProps) {
                     <TableCell>
                       <Input
                         className="w-44"
-                        placeholder="act_xxxxxxxx"
+                        placeholder={row.platform === 'qoo10' ? '브랜드명을 입력하세요' : 'act_xxxxxxxx'}
                         value={row.account_id}
                         onChange={(e) =>
                           updatePending(row._key, {
@@ -748,7 +804,9 @@ export function AccountManager({ brands }: AccountManagerProps) {
                                     id: account.id,
                                     platform: account.platform,
                                     externalAccountId:
-                                      account.platform === 'shopee' || account.platform === 'amazon'
+                                      account.platform === 'shopee' ||
+                                      account.platform === 'amazon' ||
+                                      account.platform === 'qoo10'
                                         ? account.account_id
                                         : undefined,
                                   })

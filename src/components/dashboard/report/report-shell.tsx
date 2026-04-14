@@ -93,7 +93,7 @@ function prevMonth() {
 
 // ── 플랫폼 뱃지 ──────────────────────────────
 
-function PlatformBadge({ platform }: { platform: 'meta' | 'shopee' | 'shopee_inapp' | 'tiktok' | 'amazon' }) {
+function PlatformBadge({ platform }: { platform: 'meta' | 'shopee' | 'shopee_inapp' | 'tiktok' | 'amazon' | 'qoo10' }) {
   if (platform === 'meta') {
     return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">META</Badge>
   }
@@ -102,6 +102,9 @@ function PlatformBadge({ platform }: { platform: 'meta' | 'shopee' | 'shopee_ina
   }
   if (platform === 'amazon') {
     return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">AMAZON</Badge>
+  }
+  if (platform === 'qoo10') {
+    return <Badge className="bg-red-100 text-red-700 hover:bg-red-100">QOO10</Badge>
   }
   return <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100">SHOPEE</Badge>
 }
