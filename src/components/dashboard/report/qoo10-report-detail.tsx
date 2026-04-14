@@ -42,7 +42,26 @@ function calcChange(curr: number | null, prev: number | null): number | null {
   return ((curr - prev) / Math.abs(prev)) * 100
 }
 
-function DeltaBadge({
+// 광고 ROAS 포매터 — 이미지와 동일하게 배수(ratio)를 퍼센트(%)로 표기
+const fmtRoasPct = (v: number | null) =>
+  v == null ? '-' : `${(v * 100).toFixed(2)}%`
+
+// 전월 날짜 범위 계산 ("2026-02-01 ~ 2026-02-28" → "2026-01-01 ~ 2026-01-31")
+function getPrevDateRange(current: string): string {
+  const match = current.match(/(\d{4})-(\d{2})-(\d{2})\s*~\s*(\d{4})-(\d{2})-(\d{2})/)
+  if (!match) return '-'
+  const startYear = parseInt(match[1], 10)
+  const startMonth = parseInt(match[2], 10)
+  // 전월로 이동 (JS Date month는 0-indexed)
+  const prevStart = new Date(startYear, startMonth - 2, 1)
+  const prevEnd = new Date(startYear, startMonth - 1, 0) // 전월의 말일
+  const fmt = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return `${fmt(prevStart)} ~ ${fmt(prevEnd)}`
+}
+
+// 성장률 셀 — 색상(증가가 좋으면 양수 파랑 / 음수 빨강, 반대면 그 반대)
+function GrowthCell({
   curr,
   prev,
   goodUp = true,
@@ -52,79 +71,133 @@ function DeltaBadge({
   goodUp?: boolean
 }) {
   const pct = calcChange(curr, prev)
-  if (pct == null) return <span className="text-xs text-muted-foreground">-</span>
+  if (pct == null) return <span className="text-muted-foreground">-</span>
   const up = pct >= 0
   const isGood = goodUp ? up : !up
+  const colorClass = isGood ? 'text-blue-600' : 'text-red-500'
   return (
-    <span className={`text-xs font-medium ${isGood ? 'text-green-600' : 'text-red-500'}`}>
-      {up ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}%
+    <span className={`font-medium ${colorClass}`}>
+      {up ? '' : '-'}
+      {Math.abs(pct).toFixed(0)}%
     </span>
   )
 }
 
-function KpiCard({
-  label,
-  curr,
-  prev,
-  fmt,
-  goodUp = true,
-}: {
-  label: string
-  curr: number | null
-  prev: number | null
-  fmt: (v: number | null) => string
-  goodUp?: boolean
-}) {
-  return (
-    <Card>
-      <CardContent className="px-4 pb-3 pt-4">
-        <p className="mb-1 text-xs text-muted-foreground">{label}</p>
-        <p className="text-xl font-bold leading-tight">{fmt(curr)}</p>
-        <div className="mt-1 flex flex-wrap items-center gap-1.5">
-          <span className="text-xs text-muted-foreground">전월: {fmt(prev)}</span>
-          <DeltaBadge curr={curr} prev={prev} goodUp={goodUp} />
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
+// ── 월간 요약 테이블 ──────────────────────────────
 
-// ── 월간 KPI ─────────────────────────────────────
+function MonthlyTable({ m }: { m: Qoo10MonthlyData }) {
+  const prevDateRange = getPrevDateRange(m.date_range)
 
-function MonthlyKpi({ m }: { m: Qoo10MonthlyData }) {
+  // 각 컬럼 정의: { label, curr, prev, fmt, goodUp }
+  const qoo10Cols = [
+    { label: '전체 매출', curr: m.revenue, prev: m.prev_revenue, fmt: fmtJPY, goodUp: true },
+    { label: '구매수', curr: m.purchases, prev: m.prev_purchases, fmt: fmtNum, goodUp: true },
+    { label: '전체 세션수', curr: m.sessions, prev: m.prev_sessions, fmt: fmtNum, goodUp: true },
+    { label: '구매전환율', curr: m.conversion_rate, prev: m.prev_conversion_rate, fmt: fmtPct, goodUp: true },
+    { label: 'AOV', curr: m.aov, prev: m.prev_aov, fmt: fmtJPY, goodUp: true },
+  ]
+
+  const adsCols = [
+    { label: '광고매출', curr: m.ad_sales, prev: m.prev_ad_sales, fmt: fmtJPY, goodUp: true },
+    { label: '광고비', curr: m.ad_cost, prev: m.prev_ad_cost, fmt: fmtJPY, goodUp: false },
+    { label: '광고 ROAS', curr: m.roas, prev: m.prev_roas, fmt: fmtRoasPct, goodUp: true },
+    { label: '노출수', curr: m.impressions, prev: m.prev_impressions, fmt: fmtNum, goodUp: true },
+    { label: '클릭수', curr: m.clicks, prev: m.prev_clicks, fmt: fmtNum, goodUp: true },
+    { label: 'CTR', curr: m.ctr, prev: m.prev_ctr, fmt: fmtPct, goodUp: true },
+    { label: 'CPC', curr: m.cpc, prev: m.prev_cpc, fmt: fmtJPY, goodUp: false },
+  ]
+
+  const allCols = [...qoo10Cols, ...adsCols]
+
   return (
     <section>
-      <h2 className="mb-3 text-base font-semibold">■ Qoo10_DATA (월간 요약)</h2>
-      <p className="mb-3 text-sm text-muted-foreground">{m.date_range}</p>
-
-      {/* 전체 지표 */}
-      <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">전체 (오가닉)</p>
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <KpiCard label="전체 매출" curr={m.revenue} prev={m.prev_revenue} fmt={fmtJPY} />
-        <KpiCard label="구매수" curr={m.purchases} prev={m.prev_purchases} fmt={fmtNum} />
-        <KpiCard label="전체 세션수" curr={m.sessions} prev={m.prev_sessions} fmt={fmtNum} />
-        <KpiCard label="구매전환율" curr={m.conversion_rate} prev={m.prev_conversion_rate} fmt={fmtPct} />
-        <KpiCard label="AOV" curr={m.aov} prev={m.prev_aov} fmt={fmtJPY} />
-      </div>
-
-      {/* 내부광고 지표 */}
-      <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">내부 광고</p>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        <KpiCard label="광고 매출" curr={m.ad_sales} prev={m.prev_ad_sales} fmt={fmtJPY} />
-        <KpiCard label="전체 광고비" curr={m.ad_cost} prev={m.prev_ad_cost} fmt={fmtJPY} goodUp={false} />
-        <KpiCard label="광고 ROAS" curr={m.roas} prev={m.prev_roas} fmt={(v) => v == null ? '-' : `${v.toFixed(2)}x`} />
-        <KpiCard label="노출수" curr={m.impressions} prev={m.prev_impressions} fmt={fmtNum} />
-        <KpiCard label="클릭수" curr={m.clicks} prev={m.prev_clicks} fmt={fmtNum} />
-        <KpiCard label="CTR" curr={m.ctr} prev={m.prev_ctr} fmt={fmtPct} />
-        <KpiCard label="CPC" curr={m.cpc} prev={m.prev_cpc} fmt={fmtJPY} goodUp={false} />
+      <h2 className="mb-3 text-base font-semibold">■ Qoo10_DATA</h2>
+      <div className="overflow-x-auto rounded-lg border">
+        <Table>
+          <TableHeader>
+            {/* 그룹 헤더 행 */}
+            <TableRow className="bg-muted/50">
+              <TableHead rowSpan={2} className="whitespace-nowrap align-middle border-r">
+                날짜범위
+              </TableHead>
+              <TableHead
+                colSpan={qoo10Cols.length}
+                className="text-center font-semibold border-r"
+              >
+                Qoo10
+              </TableHead>
+              <TableHead colSpan={adsCols.length} className="text-center font-semibold">
+                내부광고
+              </TableHead>
+            </TableRow>
+            {/* 컬럼명 행 */}
+            <TableRow className="bg-muted/30">
+              {qoo10Cols.map((c, i) => (
+                <TableHead
+                  key={`q-${c.label}`}
+                  className={`text-right whitespace-nowrap ${i === qoo10Cols.length - 1 ? 'border-r' : ''}`}
+                >
+                  {c.label}
+                </TableHead>
+              ))}
+              {adsCols.map((c) => (
+                <TableHead key={`a-${c.label}`} className="text-right whitespace-nowrap">
+                  {c.label}
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {/* 당월 데이터 행 */}
+            <TableRow>
+              <TableCell className="whitespace-nowrap text-xs text-muted-foreground border-r">
+                {m.date_range}
+              </TableCell>
+              {allCols.map((c, i) => (
+                <TableCell
+                  key={`curr-${c.label}`}
+                  className={`text-right font-medium ${i === qoo10Cols.length - 1 ? 'border-r' : ''}`}
+                >
+                  {c.fmt(c.curr)}
+                </TableCell>
+              ))}
+            </TableRow>
+            {/* 전월 데이터 행 */}
+            <TableRow>
+              <TableCell className="whitespace-nowrap text-xs text-muted-foreground border-r">
+                {prevDateRange}
+              </TableCell>
+              {allCols.map((c, i) => (
+                <TableCell
+                  key={`prev-${c.label}`}
+                  className={`text-right text-muted-foreground ${i === qoo10Cols.length - 1 ? 'border-r' : ''}`}
+                >
+                  {c.fmt(c.prev)}
+                </TableCell>
+              ))}
+            </TableRow>
+            {/* 전월 대비 성장률 행 */}
+            <TableRow className="bg-muted/20">
+              <TableCell className="whitespace-nowrap text-xs font-medium border-r">
+                전월 대비 성장률
+              </TableCell>
+              {allCols.map((c, i) => (
+                <TableCell
+                  key={`growth-${c.label}`}
+                  className={`text-right ${i === qoo10Cols.length - 1 ? 'border-r' : ''}`}
+                >
+                  <GrowthCell curr={c.curr} prev={c.prev} goodUp={c.goodUp} />
+                </TableCell>
+              ))}
+            </TableRow>
+          </TableBody>
+        </Table>
       </div>
     </section>
   )
 }
 
 // ── 주간 차트 ──────────────────────────────────────
-
-const WEEK_LABELS = ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5']
 
 function WeeklyCharts({ weekly }: { weekly: Qoo10WeeklyData[] }) {
   const data = weekly.map((w) => ({
@@ -469,7 +542,7 @@ export function Qoo10ReportDetail({ data, title }: Props) {
       </Card>
 
       {/* 월간 KPI 요약 */}
-      <MonthlyKpi m={monthly} />
+      <MonthlyTable m={monthly} />
 
       {/* 주간 차트 */}
       {weekly.length > 0 && <WeeklyCharts weekly={weekly} />}
