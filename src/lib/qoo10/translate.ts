@@ -45,21 +45,53 @@ export async function translateJaToKo(texts: string[]): Promise<Map<string, stri
     return result
   }
 
-  // 항목별 번역 (개별 실패 시 원문 fallback)
+  // 항목별 번역 — 구글 무료 엔드포인트 rate limit 대응:
+  //   1) 순차 처리 + 요청 간 delay (429 예방)
+  //   2) 429/네트워크 오류 시 지수 backoff 재시도 (최대 3회)
+  //   3) 최종 실패 시에만 원문 fallback
   const toUpsert: { source_text: string; translated_text: string }[] = []
 
-  await Promise.all(
-    missing.map(async (text) => {
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+  const isRateLimit = (err: unknown): boolean => {
+    if (!err || typeof err !== 'object') return false
+    const status = (err as { status?: number; statusCode?: number }).status
+      ?? (err as { statusCode?: number }).statusCode
+    return status === 429
+  }
+
+  for (const text of missing) {
+    let translated: string | null = null
+    for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const { text: translated } = await translate!(text, { from: 'ja', to: 'ko' })
-        result.set(text, translated)
-        toUpsert.push({ source_text: text, translated_text: translated })
+        const res = await translate!(text, { from: 'ja', to: 'ko' })
+        translated = res.text
+        break
       } catch (err) {
-        console.error(`[qoo10/translate] 번역 실패: "${text}"`, err)
-        result.set(text, text) // 원문 fallback
+        const rateLimited = isRateLimit(err)
+        // 마지막 시도면 루프 종료 → fallback
+        if (attempt === 2) {
+          console.error(
+            `[qoo10/translate] 번역 최종 실패 (${rateLimited ? '429' : 'error'}): "${text}"`,
+            err,
+          )
+          break
+        }
+        // 재시도 전 backoff: 429는 더 길게 (1s → 2s → 4s), 그 외는 짧게 (0.3s → 0.6s)
+        const backoffMs = rateLimited ? 1000 * Math.pow(2, attempt) : 300 * (attempt + 1)
+        await sleep(backoffMs)
       }
-    })
-  )
+    }
+
+    if (translated != null) {
+      result.set(text, translated)
+      toUpsert.push({ source_text: text, translated_text: translated })
+    } else {
+      result.set(text, text) // 원문 fallback
+    }
+
+    // 다음 요청까지 기본 delay (rate limit 예방) — 캐시 미스 건수만큼만 발생
+    await sleep(250)
+  }
 
   // 3) 성공분 캐시 upsert
   if (toUpsert.length > 0) {
