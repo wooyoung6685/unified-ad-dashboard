@@ -68,7 +68,7 @@ export function Qoo10OrganicProductTable({ rows, extra }: Props) {
               <TableRow key={r.product_name}>
                 <TableCell className="text-center text-muted-foreground">{i + 1}</TableCell>
                 <TableCell className="max-w-64 truncate" title={r.product_name}>
-                  {r.product_name}
+                  {r.product_name_ko || r.product_name}
                 </TableCell>
                 <TableCell className="text-right">{fmtJPY(r.transaction_amount_jpy)}</TableCell>
                 {hasKrw && <TableCell className="text-right">{fmtKRW(r.transaction_amount_krw)}</TableCell>}

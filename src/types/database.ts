@@ -567,6 +567,7 @@ export type Qoo10AdTypeRow = {
 export type Qoo10AdsProductRow = {
   product_code: string
   product_name: string
+  product_name_ko?: string | null  // 번역된 한국어 상품명
   cost: number | null
   sales: number | null
   roas: number | null
@@ -578,6 +579,7 @@ export type Qoo10AdsProductRow = {
 // 상품별 오가닉 매출 TOP 10
 export type Qoo10OrganicProductRow = {
   product_name: string
+  product_name_ko?: string | null  // 번역된 한국어 상품명
   transaction_amount_jpy: number | null
   transaction_amount_krw: number | null
   transaction_quantity: number | null

@@ -56,7 +56,7 @@ export function Qoo10AdsProductTable({ rows, extra }: Props) {
                 <TableCell className="text-center text-muted-foreground">{i + 1}</TableCell>
                 <TableCell className="font-mono text-xs">{r.product_code}</TableCell>
                 <TableCell className="max-w-48 truncate" title={r.product_name}>
-                  {r.product_name || '-'}
+                  {r.product_name_ko || r.product_name || '-'}
                 </TableCell>
                 <TableCell className="text-right">{fmtJPY(r.cost)}</TableCell>
                 {hasKrw && <TableCell className="text-right">{fmtKRW(r.cost_krw)}</TableCell>}

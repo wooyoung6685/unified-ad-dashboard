@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { preprocessQoo10Name, translateJaToKo } from '@/lib/qoo10/translate'
 import type {
   AmazonAdsSummaryDayData,
   AmazonAdsSummaryTotals,
@@ -1151,6 +1152,24 @@ export async function GET(req: NextRequest) {
           sales_krw: hasKrw ? toKrw(v.sales, repDate) : null,
         }
       })
+
+    // ── 상품명 JP → KO 번역 ─────────────────────────────────────────────
+    // 두 breakdown의 product_name을 합쳐 전처리 후 일괄 번역 (Supabase 캐시 활용)
+    const allProductNames = [
+      ...qoo10OrganicProductBreakdown.map((r) => r.product_name),
+      ...qoo10AdsProductBreakdown.map((r) => r.product_name),
+    ]
+    const uniquePreprocessed = [...new Set(allProductNames.map(preprocessQoo10Name))].filter(Boolean)
+    const translationMap = await translateJaToKo(uniquePreprocessed)
+
+    for (const row of qoo10OrganicProductBreakdown) {
+      const pre = preprocessQoo10Name(row.product_name)
+      row.product_name_ko = (translationMap.get(pre) ?? pre) || null
+    }
+    for (const row of qoo10AdsProductBreakdown) {
+      const pre = preprocessQoo10Name(row.product_name)
+      row.product_name_ko = (translationMap.get(pre) ?? pre) || null
+    }
 
     // ── 통합 지표 계산 ─────────────────────────────────────────────────
     const totalSalesJpy = (orgSumAmount || 0) + (adsSum.sales || 0) || null
