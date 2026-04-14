@@ -22,6 +22,16 @@ import { TiktokAnalyticsCharts } from './tiktok-analytics-charts'
 import { KpiSection } from './kpi-section'
 import { SummaryChart } from './summary-chart'
 import { SummaryFilterBar } from './summary-filter-bar'
+import { Qoo10CombinedKpi } from './qoo10-combined-kpi'
+import { Qoo10OrganicKpiSection } from './qoo10-organic-kpi-section'
+import { Qoo10OrganicSummaryChart } from './qoo10-organic-summary-chart'
+import { Qoo10OrganicProductTable } from './qoo10-organic-product-table'
+import { Qoo10OrganicAnalyticsCharts } from './qoo10-organic-analytics-charts'
+import { Qoo10AdsKpiSection } from './qoo10-ads-kpi-section'
+import { Qoo10AdsSummaryChart } from './qoo10-ads-summary-chart'
+import { Qoo10AdTypeTable } from './qoo10-ad-type-table'
+import { Qoo10AdsProductTable } from './qoo10-ads-product-table'
+import { Qoo10AdsAnalyticsCharts } from './qoo10-ads-analytics-charts'
 
 async function fetchSummaryStats(filters: SummaryFilters): Promise<SummaryResponse> {
   const params = new URLSearchParams({
@@ -37,7 +47,7 @@ async function fetchSummaryStats(filters: SummaryFilters): Promise<SummaryRespon
 }
 
 export function SummaryShell() {
-  const { role, initialBrandId, brands, metaAccounts, tiktokAccounts, shopeeAccounts, amazonAccounts } =
+  const { role, initialBrandId, brands, metaAccounts, tiktokAccounts, shopeeAccounts, amazonAccounts, qoo10Accounts } =
     useDashboardData()
   const today = new Date().toISOString().slice(0, 10)
 
@@ -56,7 +66,7 @@ export function SummaryShell() {
     'roas',
   ])
 
-  // Amazon 광고 선택 지표
+  // Amazon / Qoo10 광고 선택 지표
   const [selectedAdsMetrics, setSelectedAdsMetrics] = useState<string[]>(['cost', 'sales', 'acos'])
 
   const [activeTab, setActiveTab] = useState<'campaign' | 'gmv_max'>('gmv_max')
@@ -82,10 +92,15 @@ export function SummaryShell() {
             ? ['spend', 'impressions']
             : (newFilters.accountType === 'amazon_organic' || newFilters.accountType === 'amazon_ads' || newFilters.accountType === 'amazon_asin')
               ? ['revenue', 'purchases']
-              : ['spend', 'revenue', 'roas']
+              : (newFilters.accountType === 'qoo10_ads' || newFilters.accountType === 'qoo10_organic')
+                ? []
+                : ['spend', 'revenue', 'roas']
       setSelectedMetrics(defaultMetrics)
       if (newFilters.accountType === 'amazon_organic' || newFilters.accountType === 'amazon_ads' || newFilters.accountType === 'amazon_asin') {
         setSelectedAdsMetrics(['cost', 'sales', 'acos'])
+      }
+      if (newFilters.accountType === 'qoo10_ads' || newFilters.accountType === 'qoo10_organic') {
+        setSelectedAdsMetrics(['cost', 'sales', 'roas'])
       }
       setActiveTab(newFilters.accountType === 'tiktok' ? 'campaign' : 'gmv_max')
     }
@@ -136,6 +151,7 @@ export function SummaryShell() {
         tiktokAccounts={tiktokAccounts}
         shopeeAccounts={shopeeAccounts}
         amazonAccounts={amazonAccounts}
+        qoo10Accounts={qoo10Accounts}
         isFetching={isFetching}
         onChange={handleFiltersChange}
         onSearch={handleSearch}
@@ -367,6 +383,81 @@ export function SummaryShell() {
                   </div>
                 </div>
                 <AmazonAdsAnalyticsCharts data={data.adsDailyData ?? []} />
+              </div>
+            </div>
+          )}
+        </>
+      ) : (filters.accountType === 'qoo10_ads' || filters.accountType === 'qoo10_organic') ? (
+        <>
+          {/* 큐텐: 통합 KPI + 오가닉 + 광고 섹션 */}
+          {!data && !isFetching && (
+            <div className="text-muted-foreground rounded-lg border py-12 text-center text-sm">
+              계정을 선택하고 조회하기 버튼을 눌러주세요
+            </div>
+          )}
+
+          {data && data.platform === 'qoo10' && (
+            <div className="space-y-8">
+              {/* 1. 통합 핵심 지표 */}
+              <Qoo10CombinedKpi
+                totals={data.qoo10CombinedTotals ?? null}
+                extra={data.qoo10Extra}
+                isLoading={isFetching}
+              />
+
+              {/* 2. 오가닉 섹션 */}
+              <div className="space-y-6">
+                <h2 className="text-base font-semibold">🛒 오가닉 (Organic)</h2>
+                <Qoo10OrganicKpiSection
+                  totals={data.qoo10OrganicTotals ?? null}
+                  extra={data.qoo10Extra}
+                  isLoading={isFetching}
+                />
+                <div className="space-y-2">
+                  <h3 className="text-muted-foreground text-xs font-semibold uppercase tracking-widest">
+                    일별 추이 (거래금액 & 유입자수)
+                  </h3>
+                  <div className="bg-card rounded-lg border p-4">
+                    <Qoo10OrganicSummaryChart data={data.qoo10OrganicDailyData ?? []} />
+                  </div>
+                </div>
+                <Qoo10OrganicProductTable
+                  rows={data.qoo10OrganicProductBreakdown ?? []}
+                  extra={data.qoo10Extra}
+                />
+                <Qoo10OrganicAnalyticsCharts data={data.qoo10OrganicDailyData ?? []} />
+              </div>
+
+              {/* 3. 광고 섹션 */}
+              <div className="space-y-6">
+                <h2 className="text-base font-semibold">📢 광고 (Internal Ads)</h2>
+                <Qoo10AdsKpiSection
+                  totals={data.qoo10AdsTotals ?? null}
+                  selectedMetrics={selectedAdsMetrics}
+                  onSelect={handleAdsMetricSelect}
+                  isLoading={isFetching}
+                  extra={data.qoo10Extra}
+                />
+                <div className="space-y-2">
+                  <h3 className="text-muted-foreground text-xs font-semibold uppercase tracking-widest">
+                    일별 추이
+                  </h3>
+                  <div className="bg-card rounded-lg border p-4">
+                    <Qoo10AdsSummaryChart
+                      data={data.qoo10AdsDailyData ?? []}
+                      selectedMetrics={selectedAdsMetrics}
+                    />
+                  </div>
+                </div>
+                <Qoo10AdTypeTable
+                  rows={data.qoo10AdTypeBreakdown ?? []}
+                  extra={data.qoo10Extra}
+                />
+                <Qoo10AdsProductTable
+                  rows={data.qoo10AdsProductBreakdown ?? []}
+                  extra={data.qoo10Extra}
+                />
+                <Qoo10AdsAnalyticsCharts data={data.qoo10AdsDailyData ?? []} />
               </div>
             </div>
           )}

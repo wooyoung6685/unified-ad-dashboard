@@ -495,6 +495,95 @@ export type AmazonCombinedTotals = {
   total_sessions: number | null
 }
 
+// ── Qoo10 Dashboard ──────────────────────────
+
+// 광고 요약 일별 데이터
+export type Qoo10AdsSummaryDayData = {
+  date: string
+  cost: number | null
+  sales: number | null
+  impressions: number | null
+  clicks: number | null
+  ctr: number | null
+  carts: number | null
+  cart_conversion_rate: number | null
+  purchases: number | null
+  purchase_conversion_rate: number | null
+  roas: number | null
+  cpc: number | null
+  cost_per_purchase: number | null
+  // KRW 환산
+  cost_krw: number | null
+  sales_krw: number | null
+}
+
+export type Qoo10AdsSummaryTotals = Omit<Qoo10AdsSummaryDayData, 'date'>
+
+// 오가닉 요약 일별 데이터
+export type Qoo10OrganicSummaryDayData = {
+  date: string
+  visitors: number | null
+  add_to_cart: number | null
+  transaction_amount_jpy: number | null
+  transaction_amount_krw: number | null
+  transaction_quantity: number | null
+  aov_jpy: number | null
+  conversion_rate: number | null
+  cart_to_purchase_rate: number | null
+}
+
+export type Qoo10OrganicSummaryTotals = Omit<Qoo10OrganicSummaryDayData, 'date'>
+
+// 통합 핵심 지표
+export type Qoo10CombinedTotals = {
+  total_sales_jpy: number | null
+  total_sales_krw: number | null
+  total_quantity: number | null
+  total_visitors: number | null
+  overall_conversion_rate: number | null
+  ad_cost_jpy: number | null
+  ad_cost_krw: number | null
+  overall_roas: number | null
+  tacos: number | null
+  ad_sales_ratio: number | null
+}
+
+// 광고유형(ad_name) 별 성과 브레이크다운
+export type Qoo10AdTypeRow = {
+  ad_name: string
+  cost: number | null
+  sales: number | null
+  roas: number | null
+  impressions: number | null
+  clicks: number | null
+  ctr: number | null
+  purchases: number | null
+  purchase_conversion_rate: number | null
+  cost_krw: number | null
+  sales_krw: number | null
+}
+
+// 상품별 광고성과 TOP 10
+export type Qoo10AdsProductRow = {
+  product_code: string
+  product_name: string
+  cost: number | null
+  sales: number | null
+  roas: number | null
+  purchases: number | null
+  cost_krw: number | null
+  sales_krw: number | null
+}
+
+// 상품별 오가닉 매출 TOP 10
+export type Qoo10OrganicProductRow = {
+  product_name: string
+  transaction_amount_jpy: number | null
+  transaction_amount_krw: number | null
+  transaction_quantity: number | null
+  aov_jpy: number | null
+}
+
 export type SummaryResponse = {
   platform: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp' | 'amazon' | 'qoo10'
   dailyData: SummaryDayData[]
@@ -518,6 +607,20 @@ export type SummaryResponse = {
   adsTotals?: AmazonAdsSummaryTotals
   combinedTotals?: AmazonCombinedTotals
   amazonExtra?: { currency: string | null }
+  // Qoo10 광고/오가닉 분리 데이터
+  qoo10AdsDailyData?: Qoo10AdsSummaryDayData[]
+  qoo10AdsTotals?: Qoo10AdsSummaryTotals
+  qoo10OrganicDailyData?: Qoo10OrganicSummaryDayData[]
+  qoo10OrganicTotals?: Qoo10OrganicSummaryTotals
+  qoo10CombinedTotals?: Qoo10CombinedTotals
+  qoo10AdTypeBreakdown?: Qoo10AdTypeRow[]
+  qoo10AdsProductBreakdown?: Qoo10AdsProductRow[]
+  qoo10OrganicProductBreakdown?: Qoo10OrganicProductRow[]
+  qoo10Extra?: {
+    fxRates: Record<string, number>
+    hasKrw: boolean
+    appliedRate: number | null
+  }
 }
 
 export type ExchangeRate = {

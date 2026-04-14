@@ -1,5 +1,24 @@
 import { createClient } from '@/lib/supabase/server'
-import type { AmazonAdsSummaryDayData, AmazonAdsSummaryTotals, AmazonCombinedTotals, GmvMaxSummaryDayData, GmvMaxSummaryTotals, SummaryDayData, SummaryTotals } from '@/types/database'
+import type {
+  AmazonAdsSummaryDayData,
+  AmazonAdsSummaryTotals,
+  AmazonCombinedTotals,
+  GmvMaxSummaryDayData,
+  GmvMaxSummaryTotals,
+  Qoo10AdsSummaryDayData,
+  Qoo10AdsSummaryTotals,
+  Qoo10AdTypeRow,
+  Qoo10AdsProductRow,
+  Qoo10CombinedTotals,
+  Qoo10OrganicProductRow,
+  Qoo10OrganicSummaryDayData,
+  Qoo10OrganicSummaryTotals,
+  Qoo10OrganicTransactionStat,
+  Qoo10OrganicVisitorStat,
+  Qoo10AdsStat,
+  SummaryDayData,
+  SummaryTotals,
+} from '@/types/database'
 import { NextRequest, NextResponse } from 'next/server'
 
 // 계산 지표 산출 (0으로 나누기 방지)
@@ -49,6 +68,9 @@ export async function GET(req: NextRequest) {
     | 'amazon_organic'
     | 'amazon_ads'
     | 'amazon_asin'
+    | 'qoo10_ads'
+    | 'qoo10_organic'
+    | 'qoo10'
     | null
   const startDate = searchParams.get('start_date') ?? ''
   const endDate = searchParams.get('end_date') ?? ''
@@ -799,6 +821,372 @@ export async function GET(req: NextRequest) {
       adsTotals,
       combinedTotals,
       amazonExtra: { currency },
+    })
+  } else if (
+    accountType === 'qoo10' ||
+    accountType === 'qoo10_ads' ||
+    accountType === 'qoo10_organic'
+  ) {
+    // 전달된 accountId로 qoo10_accounts 조회 → 외부 account_id 획득
+    const { data: refAcct } = await supabase
+      .from('qoo10_accounts')
+      .select('account_id, brand_id')
+      .eq('id', accountId)
+      .single()
+
+    if (!refAcct) {
+      return NextResponse.json({ error: '큐텐 계정을 찾을 수 없습니다.' }, { status: 404 })
+    }
+
+    const { account_id: externalAccountId, brand_id: bId } = refAcct
+
+    // 같은 account_id의 ads/organic 계정 PK 조회
+    const { data: allQoo10Accts } = await supabase
+      .from('qoo10_accounts')
+      .select('id, account_type')
+      .eq('account_id', externalAccountId)
+      .eq('brand_id', bId)
+
+    const adsIds = (allQoo10Accts ?? []).filter((a) => a.account_type === 'ads').map((a) => a.id)
+    const organicIds = (allQoo10Accts ?? []).filter((a) => a.account_type === 'organic').map((a) => a.id)
+
+    // ── 광고 데이터 조회 ──────────────────────────────────────────────
+    let ads_rows: Qoo10AdsStat[] = []
+    if (adsIds.length > 0) {
+      let adsQuery = supabase
+        .from('qoo10_ads_stats')
+        .select('*')
+        .in('qoo10_account_id', adsIds)
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: true })
+      if (brandId && brandId !== 'all') adsQuery = adsQuery.eq('brand_id', brandId)
+      const { data } = await adsQuery
+      ads_rows = (data ?? []) as Qoo10AdsStat[]
+    }
+
+    // ── 오가닉 유입자 데이터 조회 ─────────────────────────────────────
+    let visitor_rows: Qoo10OrganicVisitorStat[] = []
+    if (organicIds.length > 0) {
+      let visitorQuery = supabase
+        .from('qoo10_organic_visitor_stats')
+        .select('*')
+        .in('qoo10_account_id', organicIds)
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: true })
+      if (brandId && brandId !== 'all') visitorQuery = visitorQuery.eq('brand_id', brandId)
+      const { data } = await visitorQuery
+      visitor_rows = (data ?? []) as Qoo10OrganicVisitorStat[]
+    }
+
+    // ── 오가닉 거래 데이터 조회 ───────────────────────────────────────
+    let transaction_rows: Qoo10OrganicTransactionStat[] = []
+    if (organicIds.length > 0) {
+      let txQuery = supabase
+        .from('qoo10_organic_transaction_stats')
+        .select('*')
+        .in('qoo10_account_id', organicIds)
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: true })
+      if (brandId && brandId !== 'all') txQuery = txQuery.eq('brand_id', brandId)
+      const { data } = await txQuery
+      transaction_rows = (data ?? []) as Qoo10OrganicTransactionStat[]
+    }
+
+    // ── JP 환율 조회 ──────────────────────────────────────────────────
+    const monthKeys = new Set<string>()
+    const d = new Date(startDate)
+    const endD = new Date(endDate)
+    while (d <= endD) {
+      monthKeys.add(d.toISOString().slice(0, 7))
+      d.setMonth(d.getMonth() + 1)
+    }
+    const {
+      data: { user: currentUser },
+    } = await supabase.auth.getUser()
+    const { data: rateRows } = await supabase
+      .from('exchange_rates')
+      .select('year_month, rate')
+      .eq('country', 'jp')
+      .in('year_month', Array.from(monthKeys))
+      .or(`owner_user_id.eq.${currentUser?.id ?? 'null'},owner_user_id.is.null`)
+
+    const fxRates: Record<string, number> = {}
+    for (const r of rateRows ?? []) {
+      if (r.year_month && r.rate != null) {
+        fxRates[r.year_month] = r.rate
+      }
+    }
+
+    const hasKrw = monthKeys.size > 0 && Array.from(monthKeys).every((m) => fxRates[m] != null)
+    const sortedMonths = Array.from(monthKeys).sort()
+    const appliedRate = sortedMonths.length > 0 ? (fxRates[sortedMonths[sortedMonths.length - 1]] ?? null) : null
+
+    // JPY → KRW 환산 헬퍼
+    function toKrw(jpy: number, date: string): number | null {
+      const rate = fxRates[date.slice(0, 7)]
+      return rate != null ? jpy * rate : null
+    }
+
+    // ── 오가닉 집계 ───────────────────────────────────────────────────
+    // transaction_rows를 날짜별로 집계
+    const txByDate = new Map<string, { amount: number; qty: number }>()
+    for (const r of transaction_rows) {
+      const prev = txByDate.get(r.date) ?? { amount: 0, qty: 0 }
+      txByDate.set(r.date, {
+        amount: prev.amount + (r.transaction_amount ?? 0),
+        qty: prev.qty + (r.transaction_quantity ?? 0),
+      })
+    }
+
+    // visitor_rows를 날짜별로 맵핑
+    const visitorByDate = new Map<string, { visitors: number | null; cart: number | null }>()
+    for (const r of visitor_rows) {
+      visitorByDate.set(r.date, { visitors: r.visitors, cart: r.add_to_cart })
+    }
+
+    const organicDates = Array.from(
+      new Set([...txByDate.keys(), ...visitorByDate.keys()])
+    ).sort()
+
+    const qoo10OrganicDailyData: Qoo10OrganicSummaryDayData[] = organicDates.map((date) => {
+      const tx = txByDate.get(date) ?? { amount: 0, qty: 0 }
+      const vis = visitorByDate.get(date) ?? { visitors: null, cart: null }
+      const amtKrw = toKrw(tx.amount, date)
+      return {
+        date,
+        visitors: vis.visitors,
+        add_to_cart: vis.cart,
+        transaction_amount_jpy: tx.amount || null,
+        transaction_amount_krw: amtKrw,
+        transaction_quantity: tx.qty || null,
+        aov_jpy: tx.qty > 0 ? tx.amount / tx.qty : null,
+        conversion_rate: (vis.visitors ?? 0) > 0 ? (tx.qty / (vis.visitors ?? 0)) * 100 : null,
+        cart_to_purchase_rate: (vis.cart ?? 0) > 0 ? (tx.qty / (vis.cart ?? 1)) * 100 : null,
+      }
+    })
+
+    const orgSumAmount = organicDates.reduce((s, date) => s + (txByDate.get(date)?.amount ?? 0), 0)
+    const orgSumQty = organicDates.reduce((s, date) => s + (txByDate.get(date)?.qty ?? 0), 0)
+    const orgSumVisitors = organicDates.reduce((s, date) => s + (visitorByDate.get(date)?.visitors ?? 0), 0)
+    const orgSumCart = organicDates.reduce((s, date) => s + (visitorByDate.get(date)?.cart ?? 0), 0)
+    const orgSumAmtKrw = hasKrw ? organicDates.reduce((s, date) => {
+      const k = toKrw(txByDate.get(date)?.amount ?? 0, date)
+      return s + (k ?? 0)
+    }, 0) : null
+
+    const qoo10OrganicTotals: Qoo10OrganicSummaryTotals = {
+      visitors: orgSumVisitors || null,
+      add_to_cart: orgSumCart || null,
+      transaction_amount_jpy: orgSumAmount || null,
+      transaction_amount_krw: orgSumAmtKrw,
+      transaction_quantity: orgSumQty || null,
+      aov_jpy: orgSumQty > 0 ? orgSumAmount / orgSumQty : null,
+      conversion_rate: orgSumVisitors > 0 ? (orgSumQty / orgSumVisitors) * 100 : null,
+      cart_to_purchase_rate: orgSumCart > 0 ? (orgSumQty / orgSumCart) * 100 : null,
+    }
+
+    // 상품별 오가닉 매출 TOP 10 (product_name 그룹핑)
+    const organicProductMap = new Map<string, { amount: number; qty: number; dates: string[] }>()
+    for (const r of transaction_rows) {
+      const key = r.product_name ?? '(이름없음)'
+      const prev = organicProductMap.get(key) ?? { amount: 0, qty: 0, dates: [] }
+      organicProductMap.set(key, {
+        amount: prev.amount + (r.transaction_amount ?? 0),
+        qty: prev.qty + (r.transaction_quantity ?? 0),
+        dates: [...prev.dates, r.date],
+      })
+    }
+    const qoo10OrganicProductBreakdown: Qoo10OrganicProductRow[] = Array.from(organicProductMap.entries())
+      .sort(([, a], [, b]) => b.amount - a.amount)
+      .slice(0, 10)
+      .map(([product_name, v]) => {
+        // 대표 환율: 첫 날짜 사용
+        const repDate = v.dates[0] ?? startDate
+        const amtKrw = hasKrw ? toKrw(v.amount, repDate) : null
+        return {
+          product_name,
+          transaction_amount_jpy: v.amount || null,
+          transaction_amount_krw: amtKrw,
+          transaction_quantity: v.qty || null,
+          aov_jpy: v.qty > 0 ? v.amount / v.qty : null,
+        }
+      })
+
+    // ── 광고 집계 ─────────────────────────────────────────────────────
+    // 날짜별 집계
+    type AdsAgg = { cost: number; sales: number; impressions: number; clicks: number; carts: number; purchases: number }
+    const adsByDate = new Map<string, AdsAgg>()
+    for (const r of ads_rows) {
+      const prev = adsByDate.get(r.date) ?? { cost: 0, sales: 0, impressions: 0, clicks: 0, carts: 0, purchases: 0 }
+      adsByDate.set(r.date, {
+        cost: prev.cost + (r.cost ?? 0),
+        sales: prev.sales + (r.sales ?? 0),
+        impressions: prev.impressions + (r.impressions ?? 0),
+        clicks: prev.clicks + (r.clicks ?? 0),
+        carts: prev.carts + (r.carts ?? 0),
+        purchases: prev.purchases + (r.purchases ?? 0),
+      })
+    }
+
+    const adsDates = Array.from(adsByDate.keys()).sort()
+
+    const qoo10AdsDailyData: Qoo10AdsSummaryDayData[] = adsDates.map((date) => {
+      const a = adsByDate.get(date)!
+      const costKrw = toKrw(a.cost, date)
+      const salesKrw = toKrw(a.sales, date)
+      return {
+        date,
+        cost: a.cost || null,
+        sales: a.sales || null,
+        impressions: a.impressions || null,
+        clicks: a.clicks || null,
+        ctr: a.impressions > 0 ? (a.clicks / a.impressions) * 100 : null,
+        carts: a.carts || null,
+        cart_conversion_rate: a.clicks > 0 ? (a.carts / a.clicks) * 100 : null,
+        purchases: a.purchases || null,
+        purchase_conversion_rate: a.clicks > 0 ? (a.purchases / a.clicks) * 100 : null,
+        roas: a.cost > 0 ? a.sales / a.cost : null,
+        cpc: a.clicks > 0 ? a.cost / a.clicks : null,
+        cost_per_purchase: a.purchases > 0 ? a.cost / a.purchases : null,
+        cost_krw: costKrw,
+        sales_krw: salesKrw,
+      }
+    })
+
+    const adsSum = Array.from(adsByDate.values()).reduce(
+      (acc, a) => ({
+        cost: acc.cost + a.cost,
+        sales: acc.sales + a.sales,
+        impressions: acc.impressions + a.impressions,
+        clicks: acc.clicks + a.clicks,
+        carts: acc.carts + a.carts,
+        purchases: acc.purchases + a.purchases,
+      }),
+      { cost: 0, sales: 0, impressions: 0, clicks: 0, carts: 0, purchases: 0 }
+    )
+    const adsSumCostKrw = hasKrw ? adsDates.reduce((s, date) => s + (toKrw(adsByDate.get(date)!.cost, date) ?? 0), 0) : null
+    const adsSumSalesKrw = hasKrw ? adsDates.reduce((s, date) => s + (toKrw(adsByDate.get(date)!.sales, date) ?? 0), 0) : null
+
+    const qoo10AdsTotals: Qoo10AdsSummaryTotals = {
+      cost: adsSum.cost || null,
+      sales: adsSum.sales || null,
+      impressions: adsSum.impressions || null,
+      clicks: adsSum.clicks || null,
+      ctr: adsSum.impressions > 0 ? (adsSum.clicks / adsSum.impressions) * 100 : null,
+      carts: adsSum.carts || null,
+      cart_conversion_rate: adsSum.clicks > 0 ? (adsSum.carts / adsSum.clicks) * 100 : null,
+      purchases: adsSum.purchases || null,
+      purchase_conversion_rate: adsSum.clicks > 0 ? (adsSum.purchases / adsSum.clicks) * 100 : null,
+      roas: adsSum.cost > 0 ? adsSum.sales / adsSum.cost : null,
+      cpc: adsSum.clicks > 0 ? adsSum.cost / adsSum.clicks : null,
+      cost_per_purchase: adsSum.purchases > 0 ? adsSum.cost / adsSum.purchases : null,
+      cost_krw: adsSumCostKrw,
+      sales_krw: adsSumSalesKrw,
+    }
+
+    // 광고유형(ad_name)별 브레이크다운
+    type AdTypeAgg = { cost: number; sales: number; impressions: number; clicks: number; purchases: number; dates: string[] }
+    const adTypeMap = new Map<string, AdTypeAgg>()
+    for (const r of ads_rows) {
+      const key = r.ad_name ?? '기타'
+      const prev = adTypeMap.get(key) ?? { cost: 0, sales: 0, impressions: 0, clicks: 0, purchases: 0, dates: [] }
+      adTypeMap.set(key, {
+        cost: prev.cost + (r.cost ?? 0),
+        sales: prev.sales + (r.sales ?? 0),
+        impressions: prev.impressions + (r.impressions ?? 0),
+        clicks: prev.clicks + (r.clicks ?? 0),
+        purchases: prev.purchases + (r.purchases ?? 0),
+        dates: [...prev.dates, r.date],
+      })
+    }
+    const qoo10AdTypeBreakdown: Qoo10AdTypeRow[] = Array.from(adTypeMap.entries())
+      .sort(([, a], [, b]) => b.cost - a.cost)
+      .map(([ad_name, v]) => {
+        const repDate = v.dates[0] ?? startDate
+        return {
+          ad_name,
+          cost: v.cost || null,
+          sales: v.sales || null,
+          roas: v.cost > 0 ? v.sales / v.cost : null,
+          impressions: v.impressions || null,
+          clicks: v.clicks || null,
+          ctr: v.impressions > 0 ? (v.clicks / v.impressions) * 100 : null,
+          purchases: v.purchases || null,
+          purchase_conversion_rate: v.clicks > 0 ? (v.purchases / v.clicks) * 100 : null,
+          cost_krw: hasKrw ? toKrw(v.cost, repDate) : null,
+          sales_krw: hasKrw ? toKrw(v.sales, repDate) : null,
+        }
+      })
+
+    // 상품별(product_code) 광고성과 TOP 10
+    type AdsProductAgg = { product_name: string; cost: number; sales: number; purchases: number; dates: string[] }
+    const adsProductMap = new Map<string, AdsProductAgg>()
+    for (const r of ads_rows) {
+      const key = r.product_code ?? '(코드없음)'
+      const prev = adsProductMap.get(key) ?? { product_name: r.product_name ?? '', cost: 0, sales: 0, purchases: 0, dates: [] }
+      adsProductMap.set(key, {
+        product_name: prev.product_name || r.product_name || '',
+        cost: prev.cost + (r.cost ?? 0),
+        sales: prev.sales + (r.sales ?? 0),
+        purchases: prev.purchases + (r.purchases ?? 0),
+        dates: [...prev.dates, r.date],
+      })
+    }
+    const qoo10AdsProductBreakdown: Qoo10AdsProductRow[] = Array.from(adsProductMap.entries())
+      .sort(([, a], [, b]) => b.cost - a.cost)
+      .slice(0, 10)
+      .map(([product_code, v]) => {
+        const repDate = v.dates[0] ?? startDate
+        return {
+          product_code,
+          product_name: v.product_name,
+          cost: v.cost || null,
+          sales: v.sales || null,
+          roas: v.cost > 0 ? v.sales / v.cost : null,
+          purchases: v.purchases || null,
+          cost_krw: hasKrw ? toKrw(v.cost, repDate) : null,
+          sales_krw: hasKrw ? toKrw(v.sales, repDate) : null,
+        }
+      })
+
+    // ── 통합 지표 계산 ─────────────────────────────────────────────────
+    const totalSalesJpy = (orgSumAmount || 0) + (adsSum.sales || 0) || null
+    const totalSalesKrw = hasKrw
+      ? (orgSumAmtKrw ?? 0) + (adsSumSalesKrw ?? 0) || null
+      : null
+
+    const qoo10CombinedTotals: Qoo10CombinedTotals = {
+      total_sales_jpy: orgSumAmount || null,  // 오가닉 매출 = 전체 매출 (큐텐 특성상)
+      total_sales_krw: orgSumAmtKrw,
+      total_quantity: orgSumQty || null,
+      total_visitors: orgSumVisitors || null,
+      overall_conversion_rate: orgSumVisitors > 0 ? (orgSumQty / orgSumVisitors) * 100 : null,
+      ad_cost_jpy: adsSum.cost || null,
+      ad_cost_krw: adsSumCostKrw,
+      overall_roas: adsSum.cost > 0 && orgSumAmount > 0 ? orgSumAmount / adsSum.cost : null,
+      tacos: orgSumAmount > 0 && adsSum.cost > 0 ? (adsSum.cost / orgSumAmount) * 100 : null,
+      ad_sales_ratio:
+        (totalSalesJpy ?? 0) > 0 && adsSum.sales > 0
+          ? (adsSum.sales / (totalSalesJpy ?? 1)) * 100
+          : null,
+    }
+
+    return NextResponse.json({
+      platform: 'qoo10',
+      dailyData: [],
+      totals: buildEmptyTotals(),
+      qoo10AdsDailyData,
+      qoo10AdsTotals,
+      qoo10OrganicDailyData,
+      qoo10OrganicTotals,
+      qoo10CombinedTotals,
+      qoo10AdTypeBreakdown,
+      qoo10AdsProductBreakdown,
+      qoo10OrganicProductBreakdown,
+      qoo10Extra: { fxRates, hasKrw, appliedRate },
     })
   }
 }
