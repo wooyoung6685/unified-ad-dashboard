@@ -15,12 +15,12 @@ import {
 
 const fmtJPY = (v: number) => `¥${Math.round(v).toLocaleString('ko-KR')}`
 
-type MetricMeta = { label: string; format: 'jpy' | 'pct' | 'number' | 'ratio' }
+type MetricMeta = { label: string; format: 'jpy' | 'pct' | 'number' | 'pct_roas' }
 
 const METRIC_META: Record<string, MetricMeta> = {
   cost: { label: '광고비', format: 'jpy' },
   sales: { label: '광고매출', format: 'jpy' },
-  roas: { label: 'ROAS', format: 'ratio' },
+  roas: { label: 'ROAS', format: 'pct_roas' },
   ctr: { label: 'CTR', format: 'pct' },
   cart_conversion_rate: { label: '카트전환율', format: 'pct' },
   purchase_conversion_rate: { label: '구매전환율', format: 'pct' },
@@ -35,7 +35,7 @@ function formatTick(value: number, key: string): string {
   const fmt = METRIC_META[key]?.format
   if (fmt === 'jpy') return fmtJPY(value)
   if (fmt === 'pct') return fmtPct(value)
-  if (fmt === 'ratio') return `${value.toFixed(2)}x`
+  if (fmt === 'pct_roas') return `${(value * 100).toFixed(0)}%`
   return fmtNum(value)
 }
 

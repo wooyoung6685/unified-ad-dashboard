@@ -15,7 +15,7 @@ import { DollarSign, Info, MousePointer, ShoppingCart, TrendingUp } from 'lucide
 const fmtJPY = (v: number | null) =>
   v == null ? '-' : `¥${Math.round(v).toLocaleString('ko-KR')}`
 
-type MetricFormat = 'jpy' | 'jpy_krw' | 'pct' | 'number' | 'ratio'
+type MetricFormat = 'jpy' | 'jpy_krw' | 'pct' | 'number' | 'pct_roas'
 
 type MetricDef = {
   key: keyof Qoo10AdsSummaryTotals
@@ -27,7 +27,7 @@ type MetricDef = {
 
 // 효율 지표
 const ADS_EFFICIENCY: MetricDef[] = [
-  { key: 'roas', label: 'ROAS', format: 'ratio', icon: TrendingUp, tooltip: 'Return on Ad Spend = 광고매출 ÷ 광고비. 높을수록 좋습니다.' },
+  { key: 'roas', label: 'ROAS', format: 'pct_roas', icon: TrendingUp, tooltip: 'Return on Ad Spend = 광고매출 ÷ 광고비 × 100%. 높을수록 좋습니다.' },
   { key: 'ctr', label: 'CTR', format: 'pct', icon: MousePointer, tooltip: 'Click Through Rate = 클릭수 ÷ 노출수 × 100' },
   { key: 'cart_conversion_rate', label: '카트전환율', format: 'pct', icon: ShoppingCart, tooltip: '카트수 ÷ 클릭수 × 100. 클릭 후 장바구니에 담은 비율입니다.' },
   { key: 'purchase_conversion_rate', label: '구매전환율', format: 'pct', icon: TrendingUp, tooltip: '구매수 ÷ 클릭수 × 100. 클릭 후 실제 구매로 이어진 비율입니다.' },
@@ -62,8 +62,8 @@ function formatValue(
       return { main: fmtJPY(v) }
     case 'pct':
       return { main: fmtPct(v) }
-    case 'ratio':
-      return { main: v != null ? `${v.toFixed(2)}x` : '-' }
+    case 'pct_roas':
+      return { main: v != null ? `${(v * 100).toFixed(0)}%` : '-' }
     default:
       return { main: fmtNum(v) }
   }

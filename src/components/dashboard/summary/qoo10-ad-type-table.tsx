@@ -61,7 +61,7 @@ export function Qoo10AdTypeTable({ rows, extra }: Props) {
                 <TableCell className="text-right">{fmtJPY(r.sales)}</TableCell>
                 {hasKrw && <TableCell className="text-right">{fmtKRW(r.sales_krw)}</TableCell>}
                 <TableCell className="text-right">
-                  {r.roas != null ? `${r.roas.toFixed(2)}x` : '-'}
+                  {r.roas != null ? `${(r.roas * 100).toFixed(0)}%` : '-'}
                 </TableCell>
                 <TableCell className="text-right">{fmtNum(r.impressions)}</TableCell>
                 <TableCell className="text-right">{fmtNum(r.clicks)}</TableCell>

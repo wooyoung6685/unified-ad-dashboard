@@ -108,7 +108,7 @@ export function Qoo10CombinedKpi({ totals, extra, isLoading }: Props) {
           />
           <KpiItem
             label="전체 ROAS"
-            value={totals?.overall_roas != null ? `${totals.overall_roas.toFixed(2)}x` : '-'}
+            value={totals?.overall_roas != null ? `${(totals.overall_roas * 100).toFixed(0)}%` : '-'}
             tooltip="총 오가닉 매출 ÷ 총 광고비. 광고 1엔당 벌어들인 매출을 나타냅니다. 높을수록 좋습니다."
             isLoading={isLoading}
           />

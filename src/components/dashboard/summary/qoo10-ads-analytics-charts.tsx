@@ -139,7 +139,7 @@ function AdsTooltip({ active, payload, label }: any) {
         let formatted = entry.value
         if (entry.name === '광고비' || entry.name === '광고매출') formatted = fmtJPY(entry.value)
         else if (['CTR', '카트전환율', '구매전환율'].includes(entry.name)) formatted = fmtPct(entry.value)
-        else if (entry.name === 'ROAS') formatted = `${(entry.value as number).toFixed(2)}x`
+        else if (entry.name === 'ROAS') formatted = `${((entry.value as number) * 100).toFixed(0)}%`
         else formatted = fmtNum(entry.value)
         return (
           <p key={i} style={{ color: entry.color, margin: '2px 0' }}>
@@ -212,7 +212,7 @@ export function Qoo10AdsAnalyticsCharts({ data }: Props) {
                 <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                 <YAxis yAxisId="left" tickFormatter={(v) => `¥${(v / 1000).toFixed(0)}K`} tick={{ fontSize: 10 }} width={55} />
-                <YAxis yAxisId="right" orientation="right" tickFormatter={(v) => `${v.toFixed(1)}x`} tick={{ fontSize: 10 }} width={40} />
+                <YAxis yAxisId="right" orientation="right" tickFormatter={(v) => `${(v * 100).toFixed(0)}%`} tick={{ fontSize: 10 }} width={45} />
                 <Tooltip content={<AdsTooltip />} />
                 <Legend />
                 <Bar yAxisId="left" dataKey="cost" name="광고비" fill="#F97316" opacity={0.7} />
