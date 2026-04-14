@@ -10,6 +10,7 @@ import { useState } from 'react'
 import { InsightMemoCard } from './insight-memo-card'
 import { AmazonReportDetail } from './amazon-report-detail'
 import { MetaReportDetail } from './meta-report-detail'
+import { Qoo10ReportDetail } from './qoo10-report-detail'
 import { ShopeeReportDetail } from './shopee-report-detail'
 import { TiktokReportDetail } from './tiktok-report-detail'
 
@@ -174,6 +175,8 @@ export function ReportDetail({ report, role, creatorEmail }: Props) {
           <ShopeeReportDetail data={snapshot.data} title={title} />
         ) : snapshot.platform === 'amazon' ? (
           <AmazonReportDetail data={snapshot.data} title={title} />
+        ) : snapshot.platform === 'qoo10' ? (
+          <Qoo10ReportDetail data={snapshot.data} title={title} />
         ) : null}
       </div>
 

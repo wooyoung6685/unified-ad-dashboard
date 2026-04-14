@@ -19,6 +19,10 @@ export const fmtFx = (v: number | null) =>
     ? '-'
     : v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
+// JPY 금액 (¥ 기호 포함, 정수)
+export const fmtJPY = (v: number | null) =>
+  v == null ? '-' : `¥${Math.round(v).toLocaleString('ja-JP')}`
+
 // USD 금액 ($ 기호 포함, 소수 2자리)
 export const fmtUSD = (v: number | null) =>
   v == null

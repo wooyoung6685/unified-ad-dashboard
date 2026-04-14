@@ -79,6 +79,7 @@ const PLATFORM_OPTIONS = [
   { value: 'shopee' as const, label: 'SHOPEE (쇼피)' },
   { value: 'tiktok' as const, label: 'TIKTOK' },
   { value: 'amazon' as const, label: 'AMAZON' },
+  { value: 'qoo10' as const, label: 'QOO10 (큐텐)' },
 ]
 
 const CURRENT_YEAR = new Date().getFullYear()
@@ -179,7 +180,7 @@ function CreateReportDialog({ open, onOpenChange, brands }: CreateDialogProps) {
   const generateSnapshot = useGenerateSnapshot()
 
   const [brandId, setBrandId] = useState('')
-  const [platform, setPlatform] = useState<'meta' | 'shopee' | 'tiktok' | 'amazon' | ''>('')
+  const [platform, setPlatform] = useState<'meta' | 'shopee' | 'tiktok' | 'amazon' | 'qoo10' | ''>('')
   const [country, setCountry] = useState('')
   const [accountId, setAccountId] = useState('')  // internal_account_id (DB PK)
   const { year: defaultYear, month: defaultMonth } = prevMonth()
@@ -193,17 +194,19 @@ function CreateReportDialog({ open, onOpenChange, brands }: CreateDialogProps) {
   const { data: accountsData, isLoading: loadingAccounts } = useQuery({
     queryKey: ['admin', 'accounts', 'all'],
     queryFn: async () => {
-      const [metaRes, shopeeRes, tiktokRes, amazonRes] = await Promise.all([
+      const [metaRes, shopeeRes, tiktokRes, amazonRes, qoo10Res] = await Promise.all([
         fetch('/api/admin/accounts/meta').then((r) => r.json()),
         fetch('/api/admin/accounts/shopee').then((r) => r.json()),
         fetch('/api/admin/accounts/tiktok').then((r) => r.json()),
         fetch('/api/admin/accounts/amazon').then((r) => r.json()),
+        fetch('/api/admin/accounts/qoo10').then((r) => r.json()),
       ])
       return {
         meta: metaRes.accounts ?? [],
         shopee: shopeeRes.accounts ?? [],
         tiktok: tiktokRes.accounts ?? [],
         amazon: amazonRes.accounts ?? [],
+        qoo10: qoo10Res.accounts ?? [],
       }
     },
     staleTime: 5 * 60 * 1000,
@@ -286,7 +289,33 @@ function CreateReportDialog({ open, onOpenChange, brands }: CreateDialogProps) {
       return result
     })()
 
-    return [...metaAccounts, ...shopeeInappAccounts, ...tiktokAccounts, ...amazonAccounts]
+    // Qoo10 계정 (organic 우선 dedup)
+    const qoo10Accounts: AccountOption[] = (() => {
+      const seen = new Set<string>()
+      const result: AccountOption[] = []
+      const sorted = [...(accountsData.qoo10 ?? [])]
+        .filter(
+          (a: { brand_id: string; is_active: boolean }) =>
+            a.brand_id === brandId && a.is_active,
+        )
+        .sort((a: { account_type: string }) =>
+          a.account_type === 'organic' ? -1 : 1
+        )
+      for (const a of sorted as { id: string; account_id: string; sub_brand: string | null; country: string | null; account_type: string }[]) {
+        if (seen.has(a.account_id)) continue
+        seen.add(a.account_id)
+        result.push({
+          id: a.id,
+          account_id: a.account_id,
+          label: [a.sub_brand, a.account_id].filter(Boolean).join(' / '),
+          country: a.country,
+          account_type: 'qoo10',
+        })
+      }
+      return result
+    })()
+
+    return [...metaAccounts, ...shopeeInappAccounts, ...tiktokAccounts, ...amazonAccounts, ...qoo10Accounts]
   }, [accountsData, brandId])
 
   // 플랫폼별 사용 가능 옵션
@@ -295,11 +324,13 @@ function CreateReportDialog({ open, onOpenChange, brands }: CreateDialogProps) {
     const hasShopee = allAccounts.some((a) => a.account_type === 'shopee')
     const hasTiktok = allAccounts.some((a) => a.account_type === 'tiktok')
     const hasAmazon = allAccounts.some((a) => a.account_type === 'amazon')
+    const hasQoo10 = allAccounts.some((a) => a.account_type === 'qoo10')
     return PLATFORM_OPTIONS.filter((p) => {
       if (p.value === 'meta') return hasMeta
       if (p.value === 'shopee') return hasShopee
       if (p.value === 'tiktok') return hasTiktok
       if (p.value === 'amazon') return hasAmazon
+      if (p.value === 'qoo10') return hasQoo10
       return false
     })
   }, [allAccounts])
@@ -332,7 +363,7 @@ function CreateReportDialog({ open, onOpenChange, brands }: CreateDialogProps) {
       const selectedAccount = allAccounts.find((a) => a.id === accountId)
       const report = await createReport.mutateAsync({
         brand_id: brandId,
-        platform: platform as 'meta' | 'shopee' | 'tiktok' | 'amazon',
+        platform: platform as 'meta' | 'shopee' | 'tiktok' | 'amazon' | 'qoo10',
         country: country || null,
         internal_account_id: selectedAccount?.id ?? null,
         year,
@@ -425,7 +456,7 @@ function CreateReportDialog({ open, onOpenChange, brands }: CreateDialogProps) {
                 <Select
                   value={platform}
                   onValueChange={(v) => {
-                    setPlatform(v as 'meta' | 'shopee' | 'tiktok')
+                    setPlatform(v as 'meta' | 'shopee' | 'tiktok' | 'amazon' | 'qoo10')
                     setCountry('')
                     setAccountId('')
                   }}

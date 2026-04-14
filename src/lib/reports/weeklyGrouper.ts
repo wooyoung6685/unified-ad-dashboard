@@ -1,9 +1,11 @@
 import { getDaysInMonth } from 'date-fns'
-import type { GmvMaxWeeklyData, MetaWeeklyData, ShopeeWeeklyData, TiktokWeeklyData } from '@/types/database'
+import type { GmvMaxWeeklyData, MetaWeeklyData, Qoo10WeeklyData, ShopeeWeeklyData, TiktokWeeklyData } from '@/types/database'
 import {
   divOrNull,
   sumRows,
   type MetaDailyRow,
+  type Qoo10DailyAdsRow,
+  type Qoo10DailyOrganicRow,
   type ShopeeInappRow,
   type TiktokDailyRow,
 } from './aggregators'
@@ -233,6 +235,71 @@ export function groupGmvMaxByWeek(
       roi: divOrNull(gross_revenue * 100, cost),
       orders: orders || null,
       cost_per_order: divOrNull(cost, orders),
+    }
+  })
+}
+
+// ── Qoo10 주간 집계 ───────────────────────────────────────────────────
+
+export function groupQoo10ByWeek(
+  organicRows: Qoo10DailyOrganicRow[],
+  adsRows: Qoo10DailyAdsRow[],
+  year: number,
+  month: number,
+): Qoo10WeeklyData[] {
+  const weekRanges = getWeekRanges(year, month)
+
+  type OrgAgg = { revenue: number; purchases: number; sessions: number }
+  type AdsAgg = { ad_sales: number; ad_cost: number; impressions: number; clicks: number }
+
+  const orgMap = new Map<number, OrgAgg>()
+  const adsMap = new Map<number, AdsAgg>()
+  weekRanges.forEach((w) => {
+    orgMap.set(w.week, { revenue: 0, purchases: 0, sessions: 0 })
+    adsMap.set(w.week, { ad_sales: 0, ad_cost: 0, impressions: 0, clicks: 0 })
+  })
+
+  for (const r of organicRows) {
+    const day = parseInt(r.date.slice(8, 10), 10)
+    const w = getWeekNumber(day)
+    const agg = orgMap.get(w)
+    if (agg) {
+      agg.revenue += r.revenue ?? 0
+      agg.purchases += r.purchases ?? 0
+      agg.sessions += r.sessions ?? 0
+    }
+  }
+
+  for (const r of adsRows) {
+    const day = parseInt(r.date.slice(8, 10), 10)
+    const w = getWeekNumber(day)
+    const agg = adsMap.get(w)
+    if (agg) {
+      agg.ad_sales += r.ad_sales ?? 0
+      agg.ad_cost += r.ad_cost ?? 0
+      agg.impressions += r.impressions ?? 0
+      agg.clicks += r.clicks ?? 0
+    }
+  }
+
+  return weekRanges.map(({ week, label }) => {
+    const o = orgMap.get(week) ?? { revenue: 0, purchases: 0, sessions: 0 }
+    const a = adsMap.get(week) ?? { ad_sales: 0, ad_cost: 0, impressions: 0, clicks: 0 }
+    return {
+      week,
+      date_range: label,
+      revenue: o.revenue || null,
+      purchases: o.purchases || null,
+      sessions: o.sessions || null,
+      conversion_rate: o.sessions > 0 ? (o.purchases / o.sessions) * 100 : null,
+      aov: o.purchases > 0 ? o.revenue / o.purchases : null,
+      ad_sales: a.ad_sales || null,
+      ad_cost: a.ad_cost || null,
+      roas: a.ad_cost > 0 ? a.ad_sales / a.ad_cost : null,
+      impressions: a.impressions || null,
+      clicks: a.clicks || null,
+      ctr: a.impressions > 0 ? (a.clicks / a.impressions) * 100 : null,
+      cpc: a.clicks > 0 ? a.ad_cost / a.clicks : null,
     }
   })
 }

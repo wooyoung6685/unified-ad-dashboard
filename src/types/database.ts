@@ -714,7 +714,79 @@ export type ReportSnapshot =
   | { platform: 'shopee_inapp'; data: ShopeeReportData }
   | { platform: 'tiktok'; data: TiktokReportData }
   | { platform: 'amazon'; data: AmazonReportData }
-  | { platform: 'qoo10'; data: Record<string, unknown> }
+  | { platform: 'qoo10'; data: Qoo10ReportData }
+
+// ── Qoo10 ─────────────────────────────────────
+
+export type Qoo10MonthlyData = {
+  date_range: string
+  // 전체(오가닉) 지표
+  revenue: number | null          // 전체매출 JPY
+  purchases: number | null        // 구매수
+  sessions: number | null         // 전체 세션수 (방문자)
+  conversion_rate: number | null  // 구매전환율 %
+  aov: number | null              // 객단가 JPY
+  // 내부광고 지표
+  ad_sales: number | null         // 광고매출 JPY
+  ad_cost: number | null          // 전체 광고비 JPY
+  roas: number | null             // 광고 ROAS (배수, 예: 2.1)
+  impressions: number | null      // 노출수
+  clicks: number | null           // 클릭수
+  ctr: number | null              // CTR %
+  cpc: number | null              // CPC JPY
+  // 전월 대비 (델타 배지용)
+  prev_revenue: number | null
+  prev_purchases: number | null
+  prev_sessions: number | null
+  prev_conversion_rate: number | null
+  prev_aov: number | null
+  prev_ad_sales: number | null
+  prev_ad_cost: number | null
+  prev_roas: number | null
+  prev_impressions: number | null
+  prev_clicks: number | null
+  prev_ctr: number | null
+  prev_cpc: number | null
+}
+
+export type Qoo10WeeklyData = {
+  week: number
+  date_range: string
+  revenue: number | null
+  purchases: number | null
+  sessions: number | null
+  conversion_rate: number | null
+  aov: number | null
+  ad_sales: number | null
+  ad_cost: number | null
+  roas: number | null
+  impressions: number | null
+  clicks: number | null
+  ctr: number | null
+  cpc: number | null
+}
+
+export type Qoo10DailyData = {
+  date: string
+  revenue: number | null
+  purchases: number | null
+  sessions: number | null
+  conversion_rate: number | null
+}
+
+export type Qoo10ProductData = {
+  product_name_jp: string
+  product_name_ko: string | null
+  sales: number | null
+  quantity: number | null
+}
+
+export type Qoo10ReportData = {
+  monthly: Qoo10MonthlyData
+  weekly: Qoo10WeeklyData[]
+  daily: Qoo10DailyData[]
+  products: Qoo10ProductData[]
+}
 
 // ── Meta ──────────────────────────────────────
 

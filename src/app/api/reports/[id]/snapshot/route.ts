@@ -14,8 +14,11 @@ import {
   type ShopeeShoppingRow,
   type MetaSpendRow,
   type TiktokDailyRow,
+  type Qoo10DailyOrganicRow,
+  type Qoo10DailyAdsRow,
 } from '@/lib/reports/aggregators'
-import { groupGmvMaxByWeek, groupMetaByWeek, groupShopeeByWeek, groupTiktokByWeek } from '@/lib/reports/weeklyGrouper'
+import { groupGmvMaxByWeek, groupMetaByWeek, groupQoo10ByWeek, groupShopeeByWeek, groupTiktokByWeek } from '@/lib/reports/weeklyGrouper'
+import { preprocessQoo10Name, translateJaToKo } from '@/lib/qoo10/translate'
 import {
   fetchMetaCampaigns,
   fetchMetaAdsets,
@@ -31,6 +34,9 @@ import type {
   AmazonMonthlyData,
   AmazonProductData,
   AmazonWeeklyData,
+  Qoo10DailyData,
+  Qoo10MonthlyData,
+  Qoo10ProductData,
   ReportSnapshot,
   ShopeeAdsBreakdownData,
 } from '@/types/database'
@@ -66,7 +72,7 @@ export async function POST(_req: NextRequest, { params }: RouteContext) {
   }
 
   const { platform, internal_account_id, year, month } = report as {
-    platform: 'meta' | 'shopee_inapp' | 'tiktok' | 'amazon'
+    platform: 'meta' | 'shopee_inapp' | 'tiktok' | 'amazon' | 'qoo10'
     internal_account_id: string | null
     year: number
     month: number
@@ -112,6 +118,16 @@ export async function POST(_req: NextRequest, { params }: RouteContext) {
       })
     } else if (platform === 'amazon') {
       snapshot = await buildAmazonSnapshot({
+        internal_account_id,
+        year,
+        month,
+        thisMonthStart,
+        thisMonthEnd,
+        prevMonthStart,
+        prevMonthEnd,
+      })
+    } else if (platform === 'qoo10') {
+      snapshot = await buildQoo10Snapshot({
         internal_account_id,
         year,
         month,
@@ -913,5 +929,266 @@ async function buildAmazonSnapshot(args: {
   return {
     platform: 'amazon',
     data: { monthly, weekly, keywords, daily, products },
+  } as ReportSnapshot
+}
+
+// ── Qoo10 스냅샷 빌더 ────────────────────────────────────────────────────────
+
+async function buildQoo10Snapshot(args: {
+  internal_account_id: string
+  year: number
+  month: number
+  thisMonthStart: string
+  thisMonthEnd: string
+  prevMonthStart: string
+  prevMonthEnd: string
+}): Promise<ReportSnapshot> {
+  const { internal_account_id, year, month, thisMonthStart, thisMonthEnd, prevMonthStart, prevMonthEnd } = args
+
+  // 1. 이 계정의 account_id, brand_id 조회
+  const { data: qoo10Account } = await supabaseAdmin
+    .from('qoo10_accounts')
+    .select('account_id, brand_id')
+    .eq('id', internal_account_id)
+    .single()
+
+  if (!qoo10Account) throw new Error('큐텐 계정을 찾을 수 없습니다.')
+
+  const { account_id: externalAccountId, brand_id: bId } = qoo10Account
+
+  // 2. 같은 account_id의 ads/organic 계정 PK 조회
+  const { data: allQoo10Accts } = await supabaseAdmin
+    .from('qoo10_accounts')
+    .select('id, account_type')
+    .eq('account_id', externalAccountId)
+    .eq('brand_id', bId)
+
+  const adsIds = (allQoo10Accts ?? []).filter((a) => a.account_type === 'ads').map((a) => a.id)
+  const organicIds = (allQoo10Accts ?? []).filter((a) => a.account_type === 'organic').map((a) => a.id)
+
+  // 3. 모든 데이터 병렬 조회 (당월 + 전월)
+  const [
+    { data: curAds },
+    { data: prevAds },
+    { data: curVisitor },
+    { data: prevVisitor },
+    { data: curTx },
+    { data: prevTx },
+  ] = await Promise.all([
+    adsIds.length > 0
+      ? supabaseAdmin
+          .from('qoo10_ads_stats')
+          .select('date, cost, sales, impressions, clicks')
+          .in('qoo10_account_id', adsIds)
+          .gte('date', thisMonthStart)
+          .lte('date', thisMonthEnd)
+          .order('date', { ascending: true })
+      : Promise.resolve({ data: [] }),
+    adsIds.length > 0
+      ? supabaseAdmin
+          .from('qoo10_ads_stats')
+          .select('date, cost, sales, impressions, clicks')
+          .in('qoo10_account_id', adsIds)
+          .gte('date', prevMonthStart)
+          .lte('date', prevMonthEnd)
+      : Promise.resolve({ data: [] }),
+    organicIds.length > 0
+      ? supabaseAdmin
+          .from('qoo10_organic_visitor_stats')
+          .select('date, visitors')
+          .in('qoo10_account_id', organicIds)
+          .gte('date', thisMonthStart)
+          .lte('date', thisMonthEnd)
+          .order('date', { ascending: true })
+      : Promise.resolve({ data: [] }),
+    organicIds.length > 0
+      ? supabaseAdmin
+          .from('qoo10_organic_visitor_stats')
+          .select('date, visitors')
+          .in('qoo10_account_id', organicIds)
+          .gte('date', prevMonthStart)
+          .lte('date', prevMonthEnd)
+      : Promise.resolve({ data: [] }),
+    organicIds.length > 0
+      ? supabaseAdmin
+          .from('qoo10_organic_transaction_stats')
+          .select('date, transaction_amount, transaction_quantity, product_name')
+          .in('qoo10_account_id', organicIds)
+          .gte('date', thisMonthStart)
+          .lte('date', thisMonthEnd)
+          .order('date', { ascending: true })
+      : Promise.resolve({ data: [] }),
+    organicIds.length > 0
+      ? supabaseAdmin
+          .from('qoo10_organic_transaction_stats')
+          .select('date, transaction_amount, transaction_quantity')
+          .in('qoo10_account_id', organicIds)
+          .gte('date', prevMonthStart)
+          .lte('date', prevMonthEnd)
+      : Promise.resolve({ data: [] }),
+  ])
+
+  // 4. 날짜별 집계 (당월)
+  type OrgAgg = { revenue: number; purchases: number }
+  const txByDate = new Map<string, OrgAgg>()
+  for (const r of curTx ?? []) {
+    const prev = txByDate.get(r.date) ?? { revenue: 0, purchases: 0 }
+    txByDate.set(r.date, {
+      revenue: prev.revenue + ((r.transaction_amount as number) ?? 0),
+      purchases: prev.purchases + ((r.transaction_quantity as number) ?? 0),
+    })
+  }
+
+  const visitorByDate = new Map<string, number>()
+  for (const r of curVisitor ?? []) {
+    visitorByDate.set(r.date, (visitorByDate.get(r.date) ?? 0) + ((r.visitors as number) ?? 0))
+  }
+
+  type AdsAgg = { ad_sales: number; ad_cost: number; impressions: number; clicks: number }
+  const adsByDate = new Map<string, AdsAgg>()
+  for (const r of curAds ?? []) {
+    const prev = adsByDate.get(r.date) ?? { ad_sales: 0, ad_cost: 0, impressions: 0, clicks: 0 }
+    adsByDate.set(r.date, {
+      ad_sales: prev.ad_sales + ((r.sales as number) ?? 0),
+      ad_cost: prev.ad_cost + ((r.cost as number) ?? 0),
+      impressions: prev.impressions + ((r.impressions as number) ?? 0),
+      clicks: prev.clicks + ((r.clicks as number) ?? 0),
+    })
+  }
+
+  // 5. 전월 집계
+  type PrevOrgAgg = { revenue: number; purchases: number; sessions: number }
+  const prevOrgAgg: PrevOrgAgg = { revenue: 0, purchases: 0, sessions: 0 }
+  for (const r of prevTx ?? []) {
+    prevOrgAgg.revenue += (r.transaction_amount as number) ?? 0
+    prevOrgAgg.purchases += (r.transaction_quantity as number) ?? 0
+  }
+  for (const r of prevVisitor ?? []) {
+    prevOrgAgg.sessions += (r.visitors as number) ?? 0
+  }
+
+  type PrevAdsAgg = { ad_sales: number; ad_cost: number; impressions: number; clicks: number }
+  const prevAdsAgg: PrevAdsAgg = { ad_sales: 0, ad_cost: 0, impressions: 0, clicks: 0 }
+  for (const r of prevAds ?? []) {
+    prevAdsAgg.ad_sales += (r.sales as number) ?? 0
+    prevAdsAgg.ad_cost += (r.cost as number) ?? 0
+    prevAdsAgg.impressions += (r.impressions as number) ?? 0
+    prevAdsAgg.clicks += (r.clicks as number) ?? 0
+  }
+
+  // 6. 당월 합계
+  const allDates = Array.from(
+    new Set([...txByDate.keys(), ...visitorByDate.keys(), ...adsByDate.keys()])
+  ).sort()
+
+  const sumRevenue = allDates.reduce((s, d) => s + (txByDate.get(d)?.revenue ?? 0), 0)
+  const sumPurchases = allDates.reduce((s, d) => s + (txByDate.get(d)?.purchases ?? 0), 0)
+  const sumSessions = allDates.reduce((s, d) => s + (visitorByDate.get(d) ?? 0), 0)
+  const sumAdSales = allDates.reduce((s, d) => s + (adsByDate.get(d)?.ad_sales ?? 0), 0)
+  const sumAdCost = allDates.reduce((s, d) => s + (adsByDate.get(d)?.ad_cost ?? 0), 0)
+  const sumImpressions = allDates.reduce((s, d) => s + (adsByDate.get(d)?.impressions ?? 0), 0)
+  const sumClicks = allDates.reduce((s, d) => s + (adsByDate.get(d)?.clicks ?? 0), 0)
+
+  // 대상 기간 문자열
+  const dateRange = `${thisMonthStart} ~ ${thisMonthEnd}`
+
+  // 7. monthly 데이터 구성
+  const monthly: Qoo10MonthlyData = {
+    date_range: dateRange,
+    revenue: sumRevenue || null,
+    purchases: sumPurchases || null,
+    sessions: sumSessions || null,
+    conversion_rate: sumSessions > 0 ? (sumPurchases / sumSessions) * 100 : null,
+    aov: sumPurchases > 0 ? sumRevenue / sumPurchases : null,
+    ad_sales: sumAdSales || null,
+    ad_cost: sumAdCost || null,
+    roas: sumAdCost > 0 ? sumAdSales / sumAdCost : null,
+    impressions: sumImpressions || null,
+    clicks: sumClicks || null,
+    ctr: sumImpressions > 0 ? (sumClicks / sumImpressions) * 100 : null,
+    cpc: sumClicks > 0 ? sumAdCost / sumClicks : null,
+    // 전월
+    prev_revenue: prevOrgAgg.revenue || null,
+    prev_purchases: prevOrgAgg.purchases || null,
+    prev_sessions: prevOrgAgg.sessions || null,
+    prev_conversion_rate: prevOrgAgg.sessions > 0 ? (prevOrgAgg.purchases / prevOrgAgg.sessions) * 100 : null,
+    prev_aov: prevOrgAgg.purchases > 0 ? prevOrgAgg.revenue / prevOrgAgg.purchases : null,
+    prev_ad_sales: prevAdsAgg.ad_sales || null,
+    prev_ad_cost: prevAdsAgg.ad_cost || null,
+    prev_roas: prevAdsAgg.ad_cost > 0 ? prevAdsAgg.ad_sales / prevAdsAgg.ad_cost : null,
+    prev_impressions: prevAdsAgg.impressions || null,
+    prev_clicks: prevAdsAgg.clicks || null,
+    prev_ctr: prevAdsAgg.impressions > 0 ? (prevAdsAgg.clicks / prevAdsAgg.impressions) * 100 : null,
+    prev_cpc: prevAdsAgg.clicks > 0 ? prevAdsAgg.ad_cost / prevAdsAgg.clicks : null,
+  }
+
+  // 8. organic/ads 행 배열 구성 → 주간 집계
+  const organicRows: Qoo10DailyOrganicRow[] = allDates.map((date) => ({
+    date,
+    revenue: txByDate.get(date)?.revenue ?? null,
+    purchases: txByDate.get(date)?.purchases ?? null,
+    sessions: visitorByDate.get(date) ?? null,
+  }))
+
+  const adsRowsForWeekly: Qoo10DailyAdsRow[] = allDates.map((date) => ({
+    date,
+    ad_sales: adsByDate.get(date)?.ad_sales ?? null,
+    ad_cost: adsByDate.get(date)?.ad_cost ?? null,
+    impressions: adsByDate.get(date)?.impressions ?? null,
+    clicks: adsByDate.get(date)?.clicks ?? null,
+  }))
+
+  const weekly = groupQoo10ByWeek(organicRows, adsRowsForWeekly, year, month)
+
+  // 9. daily 데이터 (오가닉 기준)
+  const daily: Qoo10DailyData[] = allDates.map((date) => {
+    const tx = txByDate.get(date) ?? { revenue: 0, purchases: 0 }
+    const sessions = visitorByDate.get(date) ?? 0
+    return {
+      date,
+      revenue: tx.revenue || null,
+      purchases: tx.purchases || null,
+      sessions: sessions || null,
+      conversion_rate: sessions > 0 ? (tx.purchases / sessions) * 100 : null,
+    }
+  })
+
+  // 10. 제품별 집계 + JP→KO 번역
+  const productMap = new Map<string, { sales: number; quantity: number }>()
+  for (const r of curTx ?? []) {
+    const rawName = (r.product_name as string) ?? '(이름없음)'
+    const key = rawName
+    const prev = productMap.get(key) ?? { sales: 0, quantity: 0 }
+    productMap.set(key, {
+      sales: prev.sales + ((r.transaction_amount as number) ?? 0),
+      quantity: prev.quantity + ((r.transaction_quantity as number) ?? 0),
+    })
+  }
+
+  // 상위 30개 선별 후 번역
+  const topProducts = Array.from(productMap.entries())
+    .filter(([, v]) => v.sales > 0)
+    .sort(([, a], [, b]) => b.sales - a.sales)
+    .slice(0, 30)
+
+  const rawNames = topProducts.map(([name]) => name)
+  const preprocessedNames = rawNames.map(preprocessQoo10Name)
+  const uniquePreprocessed = [...new Set(preprocessedNames.filter(Boolean))]
+  const translationMap = await translateJaToKo(uniquePreprocessed)
+
+  const products: Qoo10ProductData[] = topProducts.map(([rawName, v]) => {
+    const preprocessed = preprocessQoo10Name(rawName)
+    const koName = preprocessed ? (translationMap.get(preprocessed) ?? null) : null
+    return {
+      product_name_jp: preprocessed || rawName,
+      product_name_ko: koName,
+      sales: v.sales || null,
+      quantity: v.quantity || null,
+    }
+  })
+
+  return {
+    platform: 'qoo10',
+    data: { monthly, weekly, daily, products },
   } as ReportSnapshot
 }
