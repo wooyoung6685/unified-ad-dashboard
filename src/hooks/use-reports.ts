@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 type CreateReportBody = {
   brand_id: string
-  platform: 'meta' | 'shopee' | 'tiktok' | 'amazon'
+  platform: 'meta' | 'shopee' | 'tiktok' | 'amazon' | 'qoo10'
   country: string | null
   internal_account_id: string | null
   year: number
@@ -48,6 +48,23 @@ export function useGenerateSnapshot() {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? '스냅샷 생성에 실패했습니다.')
       return json
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['reports'] }),
+  })
+}
+
+export function useRepairThumbnails() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, section }: { id: string; section: 'meta' | 'tiktok' | 'gmvmax' }) => {
+      const res = await fetch(`/api/reports/${id}/snapshot/thumbnails`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ section }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? '썸네일 복구에 실패했습니다.')
+      return json as { success: boolean; updated: number }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['reports'] }),
   })

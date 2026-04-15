@@ -7,6 +7,16 @@ export type PlatformMetricOption = {
   defaultSort: 'asc' | 'desc'
 }
 
+// 소재 카드에 표시할 단일 지표 정의
+export type CardMetricDef = {
+  key: string
+  label: string
+  format: 'krw' | 'pct' | 'num'
+  highlight?: 'emerald' | 'blue'
+}
+
+export type CardMetricsMap = Record<string, CardMetricDef[]>
+
 // Meta 정렬/필터 지표
 export const META_RANK_OPTIONS: PlatformMetricOption[] = [
   { value: 'revenue', label: '구매전환값 (Sales)', defaultSort: 'desc' },
@@ -128,6 +138,145 @@ export const DEFAULT_GMVMAX_WIDGETS: CreativeWidgetConfig[] = [
     filters: [],
   },
 ]
+
+// ── 플랫폼별 rankBy → 카드 지표 매핑 ─────────────────────────────
+
+export const META_CARD_METRICS: CardMetricsMap = {
+  revenue: [
+    { key: 'revenue', label: '매출', format: 'krw', highlight: 'emerald' },
+    { key: 'spend', label: '지출금액', format: 'krw' },
+    { key: 'roas', label: 'ROAS', format: 'pct', highlight: 'blue' },
+    { key: 'purchases', label: '구매수', format: 'num' },
+  ],
+  roas: [
+    { key: 'roas', label: 'ROAS', format: 'pct', highlight: 'blue' },
+    { key: 'revenue', label: '매출', format: 'krw', highlight: 'emerald' },
+    { key: 'spend', label: '지출금액', format: 'krw' },
+    { key: 'cpc', label: 'CPC', format: 'krw' },
+  ],
+  spend: [
+    { key: 'spend', label: '지출금액', format: 'krw' },
+    { key: 'revenue', label: '매출', format: 'krw', highlight: 'emerald' },
+    { key: 'roas', label: 'ROAS', format: 'pct', highlight: 'blue' },
+    { key: 'clicks', label: '클릭수', format: 'num' },
+  ],
+  cpc: [
+    { key: 'cpc', label: 'CPC', format: 'krw' },
+    { key: 'ctr', label: 'CTR', format: 'pct', highlight: 'blue' },
+    { key: 'clicks', label: '클릭수', format: 'num' },
+    { key: 'spend', label: '지출금액', format: 'krw' },
+  ],
+  ctr: [
+    { key: 'ctr', label: 'CTR', format: 'pct', highlight: 'blue' },
+    { key: 'cpc', label: 'CPC', format: 'krw' },
+    { key: 'clicks', label: '클릭수', format: 'num' },
+    { key: 'spend', label: '지출금액', format: 'krw' },
+  ],
+  clicks: [
+    { key: 'clicks', label: '클릭수', format: 'num' },
+    { key: 'ctr', label: 'CTR', format: 'pct', highlight: 'blue' },
+    { key: 'cpc', label: 'CPC', format: 'krw' },
+    { key: 'spend', label: '지출금액', format: 'krw' },
+  ],
+  purchases: [
+    { key: 'purchases', label: '구매수', format: 'num' },
+    { key: 'revenue', label: '매출', format: 'krw', highlight: 'emerald' },
+    { key: 'roas', label: 'ROAS', format: 'pct', highlight: 'blue' },
+    { key: 'spend', label: '지출금액', format: 'krw' },
+  ],
+}
+
+export const TIKTOK_CARD_METRICS: CardMetricsMap = {
+  revenue: [
+    { key: 'revenue', label: '매출', format: 'krw', highlight: 'emerald' },
+    { key: 'spend', label: '지출금액', format: 'krw' },
+    { key: 'roas', label: 'ROAS', format: 'pct', highlight: 'blue' },
+    { key: 'purchases', label: '구매수', format: 'num' },
+  ],
+  roas: [
+    { key: 'roas', label: 'ROAS', format: 'pct', highlight: 'blue' },
+    { key: 'revenue', label: '매출', format: 'krw', highlight: 'emerald' },
+    { key: 'spend', label: '지출금액', format: 'krw' },
+    { key: 'cpc', label: 'CPC', format: 'krw' },
+  ],
+  spend: [
+    { key: 'spend', label: '지출금액', format: 'krw' },
+    { key: 'revenue', label: '매출', format: 'krw', highlight: 'emerald' },
+    { key: 'roas', label: 'ROAS', format: 'pct', highlight: 'blue' },
+    { key: 'impressions', label: '노출수', format: 'num' },
+  ],
+  cpc: [
+    { key: 'cpc', label: 'CPC', format: 'krw' },
+    { key: 'ctr', label: 'CTR', format: 'pct', highlight: 'blue' },
+    { key: 'clicks', label: '클릭수', format: 'num' },
+    { key: 'spend', label: '지출금액', format: 'krw' },
+  ],
+  ctr: [
+    { key: 'ctr', label: 'CTR', format: 'pct', highlight: 'blue' },
+    { key: 'cpc', label: 'CPC', format: 'krw' },
+    { key: 'clicks', label: '클릭수', format: 'num' },
+    { key: 'impressions', label: '노출수', format: 'num' },
+  ],
+  clicks: [
+    { key: 'clicks', label: '클릭수', format: 'num' },
+    { key: 'ctr', label: 'CTR', format: 'pct', highlight: 'blue' },
+    { key: 'cpc', label: 'CPC', format: 'krw' },
+    { key: 'spend', label: '지출금액', format: 'krw' },
+  ],
+  impressions: [
+    { key: 'impressions', label: '노출수', format: 'num' },
+    { key: 'clicks', label: '클릭수', format: 'num' },
+    { key: 'ctr', label: 'CTR', format: 'pct', highlight: 'blue' },
+    { key: 'spend', label: '지출금액', format: 'krw' },
+  ],
+}
+
+export const GMVMAX_CARD_METRICS: CardMetricsMap = {
+  gross_revenue: [
+    { key: 'gross_revenue', label: '매출', format: 'krw', highlight: 'emerald' },
+    { key: 'cost', label: '비용', format: 'krw' },
+    { key: 'roi', label: 'ROI', format: 'pct', highlight: 'blue' },
+    { key: 'orders', label: '주문수', format: 'num' },
+  ],
+  roi: [
+    { key: 'roi', label: 'ROI', format: 'pct', highlight: 'blue' },
+    { key: 'gross_revenue', label: '매출', format: 'krw', highlight: 'emerald' },
+    { key: 'cost', label: '비용', format: 'krw' },
+    { key: 'cost_per_order', label: '주문당 비용', format: 'krw' },
+  ],
+  cost: [
+    { key: 'cost', label: '비용', format: 'krw' },
+    { key: 'gross_revenue', label: '매출', format: 'krw', highlight: 'emerald' },
+    { key: 'roi', label: 'ROI', format: 'pct', highlight: 'blue' },
+    { key: 'orders', label: '주문수', format: 'num' },
+  ],
+  cost_per_order: [
+    { key: 'cost_per_order', label: '주문당 비용', format: 'krw' },
+    { key: 'cost', label: '비용', format: 'krw' },
+    { key: 'orders', label: '주문수', format: 'num' },
+    { key: 'roi', label: 'ROI', format: 'pct', highlight: 'blue' },
+  ],
+  orders: [
+    { key: 'orders', label: '주문수', format: 'num' },
+    { key: 'gross_revenue', label: '매출', format: 'krw', highlight: 'emerald' },
+    { key: 'cost_per_order', label: '주문당 비용', format: 'krw' },
+    { key: 'roi', label: 'ROI', format: 'pct', highlight: 'blue' },
+  ],
+}
+
+// rankBy에 맞는 카드 지표 4개 반환
+export function getCardMetrics(
+  platform: 'meta' | 'tiktok' | 'gmvmax',
+  rankBy: string,
+): CardMetricDef[] {
+  const map =
+    platform === 'meta'
+      ? META_CARD_METRICS
+      : platform === 'tiktok'
+        ? TIKTOK_CARD_METRICS
+        : GMVMAX_CARD_METRICS
+  return map[rankBy] ?? Object.values(map)[0]
+}
 
 // 위젯 설정을 적용하여 아이템 목록을 필터+정렬+슬라이스
 export function applyWidgetConfig<T extends Record<string, unknown>>(

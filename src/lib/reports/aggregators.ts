@@ -338,3 +338,21 @@ export function aggregateGmvMaxMonthly(
     prev_cost_per_order: prev.cost_per_order,
   }
 }
+
+// ── Qoo10 행 타입 ────────────────────────────────────────────────────
+
+// groupQoo10ByWeek 및 buildQoo10Snapshot에서 사용하는 일별 집계 행 타입
+export type Qoo10DailyOrganicRow = {
+  date: string
+  revenue: number | null     // 전체매출 JPY (transaction_amount)
+  purchases: number | null   // 구매수 (transaction_quantity)
+  sessions: number | null    // 방문자수
+}
+
+export type Qoo10DailyAdsRow = {
+  date: string
+  ad_sales: number | null    // 광고매출 JPY (sales)
+  ad_cost: number | null     // 광고비 JPY (cost)
+  impressions: number | null
+  clicks: number | null
+}

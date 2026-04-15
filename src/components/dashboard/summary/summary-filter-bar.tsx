@@ -12,6 +12,7 @@ import type {
   AmazonAccount,
   Brand,
   MetaAccount,
+  Qoo10Account,
   ShopeeAccount,
   SummaryFilters,
   TiktokAccount,
@@ -22,7 +23,7 @@ import { DateRangePicker } from '../daily/date-range-picker'
 interface AccountOption {
   id: string
   label: string
-  type: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp' | 'amazon_organic'
+  type: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp' | 'amazon_organic' | 'qoo10_ads'
   brandId: string
 }
 
@@ -34,6 +35,7 @@ interface SummaryFilterBarProps {
   tiktokAccounts: (TiktokAccount & { brands: { name: string } | null })[]
   shopeeAccounts: (ShopeeAccount & { brands: { name: string } | null })[]
   amazonAccounts: (AmazonAccount & { brands: { name: string } | null })[]
+  qoo10Accounts: (Qoo10Account & { brands: { name: string } | null })[]
   isFetching: boolean
   onChange: (filters: SummaryFilters) => void
   onSearch: () => void
@@ -47,6 +49,7 @@ export function SummaryFilterBar({
   tiktokAccounts,
   shopeeAccounts,
   amazonAccounts,
+  qoo10Accounts,
   isFetching,
   onChange,
   onSearch,
@@ -105,6 +108,25 @@ export function SummaryFilterBar({
           id: a.id,
           label: [a.account_name || null, '아마존', a.country].filter(Boolean).join('_'),
           type: 'amazon_organic' as const,
+          brandId: a.brand_id,
+        })
+      }
+      return result
+    })(),
+    // account_id 기준 중복 제거 (ads 행 우선)
+    ...(() => {
+      const seen = new Set<string>()
+      const result: AccountOption[] = []
+      const sorted = [...qoo10Accounts.filter(brandFilter)].sort((a) =>
+        a.account_type === 'ads' ? -1 : 1
+      )
+      for (const a of sorted) {
+        if (seen.has(a.account_id)) continue
+        seen.add(a.account_id)
+        result.push({
+          id: a.id,
+          label: [a.account_name || a.account_id || null, '큐텐', a.country].filter(Boolean).join('_'),
+          type: 'qoo10_ads' as const,
           brandId: a.brand_id,
         })
       }

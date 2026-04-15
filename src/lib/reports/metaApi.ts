@@ -275,6 +275,7 @@ const AD_FIELDS = [
   'adset_name',
   'campaign_name',
   'spend',
+  'impressions',
   'clicks',
   'actions',
   'action_values',
@@ -463,6 +464,7 @@ export async function fetchMetaCreatives(
   return adRows.map((row: any): MetaCreativeData => {
     const spend = parseFloat(row.spend ?? '0')
     const clicks = parseFloat(row.clicks ?? '0')
+    const impressions = parseFloat(row.impressions ?? '0')
     const purchases = findAction(
       row.actions,
       PURCHASE_CANDIDATES,
@@ -497,6 +499,8 @@ export async function fetchMetaCreatives(
       purchases: purchases != null ? Math.round(purchases) : null,
       add_to_cart: add_to_cart != null ? Math.round(add_to_cart) : null,
       add_to_cart_value,
+      impressions: impressions || null,
+      ctr: impressions > 0 ? (clicks / impressions) * 100 : null,
       cpc: clicks > 0 ? spend / clicks : null,
       clicks: clicks || null,
     }

@@ -13,6 +13,7 @@ import type {
   Brand,
   DailyFilters,
   MetaAccount,
+  Qoo10Account,
   ShopeeAccount,
   TiktokAccount,
 } from '@/types/database'
@@ -22,7 +23,7 @@ import { DateRangePicker } from './date-range-picker'
 interface AccountOption {
   id: string
   label: string
-  type: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp' | 'amazon_organic'
+  type: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp' | 'amazon_organic' | 'qoo10_ads'
   brandId: string
 }
 
@@ -34,6 +35,7 @@ interface DailyFilterBarProps {
   tiktokAccounts: (TiktokAccount & { brands: { name: string } | null })[]
   shopeeAccounts: (ShopeeAccount & { brands: { name: string } | null })[]
   amazonAccounts: (AmazonAccount & { brands: { name: string } | null })[]
+  qoo10Accounts: (Qoo10Account & { brands: { name: string } | null })[]
   isFetching: boolean
   onChange: (filters: DailyFilters) => void
   onSearch: () => void
@@ -48,6 +50,7 @@ export function DailyFilterBar({
   tiktokAccounts,
   shopeeAccounts,
   amazonAccounts,
+  qoo10Accounts,
   isFetching,
   onChange,
   onSearch,
@@ -115,7 +118,27 @@ export function DailyFilterBar({
     return result
   })()
 
-  const allOptions = [...metaOptions, ...tiktokOptions, ...shopeeOptions, ...amazonOptions]
+  // account_id 기준 중복 제거 (ads 행 우선)
+  const qoo10Options: AccountOption[] = (() => {
+    const seen = new Set<string>()
+    const result: AccountOption[] = []
+    const sorted = [...qoo10Accounts.filter(brandFilter)].sort((a) =>
+      a.account_type === 'ads' ? -1 : 1
+    )
+    for (const a of sorted) {
+      if (seen.has(a.account_id)) continue
+      seen.add(a.account_id)
+      result.push({
+        id: a.id,
+        label: [a.account_name || a.account_id, '큐텐', a.country].filter(Boolean).join('_'),
+        type: 'qoo10_ads',
+        brandId: a.brand_id,
+      })
+    }
+    return result
+  })()
+
+  const allOptions = [...metaOptions, ...tiktokOptions, ...shopeeOptions, ...amazonOptions, ...qoo10Options]
 
   function handleBrandChange(value: string) {
     onChange({ ...filters, brandId: value, accountId: '' })

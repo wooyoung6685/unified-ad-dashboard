@@ -588,7 +588,7 @@ async function buildThumbnailMap(
   return thumbnailMap
 }
 
-async function fetchTiktokAdThumbnails(
+export async function fetchTiktokAdThumbnails(
   advertiserId: string,
   accessToken: string,
   adIds: string[],

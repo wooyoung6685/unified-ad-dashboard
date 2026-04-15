@@ -12,7 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { fmtDec, fmtKRW, fmtNum, fmtPct } from '@/lib/format'
+import { fmtDec, fmtKRW, fmtNum, fmtPct, formatMetricValue } from '@/lib/format'
 import {
   DEFAULT_GMVMAX_WIDGETS,
   DEFAULT_TIKTOK_WIDGETS,
@@ -21,6 +21,7 @@ import {
   TIKTOK_FILTER_OPTIONS,
   TIKTOK_RANK_OPTIONS,
   applyWidgetConfig,
+  getCardMetrics,
   getWidgetAutoTitle,
   getWidgetSubtitle,
 } from '@/lib/creative-widget-defaults'
@@ -40,6 +41,7 @@ import type {
 } from '@/types/database'
 import { Settings, SlidersHorizontal, X } from 'lucide-react'
 import { useState } from 'react'
+import { useRepairThumbnails } from '@/hooks/use-reports'
 import {
   Bar,
   CartesianGrid,
@@ -61,6 +63,8 @@ interface Props {
   role: 'admin' | 'viewer'
   insightMemo: string | null
   insightMemoGmvMax: string | null
+  insightMemoTitle?: string | null
+  insightMemoGmvMaxTitle?: string | null
   filters?: ReportFilters | null
 }
 
@@ -504,22 +508,35 @@ function AdgroupSection({
 
 // ── 섹션 6: 소재 성과 ────────────────────────────
 
-function TiktokCreativeCard({ ad, rank }: { ad: TiktokAdRow; rank: number }) {
+function TiktokCreativeCard({
+  ad,
+  rank,
+  rankBy,
+}: {
+  ad: TiktokAdRow
+  rank: number
+  rankBy: string
+}) {
+  const [imgError, setImgError] = useState(false)
+
   const thumbSrc = ad.thumbnail_url
-    ? ad.thumbnail_url.includes('ibyteimg.com') || ad.thumbnail_url.includes('tiktokcdn.com')
+    ? ad.thumbnail_url.includes('ibyteimg.com') || ad.thumbnail_url.includes('tiktokcdn')
       ? `/api/proxy/image?url=${encodeURIComponent(ad.thumbnail_url)}`
       : ad.thumbnail_url
     : null
 
+  const metrics = getCardMetrics('tiktok', rankBy)
+
   return (
     <Card className="overflow-hidden">
       <div className="relative w-full overflow-hidden bg-gray-100" style={{ paddingBottom: '100%' }}>
-        {thumbSrc ? (
+        {thumbSrc && !imgError ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={thumbSrc}
             alt={ad.ad_name}
             className="absolute inset-0 h-full w-full object-cover"
+            onError={() => setImgError(true)}
           />
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-muted-foreground">
@@ -535,30 +552,25 @@ function TiktokCreativeCard({ ad, rank }: { ad: TiktokAdRow; rank: number }) {
         <p className="mb-0.5 truncate text-xs text-muted-foreground">{ad.campaign_name}</p>
         <p className="mb-2 line-clamp-2 text-sm font-medium">{ad.ad_name}</p>
         <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted/50 p-3">
-          <div>
-            <p className="text-xs text-muted-foreground">지출금액</p>
-            <p className="text-sm font-semibold">{fmtKRW(ad.spend)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">매출</p>
-            <p className="text-sm font-bold text-emerald-600">{fmtKRW(ad.revenue)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">ROAS</p>
-            <p className="text-sm font-bold text-blue-600">{fmtPct(ad.roas)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">구매수</p>
-            <p className="text-sm font-semibold">{fmtNum(ad.purchases)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">전환수</p>
-            <p className="text-sm font-semibold">{fmtNum(ad.conversions)}</p>
-          </div>
-          <div className="col-span-2">
-            <p className="text-xs text-muted-foreground">동영상 조회수</p>
-            <p className="text-sm font-semibold">{fmtNum(ad.video_views)}</p>
-          </div>
+          {metrics.map((m) => (
+            <div key={m.key}>
+              <p className="text-xs text-muted-foreground">{m.label}</p>
+              <p
+                className={[
+                  'text-sm font-semibold',
+                  m.highlight === 'emerald' ? 'font-bold text-emerald-600' : '',
+                  m.highlight === 'blue' ? 'font-bold text-blue-600' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+              >
+                {formatMetricValue(
+                  (ad[m.key as keyof TiktokAdRow] as number | null) ?? null,
+                  m.format,
+                )}
+              </p>
+            </div>
+          ))}
         </div>
       </CardContent>
     </Card>
@@ -576,14 +588,17 @@ function CreativeSection({
   widgets,
   onWidgetsChange,
   isAdmin,
+  reportId,
 }: {
   ads: TiktokAdRow[]
   widgets: CreativeWidgetConfig[]
   onWidgetsChange: (widgets: CreativeWidgetConfig[]) => void
   isAdmin: boolean
+  reportId?: string
 }) {
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [editingWidget, setEditingWidget] = useState<CreativeWidgetConfig | undefined>()
+  const repairMutation = useRepairThumbnails()
 
   if (ads.length === 0) {
     return (
@@ -619,14 +634,24 @@ function CreativeSection({
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">🎨 소재 성과 분석 (TikTok)</CardTitle>
           {isAdmin && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setAddDialogOpen(true)}
-              disabled={widgets.length >= 10}
-            >
-              + 리스트 추가
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => reportId && repairMutation.mutate({ id: reportId, section: 'tiktok' })}
+                disabled={!reportId || repairMutation.isPending}
+              >
+                {repairMutation.isPending ? '복구 중...' : '🔧 썸네일 복구'}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setAddDialogOpen(true)}
+                disabled={widgets.length >= 10}
+              >
+                + 리스트 추가
+              </Button>
+            </div>
           )}
         </div>
       </CardHeader>
@@ -664,7 +689,7 @@ function CreativeSection({
               ) : (
                 <div className="grid grid-cols-3 gap-4">
                   {items.map((ad, i) => (
-                    <TiktokCreativeCard key={ad.ad_id} ad={ad} rank={i + 1} />
+                    <TiktokCreativeCard key={ad.ad_id} ad={ad} rank={i + 1} rankBy={widget.rankBy} />
                   ))}
                 </div>
               )}
@@ -938,22 +963,35 @@ function GmvMaxCampaignSection({
 
 // ── GMV Max 소재(item) 카드 ──────────────────────
 
-function GmvMaxItemCard({ item, rank }: { item: GmvMaxItemRow; rank: number }) {
+function GmvMaxItemCard({
+  item,
+  rank,
+  rankBy,
+}: {
+  item: GmvMaxItemRow
+  rank: number
+  rankBy: string
+}) {
+  const [imgError, setImgError] = useState(false)
+
   const thumbSrc = item.thumbnail_url
-    ? item.thumbnail_url.includes('ibyteimg.com') || item.thumbnail_url.includes('tiktokcdn.com')
+    ? item.thumbnail_url.includes('ibyteimg.com') || item.thumbnail_url.includes('tiktokcdn')
       ? `/api/proxy/image?url=${encodeURIComponent(item.thumbnail_url)}`
       : item.thumbnail_url
     : null
 
+  const metrics = getCardMetrics('gmvmax', rankBy)
+
   return (
     <Card className="overflow-hidden">
       <div className="relative w-full overflow-hidden bg-gray-100" style={{ paddingBottom: '100%' }}>
-        {thumbSrc ? (
+        {thumbSrc && !imgError ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={thumbSrc}
             alt={item.item_id}
             className="absolute inset-0 h-full w-full object-cover"
+            onError={() => setImgError(true)}
           />
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-muted-foreground">
@@ -972,22 +1010,25 @@ function GmvMaxItemCard({ item, rank }: { item: GmvMaxItemRow; rank: number }) {
           <p className="mb-2 truncate text-xs text-muted-foreground">ID: {item.item_id}</p>
         )}
         <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted/50 p-3">
-          <div>
-            <p className="text-xs text-muted-foreground">비용</p>
-            <p className="text-sm font-semibold">{fmtKRW(item.cost)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">매출</p>
-            <p className="text-sm font-bold text-emerald-600">{fmtKRW(item.gross_revenue)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">ROI</p>
-            <p className="text-sm font-bold text-blue-600">{fmtPct(item.roi)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">주문수</p>
-            <p className="text-sm font-semibold">{fmtNum(item.orders)}</p>
-          </div>
+          {metrics.map((m) => (
+            <div key={m.key}>
+              <p className="text-xs text-muted-foreground">{m.label}</p>
+              <p
+                className={[
+                  'text-sm font-semibold',
+                  m.highlight === 'emerald' ? 'font-bold text-emerald-600' : '',
+                  m.highlight === 'blue' ? 'font-bold text-blue-600' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+              >
+                {formatMetricValue(
+                  (item[m.key as keyof GmvMaxItemRow] as number | null) ?? null,
+                  m.format,
+                )}
+              </p>
+            </div>
+          ))}
         </div>
       </CardContent>
     </Card>
@@ -1005,14 +1046,17 @@ function GmvMaxCreativeSection({
   widgets,
   onWidgetsChange,
   isAdmin,
+  reportId,
 }: {
   items: GmvMaxItemRow[]
   widgets: CreativeWidgetConfig[]
   onWidgetsChange: (widgets: CreativeWidgetConfig[]) => void
   isAdmin: boolean
+  reportId?: string
 }) {
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [editingWidget, setEditingWidget] = useState<CreativeWidgetConfig | undefined>()
+  const repairMutation = useRepairThumbnails()
 
   if (items.length === 0) {
     return (
@@ -1048,14 +1092,24 @@ function GmvMaxCreativeSection({
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">🎨 소재 성과 분석 (GMV Max)</CardTitle>
           {isAdmin && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setAddDialogOpen(true)}
-              disabled={widgets.length >= 10}
-            >
-              + 리스트 추가
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => reportId && repairMutation.mutate({ id: reportId, section: 'gmvmax' })}
+                disabled={!reportId || repairMutation.isPending}
+              >
+                {repairMutation.isPending ? '복구 중...' : '🔧 썸네일 복구'}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setAddDialogOpen(true)}
+                disabled={widgets.length >= 10}
+              >
+                + 리스트 추가
+              </Button>
+            </div>
           )}
         </div>
       </CardHeader>
@@ -1093,7 +1147,7 @@ function GmvMaxCreativeSection({
               ) : (
                 <div className="grid grid-cols-3 gap-4">
                   {widgetItems.map((item, i) => (
-                    <GmvMaxItemCard key={item.item_id} item={item} rank={i + 1} />
+                    <GmvMaxItemCard key={item.item_id} item={item} rank={i + 1} rankBy={widget.rankBy} />
                   ))}
                 </div>
               )}
@@ -1132,6 +1186,8 @@ export function TiktokReportDetail({
   role,
   insightMemo,
   insightMemoGmvMax,
+  insightMemoTitle,
+  insightMemoGmvMaxTitle,
   filters: initialFilters,
 }: Props) {
   const isAdmin = role === 'admin'
@@ -1288,10 +1344,13 @@ export function TiktokReportDetail({
           widgets={tiktokCreativeWidgets}
           onWidgetsChange={handleTiktokCreativeWidgetsChange}
           isAdmin={isAdmin}
+          reportId={reportId}
         />
         <InsightMemoCard
           reportId={reportId}
           initialContent={insightMemo}
+          initialTitle={insightMemoTitle}
+          titleFieldKey="insight_memo_title"
           role={role}
           fieldKey="insight_memo"
         />
@@ -1329,14 +1388,17 @@ export function TiktokReportDetail({
             onFilterClick={isAdmin && adgroupItems.length > 0 ? () => setAdgroupDialogOpen(true) : undefined}
           />
           <CreativeSection
-          ads={ads}
-          widgets={tiktokCreativeWidgets}
-          onWidgetsChange={handleTiktokCreativeWidgetsChange}
-          isAdmin={isAdmin}
-        />
+            ads={ads}
+            widgets={tiktokCreativeWidgets}
+            onWidgetsChange={handleTiktokCreativeWidgetsChange}
+            isAdmin={isAdmin}
+            reportId={reportId}
+          />
           <InsightMemoCard
             reportId={reportId}
             initialContent={insightMemo}
+            initialTitle={insightMemoTitle}
+            titleFieldKey="insight_memo_title"
             role={role}
             label="일반 캠페인 인사이트 & 메모"
             fieldKey="insight_memo"
@@ -1357,10 +1419,13 @@ export function TiktokReportDetail({
             widgets={gmvmaxCreativeWidgets}
             onWidgetsChange={handleGmvmaxCreativeWidgetsChange}
             isAdmin={isAdmin}
+            reportId={reportId}
           />
           <InsightMemoCard
             reportId={reportId}
             initialContent={insightMemoGmvMax}
+            initialTitle={insightMemoGmvMaxTitle}
+            titleFieldKey="insight_memo_gmv_max_title"
             role={role}
             label="GMV Max 인사이트 & 메모"
             fieldKey="insight_memo_gmv_max"

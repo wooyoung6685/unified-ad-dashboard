@@ -19,8 +19,20 @@ export const fmtFx = (v: number | null) =>
     ? '-'
     : v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
+// JPY 금액 (¥ 기호 포함, 정수)
+export const fmtJPY = (v: number | null) =>
+  v == null ? '-' : `¥${Math.round(v).toLocaleString('ja-JP')}`
+
 // USD 금액 ($ 기호 포함, 소수 2자리)
 export const fmtUSD = (v: number | null) =>
   v == null
     ? '-'
     : `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+// 지표 포맷 타입별 공용 포맷 함수
+export function formatMetricValue(v: number | null, format: 'krw' | 'pct' | 'num'): string {
+  const val = v ?? 0
+  if (format === 'krw') return fmtKRW(val)
+  if (format === 'pct') return fmtPct(val)
+  return fmtNum(val)
+}

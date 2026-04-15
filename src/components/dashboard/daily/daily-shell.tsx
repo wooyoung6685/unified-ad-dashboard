@@ -17,6 +17,9 @@ import type {
   DailyFilters,
   GmvMaxDailyRow,
   MetaDailyStatFull,
+  Qoo10AdsStat,
+  Qoo10OrganicTransactionStat,
+  Qoo10OrganicVisitorStat,
   ShopeeInappDayRow,
   ShopeeShoppingStat,
   TiktokDailyStatFull,
@@ -30,6 +33,8 @@ import { DailyFetchButton } from './daily-fetch-button'
 import { MetaDailyTable } from './meta-daily-table'
 import { ShopeeInappTable } from './shopee-inapp-table'
 import { ShopeeShoppingTable } from './shopee-shopping-table'
+import { Qoo10OrganicTable } from './qoo10-organic-table'
+import { Qoo10UploadArea } from './qoo10-upload-area'
 import { ShopeeUploadArea } from './shopee-upload-area'
 import { TiktokDailyTable } from './tiktok-daily-table'
 import { TiktokGmvMaxDailyTable } from './tiktok-gmvmax-daily-table'
@@ -39,6 +44,7 @@ type DailyApiResponse =
   | { platform: 'tiktok'; rows: TiktokDailyStatFull[]; gmvMaxRows: GmvMaxDailyRow[] | null }
   | { platform: 'shopee'; shopping_rows: ShopeeShoppingStat[]; inapp_rows: ShopeeInappDayRow[] }
   | { platform: 'amazon'; organic_rows: AmazonOrganicStat[]; ads_rows: AmazonAdsStat[] }
+  | { platform: 'qoo10'; ads_rows: Qoo10AdsStat[]; visitor_rows: Qoo10OrganicVisitorStat[]; transaction_rows: Qoo10OrganicTransactionStat[]; fx_rates: Record<string, number> }
 
 async function fetchDailyStats(filters: DailyFilters): Promise<DailyApiResponse> {
   const params = new URLSearchParams({
@@ -54,7 +60,7 @@ async function fetchDailyStats(filters: DailyFilters): Promise<DailyApiResponse>
 }
 
 export function DailyShell() {
-  const { role, initialBrandId, brands, metaAccounts, tiktokAccounts, shopeeAccounts, amazonAccounts } =
+  const { role, initialBrandId, brands, metaAccounts, tiktokAccounts, shopeeAccounts, amazonAccounts, qoo10Accounts } =
     useDashboardData()
   const today = new Date().toISOString().slice(0, 10)
 
@@ -88,6 +94,7 @@ export function DailyShell() {
 
   const isShopee = filters.accountType === 'shopee_shopping' || filters.accountType === 'shopee_inapp'
   const isAmazon = filters.accountType === 'amazon_organic' || filters.accountType === 'amazon_ads' || filters.accountType === 'amazon_asin'
+  const isQoo10 = filters.accountType === 'qoo10_ads' || filters.accountType === 'qoo10_organic'
 
   // 선택된 shopee 계정 정보 (대표 행)
   const selectedShopeeAccount = isShopee
@@ -130,10 +137,28 @@ export function DailyShell() {
       )
     : null
 
+  // 선택된 qoo10 계정 정보 (대표 행)
+  const selectedQoo10Account = isQoo10
+    ? qoo10Accounts.find((a) => a.id === filters.accountId)
+    : null
+
+  // 업로드용: 같은 account_id의 ads/organic 각각의 DB PK 조회
+  const qoo10ExternalAccountId = selectedQoo10Account?.account_id ?? ''
+  const qoo10AdsAccountForUpload = qoo10ExternalAccountId
+    ? qoo10Accounts.find(
+        (a) => a.account_id === qoo10ExternalAccountId && a.account_type === 'ads'
+      )
+    : null
+  const qoo10OrganicAccountForUpload = qoo10ExternalAccountId
+    ? qoo10Accounts.find(
+        (a) => a.account_id === qoo10ExternalAccountId && a.account_type === 'organic'
+      )
+    : null
+
   // fetchButton 슬롯
   let fetchButtonSlot: React.ReactNode = undefined
   if (filters.accountId) {
-    if (isShopee || isAmazon) {
+    if (isShopee || isAmazon || isQoo10) {
       if (role === 'admin') {
         fetchButtonSlot = (
           <Button
@@ -184,6 +209,7 @@ export function DailyShell() {
         tiktokAccounts={tiktokAccounts}
         shopeeAccounts={shopeeAccounts}
         amazonAccounts={amazonAccounts}
+        qoo10Accounts={qoo10Accounts}
         isFetching={isFetching}
         onChange={handleFiltersChange}
         onSearch={handleSearch}
@@ -244,6 +270,59 @@ export function DailyShell() {
         </DialogContent>
       </Dialog>
 
+      {/* Qoo10 파일 업로드 Dialog — 광고/오가닉 세 업로드 영역 */}
+      <Dialog open={showUpload && isQoo10 && !!selectedQoo10Account} onOpenChange={setShowUpload}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>큐텐 파일 업로드</DialogTitle>
+          </DialogHeader>
+          {selectedQoo10Account && (
+            <div className="space-y-6">
+              {qoo10AdsAccountForUpload && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">내부광고 (.xlsx) — 새 광고 성과 보고서</p>
+                  <Qoo10UploadArea
+                    qoo10AccountId={qoo10AdsAccountForUpload.id}
+                    accountType="ads"
+                    onUploadSuccess={() => {
+                      handleSearch()
+                    }}
+                  />
+                </div>
+              )}
+              {qoo10AdsAccountForUpload && qoo10OrganicAccountForUpload && <Separator />}
+              {qoo10OrganicAccountForUpload && (
+                <>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">오가닉 유입자수 (.xlsx) — Qoo10_CVR</p>
+                    <Qoo10UploadArea
+                      qoo10AccountId={qoo10OrganicAccountForUpload.id}
+                      accountType="organic"
+                      fileType="visitor"
+                      onUploadSuccess={() => {
+                        handleSearch()
+                      }}
+                    />
+                  </div>
+                  <Separator />
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">오가닉 거래 (.xlsx) — Qoo10_Transaction_DateGoods</p>
+                    <Qoo10UploadArea
+                      qoo10AccountId={qoo10OrganicAccountForUpload.id}
+                      accountType="organic"
+                      fileType="transaction"
+                      onUploadSuccess={() => {
+                        handleSearch()
+                      }}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Shopee 파일 업로드 Dialog — 쇼핑몰/인앱 두 업로드 영역 */}
       <Dialog open={showUpload && isShopee && !!selectedShopeeAccount} onOpenChange={setShowUpload}>
         <DialogContent className="sm:max-w-lg">
@@ -298,6 +377,14 @@ export function DailyShell() {
                 <TiktokGmvMaxDailyTable rows={data.gmvMaxRows} />
               )}
             </>
+          ) : data.platform === 'qoo10' ? (
+            <div className="rounded-lg border">
+              <Qoo10OrganicTable
+                visitorRows={data.visitor_rows}
+                transactionRows={data.transaction_rows}
+                fxRates={data.fx_rates}
+              />
+            </div>
           ) : data.platform === 'amazon' ? (
             // amazon: 오가닉 + 광고 테이블 세로 나란히
             <>

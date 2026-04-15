@@ -10,12 +10,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { fmtDec, fmtKRW, fmtNum, fmtPct } from '@/lib/format'
+import { fmtDec, fmtKRW, fmtNum, fmtPct, formatMetricValue } from '@/lib/format'
 import {
   DEFAULT_META_WIDGETS,
   META_FILTER_OPTIONS,
   META_RANK_OPTIONS,
   applyWidgetConfig,
+  getCardMetrics,
   getWidgetAutoTitle,
   getWidgetSubtitle,
 } from '@/lib/creative-widget-defaults'
@@ -31,6 +32,7 @@ import type {
 } from '@/types/database'
 import { Settings, SlidersHorizontal, X } from 'lucide-react'
 import { useState } from 'react'
+import { useRepairThumbnails } from '@/hooks/use-reports'
 import {
   Bar,
   CartesianGrid,
@@ -568,22 +570,35 @@ function RankBadge({ rank }: { rank: number }) {
 }
 
 // 소재 카드
-function CreativeCard({ creative, rank }: { creative: MetaCreativeData; rank: number }) {
+function CreativeCard({
+  creative,
+  rank,
+  rankBy,
+}: {
+  creative: MetaCreativeData
+  rank: number
+  rankBy: string
+}) {
+  const [imgError, setImgError] = useState(false)
+
   const thumbSrc = creative.thumbnail_url
     ? creative.thumbnail_url.includes('fbcdn.net') || creative.thumbnail_url.includes('cdninstagram.com')
       ? `/api/proxy/image?url=${encodeURIComponent(creative.thumbnail_url)}`
       : creative.thumbnail_url
     : null
 
+  const metrics = getCardMetrics('meta', rankBy)
+
   return (
     <Card className="overflow-hidden">
       <div className="relative w-full overflow-hidden bg-gray-100" style={{ paddingBottom: '100%' }}>
-        {thumbSrc ? (
+        {thumbSrc && !imgError ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={thumbSrc}
             alt={creative.ad_name}
             className="absolute inset-0 h-full w-full object-cover"
+            onError={() => setImgError(true)}
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
@@ -598,22 +613,25 @@ function CreativeCard({ creative, rank }: { creative: MetaCreativeData; rank: nu
         <p className="mb-0.5 truncate text-xs text-muted-foreground">{creative.campaign_name}</p>
         <p className="mb-2 line-clamp-2 text-sm font-medium">{creative.ad_name}</p>
         <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted/50 p-3">
-          <div>
-            <p className="text-xs text-muted-foreground">지출금액</p>
-            <p className="text-sm font-semibold">{fmtKRW(creative.spend)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">매출</p>
-            <p className="text-sm font-bold text-emerald-600">{fmtKRW(creative.revenue)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">ROAS</p>
-            <p className="text-sm font-bold text-blue-600">{fmtPct(creative.roas)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">CPC</p>
-            <p className="text-sm font-semibold">{fmtKRW(creative.cpc)}</p>
-          </div>
+          {metrics.map((m) => (
+            <div key={m.key}>
+              <p className="text-xs text-muted-foreground">{m.label}</p>
+              <p
+                className={[
+                  'text-sm font-semibold',
+                  m.highlight === 'emerald' ? 'font-bold text-emerald-600' : '',
+                  m.highlight === 'blue' ? 'font-bold text-blue-600' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+              >
+                {formatMetricValue(
+                  (creative[m.key as keyof MetaCreativeData] as number | null) ?? null,
+                  m.format,
+                )}
+              </p>
+            </div>
+          ))}
         </div>
       </CardContent>
     </Card>
@@ -632,14 +650,17 @@ function CreativeSection({
   widgets,
   onWidgetsChange,
   isAdmin,
+  reportId,
 }: {
   creatives: MetaCreativeData[]
   widgets: CreativeWidgetConfig[]
   onWidgetsChange: (widgets: CreativeWidgetConfig[]) => void
   isAdmin: boolean
+  reportId?: string
 }) {
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [editingWidget, setEditingWidget] = useState<CreativeWidgetConfig | undefined>()
+  const repairMutation = useRepairThumbnails()
 
   if (creatives.length === 0) return null
 
@@ -666,14 +687,24 @@ function CreativeSection({
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">🎨 소재 성과 분석 (Meta)</CardTitle>
           {isAdmin && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setAddDialogOpen(true)}
-              disabled={widgets.length >= 10}
-            >
-              + 리스트 추가
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => reportId && repairMutation.mutate({ id: reportId, section: 'meta' })}
+                disabled={!reportId || repairMutation.isPending}
+              >
+                {repairMutation.isPending ? '복구 중...' : '🔧 썸네일 복구'}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setAddDialogOpen(true)}
+                disabled={widgets.length >= 10}
+              >
+                + 리스트 추가
+              </Button>
+            </div>
           )}
         </div>
       </CardHeader>
@@ -714,7 +745,7 @@ function CreativeSection({
               ) : (
                 <div className="grid grid-cols-3 gap-4">
                   {items.map((c, i) => (
-                    <CreativeCard key={c.ad_id} creative={c} rank={i + 1} />
+                    <CreativeCard key={c.ad_id} creative={c} rank={i + 1} rankBy={widget.rankBy} />
                   ))}
                 </div>
               )}
@@ -842,6 +873,7 @@ export function MetaReportDetail({ data, title, role, reportId, filters: initial
         widgets={creativeWidgets}
         onWidgetsChange={handleCreativeWidgetsChange}
         isAdmin={isAdmin}
+        reportId={reportId}
       />
 
       {/* 캠페인 필터 다이얼로그 */}

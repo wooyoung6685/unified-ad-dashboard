@@ -38,7 +38,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   if (authError) return authError
 
   const body = await req.json()
-  const { title, insight_memo, insight_memo_gmv_max, filters } = body
+  const { title, insight_memo, insight_memo_gmv_max, insight_memo_title, insight_memo_gmv_max_title, filters } = body
 
   const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }
 
@@ -61,6 +61,20 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: 'insight_memo_gmv_max 형식이 잘못되었습니다.' }, { status: 400 })
     }
     updateData.insight_memo_gmv_max = insight_memo_gmv_max
+  }
+
+  if (insight_memo_title !== undefined) {
+    if (insight_memo_title !== null && typeof insight_memo_title !== 'string') {
+      return NextResponse.json({ error: 'insight_memo_title 형식이 잘못되었습니다.' }, { status: 400 })
+    }
+    updateData.insight_memo_title = insight_memo_title
+  }
+
+  if (insight_memo_gmv_max_title !== undefined) {
+    if (insight_memo_gmv_max_title !== null && typeof insight_memo_gmv_max_title !== 'string') {
+      return NextResponse.json({ error: 'insight_memo_gmv_max_title 형식이 잘못되었습니다.' }, { status: 400 })
+    }
+    updateData.insight_memo_gmv_max_title = insight_memo_gmv_max_title
   }
 
   if (filters !== undefined) {

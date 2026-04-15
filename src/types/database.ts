@@ -335,11 +335,66 @@ export type AmazonAsinStat = {
   created_at: string
 }
 
+// ── Qoo10 ────────────────────────────────────
+
+export type Qoo10Account = {
+  id: string
+  brand_id: string
+  account_id: string        // 브랜드명 입력
+  account_name: string
+  account_type: 'ads' | 'organic'
+  country: string | null
+  is_active: boolean
+  created_at: string
+}
+
+export type Qoo10AdsStat = {
+  id: string
+  qoo10_account_id: string
+  brand_id: string
+  date: string
+  product_name: string | null
+  product_code: string | null
+  ad_name: string | null
+  cost: number | null
+  sales: number | null
+  roas: number | null
+  impressions: number | null
+  clicks: number | null
+  ctr: number | null
+  carts: number | null
+  cart_conversion_rate: number | null
+  purchases: number | null
+  purchase_conversion_rate: number | null
+  created_at: string
+}
+
+export type Qoo10OrganicVisitorStat = {
+  id: string
+  qoo10_account_id: string
+  brand_id: string
+  date: string
+  visitors: number | null
+  add_to_cart: number | null
+  created_at: string
+}
+
+export type Qoo10OrganicTransactionStat = {
+  id: string
+  qoo10_account_id: string
+  brand_id: string
+  date: string
+  product_name: string | null
+  transaction_amount: number | null
+  transaction_quantity: number | null
+  created_at: string
+}
+
 // 일별 페이지 필터
 export type DailyFilters = {
   brandId: string
   accountId: string
-  accountType: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp' | 'amazon_organic' | 'amazon_ads' | 'amazon_asin'
+  accountType: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp' | 'amazon_organic' | 'amazon_ads' | 'amazon_asin' | 'qoo10_ads' | 'qoo10_organic'
   startDate: string
   endDate: string
 }
@@ -347,7 +402,7 @@ export type DailyFilters = {
 export type SummaryFilters = {
   brandId: string
   accountId: string
-  accountType: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp' | 'amazon_organic' | 'amazon_ads' | 'amazon_asin'
+  accountType: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp' | 'amazon_organic' | 'amazon_ads' | 'amazon_asin' | 'qoo10_ads' | 'qoo10_organic'
   startDate: string
   endDate: string
 }
@@ -440,8 +495,99 @@ export type AmazonCombinedTotals = {
   total_sessions: number | null
 }
 
+// ── Qoo10 Dashboard ──────────────────────────
+
+// 광고 요약 일별 데이터
+export type Qoo10AdsSummaryDayData = {
+  date: string
+  cost: number | null
+  sales: number | null
+  impressions: number | null
+  clicks: number | null
+  ctr: number | null
+  carts: number | null
+  cart_conversion_rate: number | null
+  purchases: number | null
+  purchase_conversion_rate: number | null
+  roas: number | null
+  cpc: number | null
+  cost_per_purchase: number | null
+  // KRW 환산
+  cost_krw: number | null
+  sales_krw: number | null
+}
+
+export type Qoo10AdsSummaryTotals = Omit<Qoo10AdsSummaryDayData, 'date'>
+
+// 오가닉 요약 일별 데이터
+export type Qoo10OrganicSummaryDayData = {
+  date: string
+  visitors: number | null
+  add_to_cart: number | null
+  transaction_amount_jpy: number | null
+  transaction_amount_krw: number | null
+  transaction_quantity: number | null
+  aov_jpy: number | null
+  conversion_rate: number | null
+  cart_to_purchase_rate: number | null
+}
+
+export type Qoo10OrganicSummaryTotals = Omit<Qoo10OrganicSummaryDayData, 'date'>
+
+// 통합 핵심 지표
+export type Qoo10CombinedTotals = {
+  total_sales_jpy: number | null
+  total_sales_krw: number | null
+  total_quantity: number | null
+  total_visitors: number | null
+  overall_conversion_rate: number | null
+  ad_cost_jpy: number | null
+  ad_cost_krw: number | null
+  overall_roas: number | null
+  tacos: number | null
+  ad_sales_ratio: number | null
+}
+
+// 광고유형(ad_name) 별 성과 브레이크다운
+export type Qoo10AdTypeRow = {
+  ad_name: string
+  cost: number | null
+  sales: number | null
+  roas: number | null
+  impressions: number | null
+  clicks: number | null
+  ctr: number | null
+  purchases: number | null
+  purchase_conversion_rate: number | null
+  cost_krw: number | null
+  sales_krw: number | null
+}
+
+// 상품별 광고성과 TOP 10
+export type Qoo10AdsProductRow = {
+  product_code: string
+  product_name: string
+  product_name_ko?: string | null  // 번역된 한국어 상품명
+  cost: number | null
+  sales: number | null
+  roas: number | null
+  purchases: number | null
+  cost_krw: number | null
+  sales_krw: number | null
+}
+
+// 상품별 오가닉 매출 TOP 10
+export type Qoo10OrganicProductRow = {
+  product_name: string
+  product_name_ko?: string | null  // 번역된 한국어 상품명
+  transaction_amount_jpy: number | null
+  transaction_amount_krw: number | null
+  transaction_quantity: number | null
+  aov_jpy: number | null
+}
+
 export type SummaryResponse = {
-  platform: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp' | 'amazon'
+  platform: 'meta' | 'tiktok' | 'shopee_shopping' | 'shopee_inapp' | 'amazon' | 'qoo10'
   dailyData: SummaryDayData[]
   totals: SummaryTotals
   shopeeExtra?: {
@@ -463,6 +609,20 @@ export type SummaryResponse = {
   adsTotals?: AmazonAdsSummaryTotals
   combinedTotals?: AmazonCombinedTotals
   amazonExtra?: { currency: string | null }
+  // Qoo10 광고/오가닉 분리 데이터
+  qoo10AdsDailyData?: Qoo10AdsSummaryDayData[]
+  qoo10AdsTotals?: Qoo10AdsSummaryTotals
+  qoo10OrganicDailyData?: Qoo10OrganicSummaryDayData[]
+  qoo10OrganicTotals?: Qoo10OrganicSummaryTotals
+  qoo10CombinedTotals?: Qoo10CombinedTotals
+  qoo10AdTypeBreakdown?: Qoo10AdTypeRow[]
+  qoo10AdsProductBreakdown?: Qoo10AdsProductRow[]
+  qoo10OrganicProductBreakdown?: Qoo10OrganicProductRow[]
+  qoo10Extra?: {
+    fxRates: Record<string, number>
+    hasKrw: boolean
+    appliedRate: number | null
+  }
 }
 
 export type ExchangeRate = {
@@ -528,7 +688,7 @@ export type Report = {
   id: string
   brand_id: string
   title: string
-  platform: 'meta' | 'shopee_inapp' | 'tiktok' | 'amazon'
+  platform: 'meta' | 'shopee_inapp' | 'tiktok' | 'amazon' | 'qoo10'
   country: string | null
   internal_account_id: string | null
   year: number
@@ -537,6 +697,8 @@ export type Report = {
   snapshot: ReportSnapshot | null
   insight_memo: string | null
   insight_memo_gmv_max: string | null
+  insight_memo_title: string | null
+  insight_memo_gmv_max_title: string | null
   filters: ReportFilters | null
   created_by: string | null
   created_at: string
@@ -552,6 +714,79 @@ export type ReportSnapshot =
   | { platform: 'shopee_inapp'; data: ShopeeReportData }
   | { platform: 'tiktok'; data: TiktokReportData }
   | { platform: 'amazon'; data: AmazonReportData }
+  | { platform: 'qoo10'; data: Qoo10ReportData }
+
+// ── Qoo10 ─────────────────────────────────────
+
+export type Qoo10MonthlyData = {
+  date_range: string
+  // 전체(오가닉) 지표
+  revenue: number | null          // 전체매출 JPY
+  purchases: number | null        // 구매수
+  sessions: number | null         // 전체 세션수 (방문자)
+  conversion_rate: number | null  // 구매전환율 %
+  aov: number | null              // 객단가 JPY
+  // 내부광고 지표
+  ad_sales: number | null         // 광고매출 JPY
+  ad_cost: number | null          // 전체 광고비 JPY
+  roas: number | null             // 광고 ROAS (배수, 예: 2.1)
+  impressions: number | null      // 노출수
+  clicks: number | null           // 클릭수
+  ctr: number | null              // CTR %
+  cpc: number | null              // CPC JPY
+  // 전월 대비 (델타 배지용)
+  prev_revenue: number | null
+  prev_purchases: number | null
+  prev_sessions: number | null
+  prev_conversion_rate: number | null
+  prev_aov: number | null
+  prev_ad_sales: number | null
+  prev_ad_cost: number | null
+  prev_roas: number | null
+  prev_impressions: number | null
+  prev_clicks: number | null
+  prev_ctr: number | null
+  prev_cpc: number | null
+}
+
+export type Qoo10WeeklyData = {
+  week: number
+  date_range: string
+  revenue: number | null
+  purchases: number | null
+  sessions: number | null
+  conversion_rate: number | null
+  aov: number | null
+  ad_sales: number | null
+  ad_cost: number | null
+  roas: number | null
+  impressions: number | null
+  clicks: number | null
+  ctr: number | null
+  cpc: number | null
+}
+
+export type Qoo10DailyData = {
+  date: string
+  revenue: number | null
+  purchases: number | null
+  sessions: number | null
+  conversion_rate: number | null
+}
+
+export type Qoo10ProductData = {
+  product_name_jp: string
+  product_name_ko: string | null
+  sales: number | null
+  quantity: number | null
+}
+
+export type Qoo10ReportData = {
+  monthly: Qoo10MonthlyData
+  weekly: Qoo10WeeklyData[]
+  daily: Qoo10DailyData[]
+  products: Qoo10ProductData[]
+}
 
 // ── Meta ──────────────────────────────────────
 
@@ -689,6 +924,8 @@ export type MetaCreativeData = {
   purchases: number | null
   add_to_cart: number | null
   add_to_cart_value: number | null
+  impressions: number | null
+  ctr: number | null
   cpc: number | null
   clicks: number | null
 }

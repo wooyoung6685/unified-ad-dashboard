@@ -125,19 +125,141 @@
   }
 }
 
-/* 인사이트 메모 Quill 에디터 스타일 */
-.insight-memo-quill .ql-container {
-  min-height: 120px;
+/* 인사이트 메모 Tiptap 에디터 스타일 */
+.tiptap-content {
   font-size: 14px;
+  line-height: 1.6;
 }
-.insight-memo-quill .ql-editor {
-  min-height: 120px;
+.tiptap-content:focus {
+  outline: none;
 }
-.insight-memo-quill .ql-toolbar.ql-snow {
-  border-radius: 6px 6px 0 0;
-  border-color: var(--border);
+.tiptap-content .tiptap:focus {
+  outline: none;
 }
-.insight-memo-quill .ql-container.ql-snow {
-  border-radius: 0 0 6px 6px;
-  border-color: var(--border);
+.tiptap-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--muted-foreground);
+  pointer-events: none;
+  height: 0;
+}
+.tiptap-content h1 {
+  font-size: 1.5em;
+  font-weight: 700;
+  margin: 0.5em 0;
+}
+.tiptap-content h2 {
+  font-size: 1.25em;
+  font-weight: 600;
+  margin: 0.4em 0;
+}
+.tiptap-content h3 {
+  font-size: 1.1em;
+  font-weight: 600;
+  margin: 0.3em 0;
+}
+.tiptap-content ul {
+  list-style-type: disc;
+  padding-left: 1.5em;
+}
+.tiptap-content ol {
+  list-style-type: decimal;
+  padding-left: 1.5em;
+}
+
+/* 테이블 스타일 */
+.tiptap-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 8px 0;
+  overflow: hidden;
+}
+.tiptap-content table td,
+.tiptap-content table th {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  min-width: 60px;
+  position: relative;
+  vertical-align: top;
+  box-sizing: border-box;
+}
+.tiptap-content table th {
+  font-weight: 600;
+  background-color: var(--muted);
+}
+
+/* 테이블 셀 선택 */
+.tiptap-content table .selectedCell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--primary);
+  opacity: 0.1;
+  pointer-events: none;
+}
+
+/* 테이블 열 리사이즈 핸들 — prosemirror-tables가 생성하는 요소 */
+.tiptap-content .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: -2px;
+  width: 4px;
+  background-color: var(--primary);
+  cursor: col-resize;
+  z-index: 20;
+}
+.tiptap-content .tableWrapper {
+  overflow-x: auto;
+}
+.tiptap-content.resize-cursor {
+  cursor: col-resize;
+}
+/* 에디터 전체 리사이즈 커서 (Tiptap이 body/에디터에 클래스 추가) */
+.ProseMirror.resize-cursor {
+  cursor: col-resize;
+}
+
+/* 이미지 크기 제한 (섬네일) - 테이블 밖 */
+.tiptap-content img {
+  max-width: 240px;
+  max-height: 240px;
+  object-fit: contain;
+  border-radius: 4px;
+}
+/* 테이블 셀 안 이미지 - 셀 너비에 맞춤 */
+.tiptap-content table img {
+  max-width: 100%;
+  max-height: none;
+  width: 100%;
+  object-fit: contain;
+}
+
+/* 읽기전용 테이블 동일 스타일 */
+.insight-memo-readonly table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 8px 0;
+}
+.insight-memo-readonly table td,
+.insight-memo-readonly table th {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  min-width: 40px;
+}
+.insight-memo-readonly table th {
+  font-weight: 600;
+  background-color: var(--muted);
+}
+.insight-memo-readonly img {
+  max-width: 240px;
+  max-height: 240px;
+  object-fit: contain;
+  border-radius: 4px;
+}
+.insight-memo-readonly table img {
+  max-width: 100%;
+  max-height: none;
+  width: 100%;
+  object-fit: contain;
 }
