@@ -39,15 +39,36 @@ import { ShopeeExtraUploadArea } from './shopee-extra-upload-area'
 import { ShopeeUploadArea } from './shopee-upload-area'
 import { TiktokDailyTable } from './tiktok-daily-table'
 import { TiktokGmvMaxDailyTable } from './tiktok-gmvmax-daily-table'
+import { ExchangeRateNotice } from './exchange-rate-notice'
 
 type DailyApiResponse =
   | { platform: 'meta'; rows: MetaDailyStatFull[] }
-  | { platform: 'tiktok'; rows: TiktokDailyStatFull[]; gmvMaxRows: GmvMaxDailyRow[] | null }
-  | { platform: 'shopee'; shopping_rows: ShopeeShoppingStat[]; inapp_rows: ShopeeInappDayRow[] }
-  | { platform: 'amazon'; organic_rows: AmazonOrganicStat[]; ads_rows: AmazonAdsStat[] }
-  | { platform: 'qoo10'; ads_rows: Qoo10AdsStat[]; visitor_rows: Qoo10OrganicVisitorStat[]; transaction_rows: Qoo10OrganicTransactionStat[]; fx_rates: Record<string, number> }
+  | {
+      platform: 'tiktok'
+      rows: TiktokDailyStatFull[]
+      gmvMaxRows: GmvMaxDailyRow[] | null
+    }
+  | {
+      platform: 'shopee'
+      shopping_rows: ShopeeShoppingStat[]
+      inapp_rows: ShopeeInappDayRow[]
+    }
+  | {
+      platform: 'amazon'
+      organic_rows: AmazonOrganicStat[]
+      ads_rows: AmazonAdsStat[]
+    }
+  | {
+      platform: 'qoo10'
+      ads_rows: Qoo10AdsStat[]
+      visitor_rows: Qoo10OrganicVisitorStat[]
+      transaction_rows: Qoo10OrganicTransactionStat[]
+      fx_rates: Record<string, number>
+    }
 
-async function fetchDailyStats(filters: DailyFilters): Promise<DailyApiResponse> {
+async function fetchDailyStats(
+  filters: DailyFilters
+): Promise<DailyApiResponse> {
   const params = new URLSearchParams({
     brand_id: filters.brandId,
     account_id: filters.accountId,
@@ -61,8 +82,16 @@ async function fetchDailyStats(filters: DailyFilters): Promise<DailyApiResponse>
 }
 
 export function DailyShell() {
-  const { role, initialBrandId, brands, metaAccounts, tiktokAccounts, shopeeAccounts, amazonAccounts, qoo10Accounts } =
-    useDashboardData()
+  const {
+    role,
+    initialBrandId,
+    brands,
+    metaAccounts,
+    tiktokAccounts,
+    shopeeAccounts,
+    amazonAccounts,
+    qoo10Accounts,
+  } = useDashboardData()
   const today = new Date().toISOString().slice(0, 10)
 
   const [filters, setFilters] = useState<DailyFilters>({
@@ -93,9 +122,16 @@ export function DailyShell() {
     }
   }
 
-  const isShopee = filters.accountType === 'shopee_shopping' || filters.accountType === 'shopee_inapp'
-  const isAmazon = filters.accountType === 'amazon_organic' || filters.accountType === 'amazon_ads' || filters.accountType === 'amazon_asin'
-  const isQoo10 = filters.accountType === 'qoo10_ads' || filters.accountType === 'qoo10_organic'
+  const isShopee =
+    filters.accountType === 'shopee_shopping' ||
+    filters.accountType === 'shopee_inapp'
+  const isAmazon =
+    filters.accountType === 'amazon_organic' ||
+    filters.accountType === 'amazon_ads' ||
+    filters.accountType === 'amazon_asin'
+  const isQoo10 =
+    filters.accountType === 'qoo10_ads' ||
+    filters.accountType === 'qoo10_organic'
 
   // 선택된 shopee 계정 정보 (대표 행)
   const selectedShopeeAccount = isShopee
@@ -106,12 +142,15 @@ export function DailyShell() {
   const shopeeExternalAccountId = selectedShopeeAccount?.account_id ?? ''
   const shoppingAccountForUpload = shopeeExternalAccountId
     ? shopeeAccounts.find(
-        (a) => a.account_id === shopeeExternalAccountId && a.account_type === 'shopping'
+        (a) =>
+          a.account_id === shopeeExternalAccountId &&
+          a.account_type === 'shopping'
       )
     : null
   const inappAccountForUpload = shopeeExternalAccountId
     ? shopeeAccounts.find(
-        (a) => a.account_id === shopeeExternalAccountId && a.account_type === 'inapp'
+        (a) =>
+          a.account_id === shopeeExternalAccountId && a.account_type === 'inapp'
       )
     : null
 
@@ -124,17 +163,21 @@ export function DailyShell() {
   const amazonExternalAccountId = selectedAmazonAccount?.account_id ?? ''
   const organicAccountForUpload = amazonExternalAccountId
     ? amazonAccounts.find(
-        (a) => a.account_id === amazonExternalAccountId && a.account_type === 'organic'
+        (a) =>
+          a.account_id === amazonExternalAccountId &&
+          a.account_type === 'organic'
       )
     : null
   const adsAccountForUpload = amazonExternalAccountId
     ? amazonAccounts.find(
-        (a) => a.account_id === amazonExternalAccountId && a.account_type === 'ads'
+        (a) =>
+          a.account_id === amazonExternalAccountId && a.account_type === 'ads'
       )
     : null
   const asinAccountForUpload = amazonExternalAccountId
     ? amazonAccounts.find(
-        (a) => a.account_id === amazonExternalAccountId && a.account_type === 'asin'
+        (a) =>
+          a.account_id === amazonExternalAccountId && a.account_type === 'asin'
       )
     : null
 
@@ -147,12 +190,15 @@ export function DailyShell() {
   const qoo10ExternalAccountId = selectedQoo10Account?.account_id ?? ''
   const qoo10AdsAccountForUpload = qoo10ExternalAccountId
     ? qoo10Accounts.find(
-        (a) => a.account_id === qoo10ExternalAccountId && a.account_type === 'ads'
+        (a) =>
+          a.account_id === qoo10ExternalAccountId && a.account_type === 'ads'
       )
     : null
   const qoo10OrganicAccountForUpload = qoo10ExternalAccountId
     ? qoo10Accounts.find(
-        (a) => a.account_id === qoo10ExternalAccountId && a.account_type === 'organic'
+        (a) =>
+          a.account_id === qoo10ExternalAccountId &&
+          a.account_type === 'organic'
       )
     : null
 
@@ -218,7 +264,10 @@ export function DailyShell() {
       />
 
       {/* Amazon 파일 업로드 Dialog — 오가닉/광고/ASIN 세 업로드 영역 */}
-      <Dialog open={showUpload && isAmazon && !!selectedAmazonAccount} onOpenChange={setShowUpload}>
+      <Dialog
+        open={showUpload && isAmazon && !!selectedAmazonAccount}
+        onOpenChange={setShowUpload}
+      >
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>아마존 파일 업로드</DialogTitle>
@@ -227,7 +276,9 @@ export function DailyShell() {
             <div className="space-y-6">
               {organicAccountForUpload && (
                 <div className="space-y-2">
-                  <p className="text-sm font-medium">오가닉 데이터 (.csv) — BusinessReport</p>
+                  <p className="text-sm font-medium">
+                    오가닉 데이터 (.csv) — BusinessReport
+                  </p>
                   <AmazonUploadArea
                     amazonAccountId={organicAccountForUpload.id}
                     accountExternalId={amazonExternalAccountId}
@@ -241,7 +292,9 @@ export function DailyShell() {
               {organicAccountForUpload && adsAccountForUpload && <Separator />}
               {adsAccountForUpload && (
                 <div className="space-y-2">
-                  <p className="text-sm font-medium">내부광고 데이터 (.csv) — Sponsored Products</p>
+                  <p className="text-sm font-medium">
+                    내부광고 데이터 (.csv) — Sponsored Products
+                  </p>
                   <AmazonUploadArea
                     amazonAccountId={adsAccountForUpload.id}
                     accountExternalId={amazonExternalAccountId}
@@ -255,7 +308,9 @@ export function DailyShell() {
               {adsAccountForUpload && asinAccountForUpload && <Separator />}
               {asinAccountForUpload && (
                 <div className="space-y-2">
-                  <p className="text-sm font-medium">제품별 데이터 (.csv) — ASIN Report</p>
+                  <p className="text-sm font-medium">
+                    제품별 데이터 (.csv) — ASIN Report
+                  </p>
                   <AmazonUploadArea
                     amazonAccountId={asinAccountForUpload.id}
                     accountExternalId={amazonExternalAccountId}
@@ -272,16 +327,22 @@ export function DailyShell() {
       </Dialog>
 
       {/* Qoo10 파일 업로드 Dialog — 광고/오가닉 세 업로드 영역 */}
-      <Dialog open={showUpload && isQoo10 && !!selectedQoo10Account} onOpenChange={setShowUpload}>
+      <Dialog
+        open={showUpload && isQoo10 && !!selectedQoo10Account}
+        onOpenChange={setShowUpload}
+      >
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>큐텐 파일 업로드</DialogTitle>
           </DialogHeader>
+          <ExchangeRateNotice />
           {selectedQoo10Account && (
             <div className="space-y-6">
               {qoo10AdsAccountForUpload && (
                 <div className="space-y-2">
-                  <p className="text-sm font-medium">내부광고 (.xlsx) — 새 광고 성과 보고서</p>
+                  <p className="text-sm font-medium">
+                    내부광고 (.xlsx) — 새 광고 성과 보고서
+                  </p>
                   <Qoo10UploadArea
                     qoo10AccountId={qoo10AdsAccountForUpload.id}
                     accountType="ads"
@@ -291,11 +352,15 @@ export function DailyShell() {
                   />
                 </div>
               )}
-              {qoo10AdsAccountForUpload && qoo10OrganicAccountForUpload && <Separator />}
+              {qoo10AdsAccountForUpload && qoo10OrganicAccountForUpload && (
+                <Separator />
+              )}
               {qoo10OrganicAccountForUpload && (
                 <>
                   <div className="space-y-2">
-                    <p className="text-sm font-medium">오가닉 유입자수 (.xlsx) — Qoo10_CVR</p>
+                    <p className="text-sm font-medium">
+                      오가닉 유입자수 (.xlsx) — Qoo10_CVR
+                    </p>
                     <Qoo10UploadArea
                       qoo10AccountId={qoo10OrganicAccountForUpload.id}
                       accountType="organic"
@@ -307,7 +372,9 @@ export function DailyShell() {
                   </div>
                   <Separator />
                   <div className="space-y-2">
-                    <p className="text-sm font-medium">오가닉 거래 (.xlsx) — Qoo10_Transaction_DateGoods</p>
+                    <p className="text-sm font-medium">
+                      오가닉 거래 (.xlsx) — Qoo10_Transaction_DateGoods
+                    </p>
                     <Qoo10UploadArea
                       qoo10AccountId={qoo10OrganicAccountForUpload.id}
                       accountType="organic"
@@ -325,11 +392,15 @@ export function DailyShell() {
       </Dialog>
 
       {/* Shopee 파일 업로드 Dialog — 쇼핑몰/인앱 + 3종 추가 업로드 영역 */}
-      <Dialog open={showUpload && isShopee && !!selectedShopeeAccount} onOpenChange={setShowUpload}>
-        <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
+      <Dialog
+        open={showUpload && isShopee && !!selectedShopeeAccount}
+        onOpenChange={setShowUpload}
+      >
+        <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>쇼피 파일 업로드</DialogTitle>
           </DialogHeader>
+          <ExchangeRateNotice />
           {selectedShopeeAccount && (
             <div className="space-y-6">
               {shoppingAccountForUpload && (
@@ -345,7 +416,9 @@ export function DailyShell() {
                   />
                 </div>
               )}
-              {shoppingAccountForUpload && inappAccountForUpload && <Separator />}
+              {shoppingAccountForUpload && inappAccountForUpload && (
+                <Separator />
+              )}
               {inappAccountForUpload && (
                 <div className="space-y-2">
                   <p className="text-sm font-medium">인앱 데이터 (.csv)</p>
@@ -363,7 +436,9 @@ export function DailyShell() {
                 <>
                   <Separator />
                   <div className="space-y-2">
-                    <p className="text-sm font-medium">프로모션(일별) (.xlsx) — sales_overview</p>
+                    <p className="text-sm font-medium">
+                      프로모션(일별) (.xlsx) — sales_overview
+                    </p>
                     <ShopeeExtraUploadArea
                       shopeeAccountId={shoppingAccountForUpload.id}
                       kind="sales_overview"
@@ -374,7 +449,9 @@ export function DailyShell() {
                   </div>
                   <Separator />
                   <div className="space-y-2">
-                    <p className="text-sm font-medium">바우처(월별) (.xlsx) — voucher</p>
+                    <p className="text-sm font-medium">
+                      바우처(월별) (.xlsx) — voucher
+                    </p>
                     <ShopeeExtraUploadArea
                       shopeeAccountId={shoppingAccountForUpload.id}
                       kind="voucher"
@@ -430,7 +507,9 @@ export function DailyShell() {
             <>
               {data.organic_rows.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">오가닉</p>
+                  <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
+                    오가닉
+                  </p>
                   <div className="rounded-lg border">
                     <AmazonOrganicTable rows={data.organic_rows} />
                   </div>
@@ -438,7 +517,9 @@ export function DailyShell() {
               )}
               {data.ads_rows.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">내부광고</p>
+                  <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
+                    내부광고
+                  </p>
                   <div className="rounded-lg border">
                     <AmazonAdsTable rows={data.ads_rows} />
                   </div>
@@ -455,7 +536,9 @@ export function DailyShell() {
             <>
               {data.shopping_rows.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">쇼핑몰</p>
+                  <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
+                    쇼핑몰
+                  </p>
                   <div className="rounded-lg border">
                     <ShopeeShoppingTable rows={data.shopping_rows} />
                   </div>
@@ -463,17 +546,20 @@ export function DailyShell() {
               )}
               {data.inapp_rows.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">인앱</p>
+                  <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
+                    인앱
+                  </p>
                   <div className="rounded-lg border">
                     <ShopeeInappTable rows={data.inapp_rows} />
                   </div>
                 </div>
               )}
-              {data.shopping_rows.length === 0 && data.inapp_rows.length === 0 && (
-                <div className="text-muted-foreground rounded-lg border py-12 text-center text-sm">
-                  해당 기간에 데이터가 없습니다.
-                </div>
-              )}
+              {data.shopping_rows.length === 0 &&
+                data.inapp_rows.length === 0 && (
+                  <div className="text-muted-foreground rounded-lg border py-12 text-center text-sm">
+                    해당 기간에 데이터가 없습니다.
+                  </div>
+                )}
             </>
           )}
         </div>
