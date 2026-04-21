@@ -4,10 +4,9 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import type { Report } from '@/types/database'
-import { ArrowLeft, Check, Download, Pencil, X } from 'lucide-react'
+import { ArrowLeft, Check, Pencil, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
-import { InsightMemoCard } from './insight-memo-card'
+import { useState, type ReactNode } from 'react'
 import { AmazonReportDetail } from './amazon-report-detail'
 import { MetaReportDetail } from './meta-report-detail'
 import { Qoo10ReportDetail } from './qoo10-report-detail'
@@ -26,23 +25,6 @@ export function ReportDetail({ report, role, creatorEmail }: Props) {
   const [editTitle, setEditTitle] = useState(report.title)
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [isSavingImage, setIsSavingImage] = useState(false)
-  const handleSaveImage = async () => {
-    setIsSavingImage(true)
-    try {
-      const html2canvas = (await import('html2canvas')).default
-      const el = document.getElementById('report-content')
-      if (!el) return
-      const canvas = await html2canvas(el, { useCORS: true, scale: 2 })
-      const link = document.createElement('a')
-      link.download = `${title}.png`
-      link.href = canvas.toDataURL('image/png')
-      link.click()
-    } finally {
-      setIsSavingImage(false)
-    }
-  }
-
   const handleEditSave = async () => {
     if (!editTitle.trim()) return
     setIsSaving(true)
@@ -68,83 +50,74 @@ export function ReportDetail({ report, role, creatorEmail }: Props) {
 
   const snapshot = report.snapshot
 
-  return (
-    <div className="flex flex-col gap-6 p-6">
-      {/* 헤더 */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => router.back()}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <h1 className="text-lg font-semibold">리포트 상세</h1>
-          </div>
-          <p className="ml-10 text-sm text-muted-foreground">
-            작성자: {creatorEmail} | 기간: {report.year}년{' '}
-            {String(report.month).padStart(2, '0')}월
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+  // 제목 Card 우상단에 오버레이될 수정 UI (admin 전용)
+  const titleAction: ReactNode | undefined =
+    role === 'admin'
+      ? !isEditing
+        ? (
           <Button
             variant="outline"
             size="sm"
-            onClick={handleSaveImage}
-            disabled={isSavingImage}
+            onClick={() => {
+              setEditTitle(title)
+              setIsEditing(true)
+            }}
           >
-            <Download className="mr-1 h-4 w-4" />
-            {isSavingImage ? '저장 중...' : '이미지 저장'}
+            <Pencil className="mr-1 h-4 w-4" />
+            수정하기
           </Button>
-          {role === 'admin' && !isEditing && (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setEditTitle(title)
-                  setIsEditing(true)
-                }}
-              >
-                <Pencil className="mr-1 h-4 w-4" />
-                수정하기
-              </Button>
-            </>
-          )}
-          {role === 'admin' && isEditing && (
-            <div className="flex items-center gap-2">
-              <Input
-                className="h-8 w-64 text-sm"
-                value={editTitle}
-                onChange={(e) => setEditTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleEditSave()
-                  if (e.key === 'Escape') handleEditCancel()
-                }}
-                autoFocus
-              />
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8"
-                onClick={handleEditSave}
-                disabled={isSaving}
-              >
-                <Check className="h-4 w-4 text-green-600" />
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8"
-                onClick={handleEditCancel}
-              >
-                <X className="h-4 w-4 text-red-500" />
-              </Button>
-            </div>
-          )}
+        )
+        : (
+          <div className="flex items-center gap-2">
+            <Input
+              className="h-8 w-64 text-sm"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleEditSave()
+                if (e.key === 'Escape') handleEditCancel()
+              }}
+              autoFocus
+            />
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8"
+              onClick={handleEditSave}
+              disabled={isSaving}
+            >
+              <Check className="h-4 w-4 text-green-600" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8"
+              onClick={handleEditCancel}
+            >
+              <X className="h-4 w-4 text-red-500" />
+            </Button>
+          </div>
+        )
+      : undefined
+
+  return (
+    <div className="flex flex-col gap-6 p-6">
+      {/* 헤더 */}
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={() => router.back()}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-lg font-semibold">리포트 상세</h1>
         </div>
+        <p className="ml-10 text-sm text-muted-foreground">
+          작성자: {creatorEmail} | 기간: {report.year}년{' '}
+          {String(report.month).padStart(2, '0')}월
+        </p>
       </div>
 
       {/* 본문 */}
-      <div id="report-content" className="flex flex-col gap-6 bg-background">
+      <div className="flex flex-col gap-6 bg-background">
         {!snapshot ? (
           <Card>
             <CardContent className="py-12 text-center text-muted-foreground">
@@ -158,6 +131,8 @@ export function ReportDetail({ report, role, creatorEmail }: Props) {
             role={role}
             reportId={report.id}
             filters={report.filters}
+            sectionInsights={report.section_insights ?? {}}
+            titleAction={titleAction}
           />
         ) : snapshot.platform === 'tiktok' ? (
           <TiktokReportDetail
@@ -165,31 +140,40 @@ export function ReportDetail({ report, role, creatorEmail }: Props) {
             title={title}
             reportId={report.id}
             role={role}
-            insightMemo={report.insight_memo}
-            insightMemoGmvMax={report.insight_memo_gmv_max}
-            insightMemoTitle={report.insight_memo_title}
-            insightMemoGmvMaxTitle={report.insight_memo_gmv_max_title}
+            sectionInsights={report.section_insights ?? {}}
             filters={report.filters}
+            titleAction={titleAction}
           />
         ) : snapshot.platform === 'shopee_inapp' ? (
-          <ShopeeReportDetail data={snapshot.data} title={title} />
+          <ShopeeReportDetail
+            data={snapshot.data}
+            title={title}
+            reportId={report.id}
+            initialPromotionRows={report.promotion_rows ?? []}
+            role={role}
+            sectionInsights={report.section_insights ?? {}}
+            titleAction={titleAction}
+          />
         ) : snapshot.platform === 'amazon' ? (
-          <AmazonReportDetail data={snapshot.data} title={title} />
+          <AmazonReportDetail
+            data={snapshot.data}
+            title={title}
+            reportId={report.id}
+            role={role}
+            sectionInsights={report.section_insights ?? {}}
+            titleAction={titleAction}
+          />
         ) : snapshot.platform === 'qoo10' ? (
-          <Qoo10ReportDetail data={snapshot.data} title={title} />
+          <Qoo10ReportDetail
+            data={snapshot.data}
+            title={title}
+            reportId={report.id}
+            role={role}
+            sectionInsights={report.section_insights ?? {}}
+            titleAction={titleAction}
+          />
         ) : null}
       </div>
-
-      {/* 인사이트 & 메모 - TikTok은 각 탭 내부에 포함, 나머지 플랫폼만 여기서 렌더링 */}
-      {snapshot?.platform !== 'tiktok' && (
-        <InsightMemoCard
-          reportId={report.id}
-          initialContent={report.insight_memo}
-          initialTitle={report.insight_memo_title}
-          titleFieldKey="insight_memo_title"
-          role={role}
-        />
-      )}
     </div>
   )
 }

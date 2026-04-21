@@ -1,5 +1,7 @@
 import { requireAdmin } from '@/lib/supabase/auth'
 import { createClient } from '@/lib/supabase/server'
+import { isValidSectionKey } from '@/lib/reports/section-keys'
+import type { SectionInsights } from '@/types/database'
 import { NextRequest, NextResponse } from 'next/server'
 
 type RouteContext = { params: Promise<{ id: string }> }
@@ -38,7 +40,15 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   if (authError) return authError
 
   const body = await req.json()
-  const { title, insight_memo, insight_memo_gmv_max, insight_memo_title, insight_memo_gmv_max_title, filters } = body
+  const {
+    title,
+    insight_memo,
+    insight_memo_gmv_max,
+    insight_memo_title,
+    insight_memo_gmv_max_title,
+    filters,
+    section_insight_patch,
+  } = body
 
   const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }
 
@@ -81,7 +91,78 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     if (filters !== null && (typeof filters !== 'object' || Array.isArray(filters))) {
       return NextResponse.json({ error: 'filters 형식이 잘못되었습니다.' }, { status: 400 })
     }
+    const hs = filters?.hiddenSections
+    if (hs !== undefined && hs !== null) {
+      if (!Array.isArray(hs) || !hs.every(isValidSectionKey)) {
+        return NextResponse.json(
+          { error: 'hiddenSections 형식/키가 잘못되었습니다.' },
+          { status: 400 },
+        )
+      }
+    }
     updateData.filters = filters
+  }
+
+  // 섹션별 인사이트 부분 패치: { key, title, content }
+  if (section_insight_patch !== undefined) {
+    if (
+      !section_insight_patch ||
+      typeof section_insight_patch !== 'object' ||
+      Array.isArray(section_insight_patch)
+    ) {
+      return NextResponse.json(
+        { error: 'section_insight_patch 형식이 잘못되었습니다.' },
+        { status: 400 },
+      )
+    }
+    const { key, title: patchTitle, content } = section_insight_patch as {
+      key: unknown
+      title: unknown
+      content: unknown
+    }
+    if (!isValidSectionKey(key)) {
+      return NextResponse.json(
+        { error: '허용되지 않는 section key입니다.' },
+        { status: 400 },
+      )
+    }
+    if (patchTitle !== null && typeof patchTitle !== 'string') {
+      return NextResponse.json(
+        { error: 'section_insight_patch.title 형식이 잘못되었습니다.' },
+        { status: 400 },
+      )
+    }
+    if (content !== null && typeof content !== 'string') {
+      return NextResponse.json(
+        { error: 'section_insight_patch.content 형식이 잘못되었습니다.' },
+        { status: 400 },
+      )
+    }
+
+    const { data: curr, error: selErr } = await supabase
+      .from('reports')
+      .select('section_insights')
+      .eq('id', id)
+      .single()
+    if (selErr || !curr) {
+      return NextResponse.json({ error: '리포트를 찾을 수 없습니다.' }, { status: 404 })
+    }
+
+    const next: SectionInsights = {
+      ...((curr.section_insights as SectionInsights | null) ?? {}),
+    }
+    const isEmptyContent = content === null || content === '' || content === '<p></p>'
+    if (isEmptyContent) {
+      delete next[key]
+    } else {
+      const trimmedTitle =
+        typeof patchTitle === 'string' && patchTitle.trim() ? patchTitle.trim() : null
+      next[key] = {
+        title: trimmedTitle,
+        content: content as string,
+      }
+    }
+    updateData.section_insights = next
   }
 
   if (Object.keys(updateData).length === 1) {

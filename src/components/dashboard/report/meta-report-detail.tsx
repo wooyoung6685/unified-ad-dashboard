@@ -29,10 +29,14 @@ import type {
   MetaReportData,
   MetaWeeklyData,
   ReportFilters,
+  SectionInsights,
 } from '@/types/database'
+import { META_SECTION_KEYS } from '@/lib/reports/section-keys'
 import { Settings, SlidersHorizontal, X } from 'lucide-react'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useRepairThumbnails } from '@/hooks/use-reports'
+import { SectionInsightCard } from './section-insight-card'
+import { SectionVisibilityWrapper } from './section-visibility-wrapper'
 import {
   Bar,
   CartesianGrid,
@@ -53,6 +57,8 @@ interface Props {
   role?: 'admin' | 'viewer'
   reportId?: string
   filters?: ReportFilters | null
+  sectionInsights?: SectionInsights
+  titleAction?: ReactNode
 }
 
 // ── 헬퍼 ─────────────────────────────────────────
@@ -378,9 +384,11 @@ function CampCell({
 function CampaignTable({
   campaigns,
   onFilterClick,
+  headerAction,
 }: {
   campaigns: MetaCampaignData[]
   onFilterClick?: () => void
+  headerAction?: ReactNode
 }) {
   if (campaigns.length === 0) return null
   return (
@@ -388,12 +396,15 @@ function CampaignTable({
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">🎯 캠페인 성과 분석 (Meta)</CardTitle>
-          {onFilterClick && (
-            <Button variant="outline" size="sm" onClick={onFilterClick}>
-              <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
-              필터
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {headerAction}
+            {onFilterClick && (
+              <Button variant="outline" size="sm" onClick={onFilterClick}>
+                <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
+                필터
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -465,9 +476,11 @@ function CampaignTable({
 function AdsetTable({
   adsets,
   onFilterClick,
+  headerAction,
 }: {
   adsets: MetaAdsetData[]
   onFilterClick?: () => void
+  headerAction?: ReactNode
 }) {
   if (adsets.length === 0) return null
   return (
@@ -475,12 +488,15 @@ function AdsetTable({
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">📂 광고세트 성과 분석 (Meta)</CardTitle>
-          {onFilterClick && (
-            <Button variant="outline" size="sm" onClick={onFilterClick}>
-              <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
-              필터
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {headerAction}
+            {onFilterClick && (
+              <Button variant="outline" size="sm" onClick={onFilterClick}>
+                <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
+                필터
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -651,12 +667,14 @@ function CreativeSection({
   onWidgetsChange,
   isAdmin,
   reportId,
+  headerAction,
 }: {
   creatives: MetaCreativeData[]
   widgets: CreativeWidgetConfig[]
   onWidgetsChange: (widgets: CreativeWidgetConfig[]) => void
   isAdmin: boolean
   reportId?: string
+  headerAction?: ReactNode
 }) {
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [editingWidget, setEditingWidget] = useState<CreativeWidgetConfig | undefined>()
@@ -686,26 +704,29 @@ function CreativeSection({
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">🎨 소재 성과 분석 (Meta)</CardTitle>
-          {isAdmin && (
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => reportId && repairMutation.mutate({ id: reportId, section: 'meta' })}
-                disabled={!reportId || repairMutation.isPending}
-              >
-                {repairMutation.isPending ? '복구 중...' : '🔧 썸네일 복구'}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setAddDialogOpen(true)}
-                disabled={widgets.length >= 10}
-              >
-                + 리스트 추가
-              </Button>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {headerAction}
+            {isAdmin && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => reportId && repairMutation.mutate({ id: reportId, section: 'meta' })}
+                  disabled={!reportId || repairMutation.isPending}
+                >
+                  {repairMutation.isPending ? '복구 중...' : '🔧 썸네일 복구'}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setAddDialogOpen(true)}
+                  disabled={widgets.length >= 10}
+                >
+                  + 리스트 추가
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
@@ -778,8 +799,18 @@ function CreativeSection({
 
 // ── 메인 컴포넌트 ──────────────────────────────────
 
-export function MetaReportDetail({ data, title, role, reportId, filters: initialFilters }: Props) {
+export function MetaReportDetail({
+  data,
+  title,
+  role,
+  reportId,
+  filters: initialFilters,
+  sectionInsights,
+  titleAction,
+}: Props) {
   const isAdmin = role === 'admin'
+  const effectiveRole: 'admin' | 'viewer' = role ?? 'viewer'
+  const insights = sectionInsights ?? {}
 
   // 필터 상태 (null = 전체 표시)
   const [campaignFilter, setCampaignFilter] = useState<string[] | null>(
@@ -840,41 +871,110 @@ export function MetaReportDetail({ data, title, role, reportId, filters: initial
   return (
     <div className="flex flex-col gap-6">
       {/* 섹션 1: 리포트 제목 */}
-      <Card>
+      <Card className="relative">
         <CardContent className="py-8 text-center">
           <h1 className="text-2xl font-bold">{title}</h1>
         </CardContent>
+        {titleAction && (
+          <div className="absolute right-4 top-4">{titleAction}</div>
+        )}
       </Card>
 
       {/* 섹션 2: 월간 요약 */}
-      <MonthlyKpi m={data.monthly} />
+      <SectionInsightCard
+        reportId={reportId ?? ''}
+        role={effectiveRole}
+        sectionKey={META_SECTION_KEYS.monthly}
+        defaultLabel="월간 요약 인사이트"
+        initialEntry={insights[META_SECTION_KEYS.monthly]}
+      >
+        <MonthlyKpi m={data.monthly} />
+      </SectionInsightCard>
 
       {/* 섹션 3: 주간 차트 */}
-      <WeeklyCharts weekly={data.weekly} />
+      <SectionInsightCard
+        reportId={reportId ?? ''}
+        role={effectiveRole}
+        sectionKey={META_SECTION_KEYS.weeklyCharts}
+        defaultLabel="주간 차트 인사이트"
+        initialEntry={insights[META_SECTION_KEYS.weeklyCharts]}
+      >
+        <WeeklyCharts weekly={data.weekly} />
+      </SectionInsightCard>
 
       {/* 섹션 4: 주간 데이터 */}
-      <WeeklyTable weekly={data.weekly} />
+      <SectionInsightCard
+        reportId={reportId ?? ''}
+        role={effectiveRole}
+        sectionKey={META_SECTION_KEYS.weeklyTable}
+        defaultLabel="주간 데이터 인사이트"
+        initialEntry={insights[META_SECTION_KEYS.weeklyTable]}
+      >
+        <WeeklyTable weekly={data.weekly} />
+      </SectionInsightCard>
 
       {/* 섹션 5: 캠페인 성과 */}
-      <CampaignTable
-        campaigns={filteredCampaigns}
-        onFilterClick={isAdmin && campaignItems.length > 0 ? () => setCampaignDialogOpen(true) : undefined}
-      />
+      <SectionVisibilityWrapper
+        reportId={reportId ?? ''}
+        sectionKey={META_SECTION_KEYS.campaigns}
+        label="캠페인 성과 분석 (Meta)"
+        role={effectiveRole}
+        hiddenSections={currentFilters?.hiddenSections ?? []}
+        currentFilters={currentFilters}
+      >
+        <SectionInsightCard
+          reportId={reportId ?? ''}
+          role={effectiveRole}
+          sectionKey={META_SECTION_KEYS.campaigns}
+          defaultLabel="캠페인 성과 인사이트"
+          initialEntry={insights[META_SECTION_KEYS.campaigns]}
+        >
+          {(addButton) => (
+            <CampaignTable
+              campaigns={filteredCampaigns}
+              onFilterClick={isAdmin && campaignItems.length > 0 ? () => setCampaignDialogOpen(true) : undefined}
+              headerAction={addButton}
+            />
+          )}
+        </SectionInsightCard>
+      </SectionVisibilityWrapper>
 
       {/* 섹션 6: 광고세트 성과 */}
-      <AdsetTable
-        adsets={filteredAdsets}
-        onFilterClick={isAdmin && adsetItems.length > 0 ? () => setAdsetDialogOpen(true) : undefined}
-      />
+      <SectionInsightCard
+        reportId={reportId ?? ''}
+        role={effectiveRole}
+        sectionKey={META_SECTION_KEYS.adsets}
+        defaultLabel="광고세트 성과 인사이트"
+        initialEntry={insights[META_SECTION_KEYS.adsets]}
+      >
+        {(addButton) => (
+          <AdsetTable
+            adsets={filteredAdsets}
+            onFilterClick={isAdmin && adsetItems.length > 0 ? () => setAdsetDialogOpen(true) : undefined}
+            headerAction={addButton}
+          />
+        )}
+      </SectionInsightCard>
 
       {/* 섹션 7: 소재 성과 */}
-      <CreativeSection
-        creatives={data.creatives}
-        widgets={creativeWidgets}
-        onWidgetsChange={handleCreativeWidgetsChange}
-        isAdmin={isAdmin}
-        reportId={reportId}
-      />
+      <SectionInsightCard
+        reportId={reportId ?? ''}
+        role={effectiveRole}
+        sectionKey={META_SECTION_KEYS.creatives}
+        defaultLabel="소재 성과 인사이트"
+        initialEntry={insights[META_SECTION_KEYS.creatives]}
+      >
+        {(addButton) => (
+          <CreativeSection
+            creatives={data.creatives}
+            widgets={creativeWidgets}
+            onWidgetsChange={handleCreativeWidgetsChange}
+            isAdmin={isAdmin}
+            reportId={reportId}
+            headerAction={addButton}
+          />
+        )}
+      </SectionInsightCard>
 
       {/* 캠페인 필터 다이얼로그 */}
       <FilterDialog
