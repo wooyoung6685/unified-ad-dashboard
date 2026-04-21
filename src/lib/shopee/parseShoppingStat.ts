@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import * as XLSX from 'xlsx'
+import { countryToCurrency } from './constants'
 
 type ParseResult =
   | { success: true; inserted: number; updated: number; warning?: string }
@@ -81,7 +82,7 @@ export async function parseShoppingStat(
     })
 
     // currency 설정
-    const currency = isSg ? 'SGD' : country.toUpperCase() === 'PH' ? 'PHP' : country.toUpperCase()
+    const currency = countryToCurrency(country)
 
     // 컬럼명 후보 중 존재하는 것으로 값 조회 (버전별 컬럼명 차이 대응)
     const resolveCol = (...candidates: string[]): string | undefined =>

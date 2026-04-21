@@ -192,6 +192,54 @@ export type ShopeeInappStat = {
   created_at: string
 }
 
+export type ShopeeSalesOverviewStat = {
+  id: string
+  shopee_account_id: string
+  brand_id: string
+  date: string // YYYY-MM-DD
+  units_paid_order: number | null
+  created_at: string
+}
+
+export type ShopeeVoucherStat = {
+  id: string
+  shopee_account_id: string
+  brand_id: string
+  year_month: string // YYYY-MM
+  voucher_name: string
+  currency: string | null
+  orders_paid: number | null
+  usage_rate_paid: number | null
+  sales_paid: number | null
+  sales_paid_krw: number | null
+  cost_paid: number | null
+  cost_paid_krw: number | null
+  units_sold_paid: number | null
+  created_at: string
+}
+
+export type ShopeeProductPerformanceStat = {
+  id: string
+  shopee_account_id: string
+  brand_id: string
+  year_month: string // YYYY-MM
+  item_id: string
+  product_name: string | null
+  variation_id: string // '' = 상품 레벨
+  variation_name: string | null
+  sku: string | null
+  parent_sku: string | null
+  order_conv_rate_paid: number | null
+  units_paid: number | null
+  buyers_paid: number | null
+  product_visitors: number | null
+  product_page_views: number | null
+  add_to_cart_visitors: number | null
+  add_to_cart_units: number | null
+  add_to_cart_conv_rate: number | null
+  created_at: string
+}
+
 // 인앱: 날짜별 합산 결과 (ads_type 3개 합산)
 export type ShopeeInappDayRow = {
   date: string
@@ -682,7 +730,18 @@ export type ReportFilters = {
   meta_creative_widgets?: CreativeWidgetConfig[] | null
   tiktok_creative_widgets?: CreativeWidgetConfig[] | null
   gmvmax_creative_widgets?: CreativeWidgetConfig[] | null
+  // admin이 숨긴 섹션 키 목록 (src/lib/reports/section-keys.ts의 ALL_SECTION_KEYS 기준)
+  hiddenSections?: string[] | null
 }
+
+// 섹션별 인사이트 단일 엔트리
+export type SectionInsightEntry = {
+  title: string | null // null이면 기본 섹션 라벨 사용
+  content: string // TipTap HTML (빈 값이면 서버에서 key 제거)
+}
+
+// 리포트별 섹션 인사이트 맵 (key는 src/lib/reports/section-keys.ts 참조)
+export type SectionInsights = Record<string, SectionInsightEntry>
 
 export type Report = {
   id: string
@@ -699,10 +758,26 @@ export type Report = {
   insight_memo_gmv_max: string | null
   insight_memo_title: string | null
   insight_memo_gmv_max_title: string | null
+  section_insights: SectionInsights
   filters: ReportFilters | null
+  promotion_rows?: ShopeePromotionRow[] | null
   created_by: string | null
   created_at: string
   updated_at: string
+}
+
+export type ShopeePromotionRow = {
+  row_id: string
+  date_start: string    // 'YYYY-MM-DD'
+  date_end: string      // 'YYYY-MM-DD'
+  promotion_name: string
+  currency: string      // 'SGD' | 'PHP' | 'MYR' | ...
+  sales: number | null
+  orders: number | null
+  visitors: number | null
+  sales_per_order: number | null
+  cvr: number | null    // orders / visitors * 100
+  created_at: string
 }
 
 export type ReportListItem = Omit<Report, 'snapshot'> & {
@@ -935,7 +1010,54 @@ export type MetaCreativeData = {
 export type ShopeeReportData = {
   monthly: ShopeeMonthlyData
   weekly: ShopeeWeeklyData[]
-  ads_breakdown: ShopeeAdsBreakdownData[] // Shop Ads / Product Ads 구분
+  ads_top5?: ShopeeAdsTopRow[]
+  ads_top5_total?: ShopeeAdsTopTotalRow
+  ads_currency?: string
+  ads_fx_rate_krw?: number | null
+  voucher_top3?: ShopeeVoucherTopRow[]
+  product_top5?: ShopeeProductTopRow[]
+}
+
+export type ShopeeAdsTopRow = {
+  product: string
+  ads_type: string
+  impressions: number | null
+  clicks: number | null
+  ctr: number | null
+  conversions: number | null
+  conversion_rate: number | null
+  gmv: number | null
+  expense: number | null
+  roas: number | null
+  gmv_krw: number | null
+  expense_krw: number | null
+  currency: string
+}
+
+export type ShopeeAdsTopTotalRow = Omit<ShopeeAdsTopRow, 'product' | 'ads_type' | 'currency'>
+
+export type ShopeeVoucherTopRow = {
+  voucher_name: string
+  currency: string
+  orders_paid: number | null
+  usage_rate_paid: number | null  // % 값 (예: 23.32)
+  sales_paid: number | null
+  cost_paid: number | null
+  units_sold_paid: number | null
+}
+
+export type ShopeeProductTopRow = {
+  product_name: string
+  currency: string
+  product_visitors: number | null         // Product Visitors (Visit)
+  product_page_views: number | null       // Product Page Views
+  add_to_cart_visitors: number | null     // Product Visitors (Add to Cart)
+  add_to_cart_units: number | null        // Units (Add to Cart)
+  add_to_cart_conv_rate: number | null    // Conversion Rate (Add to Cart) %
+  buyers_paid: number | null              // Buyers (Confirmed Order)
+  units_paid: number | null               // Units (Confirmed)
+  sales_confirmed: number | null          // Sales (Confirmed)
+  order_conv_rate_paid: number | null     // Conversion Rate %
 }
 
 export type ShopeeMonthlyData = {
@@ -944,7 +1066,7 @@ export type ShopeeMonthlyData = {
   product_clicks: number | null // shopee_shopping_stats.product_clicks 합산
   visitors: number | null // shopee_shopping_stats.visitors 합산
   cvr: number | null // orders / visitors * 100
-  units_sold: number | null // shopee_inapp_stats.items_sold 합산
+  units_sold: number | null // shopee_sales_overview_stats.units_paid_order 합산
   sales_per_buyer: number | null // sales_krw / buyers
   new_buyers: number | null // shopee_shopping_stats.new_buyers 합산
   existing_buyers: number | null // shopee_shopping_stats.existing_buyers 합산
@@ -976,30 +1098,6 @@ export type ShopeeWeeklyData = {
   revenue_krw: number | null
   roas: number | null
   conversion_rate: number | null
-}
-
-export type ShopeeAdsBreakdownData = {
-  ads_type: 'shop_ad' | 'product_ad' // ads_type 원본값
-  label: string // 'Shop Ads' | 'Product Ads'
-  impressions: number | null
-  clicks: number | null
-  cpc_krw: number | null
-  ctr: number | null
-  spend_krw: number | null
-  purchases: number | null
-  revenue_krw: number | null
-  roas: number | null
-  conversion_rate: number | null
-  // 전월
-  prev_impressions: number | null
-  prev_clicks: number | null
-  prev_cpc_krw: number | null
-  prev_ctr: number | null
-  prev_spend_krw: number | null
-  prev_purchases: number | null
-  prev_revenue_krw: number | null
-  prev_roas: number | null
-  prev_conversion_rate: number | null
 }
 
 // ── TikTok ────────────────────────────────────

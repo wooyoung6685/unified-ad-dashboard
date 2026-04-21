@@ -35,6 +35,7 @@ import { ShopeeInappTable } from './shopee-inapp-table'
 import { ShopeeShoppingTable } from './shopee-shopping-table'
 import { Qoo10OrganicTable } from './qoo10-organic-table'
 import { Qoo10UploadArea } from './qoo10-upload-area'
+import { ShopeeExtraUploadArea } from './shopee-extra-upload-area'
 import { ShopeeUploadArea } from './shopee-upload-area'
 import { TiktokDailyTable } from './tiktok-daily-table'
 import { TiktokGmvMaxDailyTable } from './tiktok-gmvmax-daily-table'
@@ -323,9 +324,9 @@ export function DailyShell() {
         </DialogContent>
       </Dialog>
 
-      {/* Shopee 파일 업로드 Dialog — 쇼핑몰/인앱 두 업로드 영역 */}
+      {/* Shopee 파일 업로드 Dialog — 쇼핑몰/인앱 + 3종 추가 업로드 영역 */}
       <Dialog open={showUpload && isShopee && !!selectedShopeeAccount} onOpenChange={setShowUpload}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>쇼피 파일 업로드</DialogTitle>
           </DialogHeader>
@@ -357,6 +358,45 @@ export function DailyShell() {
                     }}
                   />
                 </div>
+              )}
+              {shoppingAccountForUpload && (
+                <>
+                  <Separator />
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">프로모션(일별) (.xlsx) — sales_overview</p>
+                    <ShopeeExtraUploadArea
+                      shopeeAccountId={shoppingAccountForUpload.id}
+                      kind="sales_overview"
+                      onUploadSuccess={() => {
+                        handleSearch()
+                      }}
+                    />
+                  </div>
+                  <Separator />
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">바우처(월별) (.xlsx) — voucher</p>
+                    <ShopeeExtraUploadArea
+                      shopeeAccountId={shoppingAccountForUpload.id}
+                      kind="voucher"
+                      onUploadSuccess={() => {
+                        handleSearch()
+                      }}
+                    />
+                  </div>
+                  <Separator />
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">
+                      프로덕트 퍼포먼스(월별) (.xlsx) — parentskudetail
+                    </p>
+                    <ShopeeExtraUploadArea
+                      shopeeAccountId={shoppingAccountForUpload.id}
+                      kind="parentskudetail"
+                      onUploadSuccess={() => {
+                        handleSearch()
+                      }}
+                    />
+                  </div>
+                </>
               )}
             </div>
           )}

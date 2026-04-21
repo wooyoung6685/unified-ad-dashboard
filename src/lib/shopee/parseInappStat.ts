@@ -1,8 +1,21 @@
 import { createClient } from '@/lib/supabase/server'
+import * as XLSX from 'xlsx'
+import { countryToCurrency } from './constants'
 
 type ParseResult =
   | { success: true; inserted: number; updated: number; warning?: string }
   | { success: false; error: string }
+
+// xlsx 매직 바이트(ZIP) 감지
+function isXlsxBuffer(buf: Buffer): boolean {
+  return (
+    buf.length >= 4 &&
+    buf[0] === 0x50 &&
+    buf[1] === 0x4b &&
+    buf[2] === 0x03 &&
+    buf[3] === 0x04
+  )
+}
 
 // 날짜 DD/MM/YYYY → YYYY-MM-DD
 function parseDate(raw: string): string | null {
@@ -19,6 +32,14 @@ function parseNum(raw: string | undefined): number {
   const str = raw.replace(/,/g, '').replace(/%/g, '').trim()
   const n = parseFloat(str)
   return isNaN(n) ? 0 : n
+}
+
+// ratio 컬럼용: 빈값/-는 null 반환
+function parseNumOrNull(raw: string | undefined): number | null {
+  if (!raw || raw.trim() === '' || raw.trim() === '-') return null
+  const str = raw.replace(/,/g, '').replace(/%/g, '').trim()
+  const n = parseFloat(str)
+  return isNaN(n) ? null : n
 }
 
 // ads_type 결정
@@ -73,7 +94,7 @@ function parseCsvLine(line: string): string[] {
 const HEADER_COLS = {
   adsType: 'Ads Type',
   adName: 'Ad Name',
-  impressions: 'Impression',          // 파일에서 단수형 사용
+  impressions: 'Impression',
   clicks: 'Clicks',
   conversions: 'Conversions',
   directConversions: 'Direct Conversions',
@@ -82,6 +103,14 @@ const HEADER_COLS = {
   gmv: 'GMV',
   directGmv: 'Direct GMV',
   expense: 'Expense',
+  productId: 'Product ID',
+  bidding: 'Bidding Method',
+  ctr: 'CTR',
+  conversionRate: 'Conversion Rate',
+  roas: 'ROAS',
+  directRoas: 'Direct ROAS',
+  acos: 'ACOS',
+  directAcos: 'Direct ACOS',
 } as const
 
 export async function parseInappStat(
@@ -92,10 +121,21 @@ export async function parseInappStat(
   country: string,
 ): Promise<ParseResult> {
   try {
-    // UTF-8 BOM 제거
-    let text = fileBuffer.toString('utf-8')
-    if (text.charCodeAt(0) === 0xfeff) {
-      text = text.slice(1)
+    // xlsx면 첫 시트를 CSV 텍스트로 변환, 아니면 CSV 원문 사용
+    let text: string
+    if (isXlsxBuffer(fileBuffer)) {
+      const workbook = XLSX.read(fileBuffer, { type: 'buffer', cellDates: false })
+      const firstSheetName = workbook.SheetNames[0]
+      if (!firstSheetName) {
+        return { success: false, error: 'xlsx 파일에 시트가 없습니다' }
+      }
+      const sheet = workbook.Sheets[firstSheetName]
+      text = XLSX.utils.sheet_to_csv(sheet, { blankrows: true, strip: false })
+    } else {
+      text = fileBuffer.toString('utf-8')
+      if (text.charCodeAt(0) === 0xfeff) {
+        text = text.slice(1)
+      }
     }
 
     const lines = text.split(/\r?\n/)
@@ -111,31 +151,31 @@ export async function parseInappStat(
       }
     }
 
-    // Line 6 (index 5): Date Period에서 시작일 파싱
+    // Line 6 (index 5): Date Period에서 시작일·종료일 파싱 후 동일성 검증
     const datePeriodLine = lines[5] ?? ''
-    const dateMatch = datePeriodLine.match(/(\d{2}\/\d{2}\/\d{4})/)
-    if (!dateMatch) {
+    const dateTokens = [...datePeriodLine.matchAll(/\d{2}\/\d{2}\/\d{4}/g)].map((m) => m[0])
+    if (dateTokens.length < 2) {
       return { success: false, error: 'Date Period 라인에서 날짜를 파싱할 수 없습니다 (Line 6)' }
     }
-    const date = parseDate(dateMatch[1])
-    if (!date) {
-      return { success: false, error: `날짜 형식이 올바르지 않습니다: ${dateMatch[1]}` }
+    const [startRaw, endRaw] = dateTokens
+    const startDate = parseDate(startRaw!)
+    const endDate = parseDate(endRaw!)
+    if (!startDate || !endDate) {
+      return { success: false, error: `날짜 형식이 올바르지 않습니다: ${startRaw} - ${endRaw}` }
     }
+    if (startDate !== endDate) {
+      return {
+        success: false,
+        error: `업로드 불가: Date Period 시작일(${startRaw})과 종료일(${endRaw})이 동일해야 합니다. 하루치 데이터 파일만 업로드해 주세요.`,
+      }
+    }
+    const date = startDate
 
     // 파일 날짜에서 연월 추출 (환율 조회에 사용)
     const yearMonth = date.substring(0, 7)
 
     // currency 설정
-    const CURRENCY_MAP: Record<string, string> = {
-      sg: 'SGD',
-      ph: 'PHP',
-      my: 'MYR',
-      th: 'THB',
-      id: 'IDR',
-      vn: 'VND',
-      tw: 'TWD',
-    }
-    const currency = CURRENCY_MAP[country.toLowerCase()] ?? country.toUpperCase()
+    const currency = countryToCurrency(country)
 
     // Line 8 (index 7): 헤더 행 - CSV 파싱으로 컬럼 인덱스 확정
     const headerCols = parseCsvLine(lines[7] ?? '')
@@ -157,6 +197,25 @@ export async function parseInappStat(
       expense: number
     }
     const accumByType: Record<string, AdsAccum> = {}
+
+    // per-ad 레코드 (ad_name 기준 중복 병합)
+    type AdAccum = {
+      ad_name: string
+      ads_type_raw: string
+      ads_type: string
+      product_id: string | null
+      bidding_method: string | null
+      impressions: number
+      clicks: number
+      conversions: number
+      direct_conversions: number
+      items_sold: number
+      direct_items_sold: number
+      gmv: number
+      direct_gmv: number
+      expense: number
+    }
+    const adAccumMap = new Map<string, AdAccum>()
 
     // Line 9부터 (index 8): 데이터 행
     for (let i = 8; i < lines.length; i++) {
@@ -198,6 +257,41 @@ export async function parseInappStat(
       acc.gmv += parseNum(get('gmv'))
       acc.directGmv += parseNum(get('directGmv'))
       acc.expense += parseNum(get('expense'))
+
+      // per-ad 레코드 병합 (ad_name 빈값 skip)
+      const adName = adNameRaw.trim()
+      if (adName) {
+        const existing = adAccumMap.get(adName)
+        if (existing) {
+          existing.impressions += parseNum(get('impressions'))
+          existing.clicks += parseNum(get('clicks'))
+          existing.conversions += parseNum(get('conversions'))
+          existing.direct_conversions += parseNum(get('directConversions'))
+          existing.items_sold += parseNum(get('itemsSold'))
+          existing.direct_items_sold += parseNum(get('directItemsSold'))
+          existing.gmv += parseNum(get('gmv'))
+          existing.direct_gmv += parseNum(get('directGmv'))
+          existing.expense += parseNum(get('expense'))
+        } else {
+          const rawProductId = get('productId').trim()
+          adAccumMap.set(adName, {
+            ad_name: adName,
+            ads_type_raw: adsTypeRaw,
+            ads_type: adsType,
+            product_id: rawProductId && rawProductId !== '-' ? rawProductId : null,
+            bidding_method: get('bidding').trim() || null,
+            impressions: parseNum(get('impressions')),
+            clicks: parseNum(get('clicks')),
+            conversions: parseNum(get('conversions')),
+            direct_conversions: parseNum(get('directConversions')),
+            items_sold: parseNum(get('itemsSold')),
+            direct_items_sold: parseNum(get('directItemsSold')),
+            gmv: parseNum(get('gmv')),
+            direct_gmv: parseNum(get('directGmv')),
+            expense: parseNum(get('expense')),
+          })
+        }
+      }
     }
 
     if (Object.keys(accumByType).length === 0) {
@@ -282,6 +376,53 @@ export async function parseInappStat(
       .upsert(records, { onConflict: 'shopee_account_id,date,ads_type', count: 'exact' })
 
     if (error) return { success: false, error: error.message }
+
+    // per-ad 두 번째 upsert
+    if (adAccumMap.size > 0) {
+      const adRows = Array.from(adAccumMap.values()).map((a) => {
+        const ctr = a.impressions > 0 ? (a.clicks / a.impressions) * 100 : null
+        const conversionRate = a.clicks > 0 ? (a.conversions / a.clicks) * 100 : null
+        const roas = a.expense > 0 ? a.gmv / a.expense : null
+        const directRoas = a.expense > 0 ? a.direct_gmv / a.expense : null
+        const acos = a.gmv > 0 ? (a.expense / a.gmv) * 100 : null
+        const directAcos = a.direct_gmv > 0 ? (a.expense / a.direct_gmv) * 100 : null
+        return {
+          shopee_account_id: shopeeAccountId,
+          brand_id: brandId,
+          date: date,
+          ad_name: a.ad_name,
+          ads_type_raw: a.ads_type_raw,
+          ads_type: a.ads_type,
+          product_id: a.product_id,
+          bidding_method: a.bidding_method,
+          currency,
+          impressions: Math.round(a.impressions),
+          clicks: Math.round(a.clicks),
+          ctr,
+          conversions: Math.round(a.conversions),
+          conversion_rate: conversionRate,
+          direct_conversions: Math.round(a.direct_conversions),
+          items_sold: Math.round(a.items_sold),
+          direct_items_sold: Math.round(a.direct_items_sold),
+          gmv: a.gmv,
+          direct_gmv: a.direct_gmv,
+          expense: a.expense,
+          roas,
+          direct_roas: directRoas || null,
+          acos: acos || null,
+          direct_acos: directAcos || null,
+          gmv_krw: rate !== null ? a.gmv * rate : null,
+          direct_gmv_krw: rate !== null ? a.direct_gmv * rate : null,
+          expense_krw: rate !== null ? a.expense * rate : null,
+        }
+      })
+
+      const { error: adErr } = await supabase
+        .from('shopee_inapp_ad_stats')
+        .upsert(adRows, { onConflict: 'shopee_account_id,date,ad_name' })
+
+      if (adErr) return { success: false, error: `per-ad 저장 실패: ${adErr.message}` }
+    }
 
     return { success: true, inserted: count ?? records.length, updated: 0, warning }
   } catch (e) {
