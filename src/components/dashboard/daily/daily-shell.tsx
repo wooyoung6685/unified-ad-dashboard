@@ -331,7 +331,7 @@ export function DailyShell() {
         open={showUpload && isQoo10 && !!selectedQoo10Account}
         onOpenChange={setShowUpload}
       >
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>큐텐 파일 업로드</DialogTitle>
           </DialogHeader>
