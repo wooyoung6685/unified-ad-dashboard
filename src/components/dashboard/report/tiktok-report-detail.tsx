@@ -1,6 +1,8 @@
 'use client'
 
-import { InsightMemoCard } from './insight-memo-card'
+import { SectionInsightCard } from './section-insight-card'
+import { SectionVisibilityWrapper } from './section-visibility-wrapper'
+import { TIKTOK_SECTION_KEYS, TIKTOK_GMVMAX_SECTION_KEYS } from '@/lib/reports/section-keys'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -32,6 +34,7 @@ import type {
   GmvMaxMonthlyData,
   GmvMaxWeeklyData,
   ReportFilters,
+  SectionInsights,
   TiktokAdRow,
   TiktokAdgroupRow,
   TiktokCampaignRow,
@@ -40,7 +43,7 @@ import type {
   TiktokWeeklyData,
 } from '@/types/database'
 import { Settings, SlidersHorizontal, X } from 'lucide-react'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useRepairThumbnails } from '@/hooks/use-reports'
 import {
   Bar,
@@ -61,11 +64,9 @@ interface Props {
   title: string
   reportId: string
   role: 'admin' | 'viewer'
-  insightMemo: string | null
-  insightMemoGmvMax: string | null
-  insightMemoTitle?: string | null
-  insightMemoGmvMaxTitle?: string | null
+  sectionInsights: SectionInsights
   filters?: ReportFilters | null
+  titleAction?: ReactNode
 }
 
 // ── 헬퍼 ─────────────────────────────────────────
@@ -350,23 +351,28 @@ function CampaignSection({
   title,
   emptyMessage = '🎵 틱톡 캠페인 데이터 준비 중...',
   onFilterClick,
+  headerAction,
 }: {
   campaigns: TiktokCampaignRow[]
   title: string
   emptyMessage?: string
   onFilterClick?: () => void
+  headerAction?: ReactNode
 }) {
   return (
     <Card>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">{title}</CardTitle>
-          {onFilterClick && (
-            <Button variant="outline" size="sm" onClick={onFilterClick}>
-              <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
-              필터
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {headerAction}
+            {onFilterClick && (
+              <Button variant="outline" size="sm" onClick={onFilterClick}>
+                <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
+                필터
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -430,9 +436,11 @@ function CampaignSection({
 function AdgroupSection({
   adgroups,
   onFilterClick,
+  headerAction,
 }: {
   adgroups: TiktokAdgroupRow[]
   onFilterClick?: () => void
+  headerAction?: ReactNode
 }) {
   if (adgroups.length === 0) return null
   return (
@@ -440,12 +448,15 @@ function AdgroupSection({
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">📂 광고그룹 성과 분석 (TikTok)</CardTitle>
-          {onFilterClick && (
-            <Button variant="outline" size="sm" onClick={onFilterClick}>
-              <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
-              필터
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {headerAction}
+            {onFilterClick && (
+              <Button variant="outline" size="sm" onClick={onFilterClick}>
+                <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
+                필터
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -589,12 +600,14 @@ function CreativeSection({
   onWidgetsChange,
   isAdmin,
   reportId,
+  headerAction,
 }: {
   ads: TiktokAdRow[]
   widgets: CreativeWidgetConfig[]
   onWidgetsChange: (widgets: CreativeWidgetConfig[]) => void
   isAdmin: boolean
   reportId?: string
+  headerAction?: ReactNode
 }) {
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [editingWidget, setEditingWidget] = useState<CreativeWidgetConfig | undefined>()
@@ -633,26 +646,29 @@ function CreativeSection({
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">🎨 소재 성과 분석 (TikTok)</CardTitle>
-          {isAdmin && (
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => reportId && repairMutation.mutate({ id: reportId, section: 'tiktok' })}
-                disabled={!reportId || repairMutation.isPending}
-              >
-                {repairMutation.isPending ? '복구 중...' : '🔧 썸네일 복구'}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setAddDialogOpen(true)}
-                disabled={widgets.length >= 10}
-              >
-                + 리스트 추가
-              </Button>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {headerAction}
+            {isAdmin && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => reportId && repairMutation.mutate({ id: reportId, section: 'tiktok' })}
+                  disabled={!reportId || repairMutation.isPending}
+                >
+                  {repairMutation.isPending ? '복구 중...' : '🔧 썸네일 복구'}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setAddDialogOpen(true)}
+                  disabled={widgets.length >= 10}
+                >
+                  + 리스트 추가
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
@@ -900,21 +916,26 @@ function GmvMaxWeeklyTable({ weekly }: { weekly: GmvMaxWeeklyData[] }) {
 function GmvMaxCampaignSection({
   campaigns,
   onFilterClick,
+  headerAction,
 }: {
   campaigns: GmvMaxCampaignRow[]
   onFilterClick?: () => void
+  headerAction?: ReactNode
 }) {
   return (
     <Card>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">🎯 캠페인 성과 분석 (GMV Max)</CardTitle>
-          {onFilterClick && (
-            <Button variant="outline" size="sm" onClick={onFilterClick}>
-              <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
-              필터
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {headerAction}
+            {onFilterClick && (
+              <Button variant="outline" size="sm" onClick={onFilterClick}>
+                <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
+                필터
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -1047,12 +1068,14 @@ function GmvMaxCreativeSection({
   onWidgetsChange,
   isAdmin,
   reportId,
+  headerAction,
 }: {
   items: GmvMaxItemRow[]
   widgets: CreativeWidgetConfig[]
   onWidgetsChange: (widgets: CreativeWidgetConfig[]) => void
   isAdmin: boolean
   reportId?: string
+  headerAction?: ReactNode
 }) {
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [editingWidget, setEditingWidget] = useState<CreativeWidgetConfig | undefined>()
@@ -1091,26 +1114,29 @@ function GmvMaxCreativeSection({
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">🎨 소재 성과 분석 (GMV Max)</CardTitle>
-          {isAdmin && (
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => reportId && repairMutation.mutate({ id: reportId, section: 'gmvmax' })}
-                disabled={!reportId || repairMutation.isPending}
-              >
-                {repairMutation.isPending ? '복구 중...' : '🔧 썸네일 복구'}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setAddDialogOpen(true)}
-                disabled={widgets.length >= 10}
-              >
-                + 리스트 추가
-              </Button>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {headerAction}
+            {isAdmin && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => reportId && repairMutation.mutate({ id: reportId, section: 'gmvmax' })}
+                  disabled={!reportId || repairMutation.isPending}
+                >
+                  {repairMutation.isPending ? '복구 중...' : '🔧 썸네일 복구'}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setAddDialogOpen(true)}
+                  disabled={widgets.length >= 10}
+                >
+                  + 리스트 추가
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
@@ -1184,11 +1210,9 @@ export function TiktokReportDetail({
   title,
   reportId,
   role,
-  insightMemo,
-  insightMemoGmvMax,
-  insightMemoTitle,
-  insightMemoGmvMaxTitle,
+  sectionInsights,
   filters: initialFilters,
+  titleAction,
 }: Props) {
   const isAdmin = role === 'admin'
   const {
@@ -1322,38 +1346,99 @@ export function TiktokReportDetail({
   if (!showGmvMaxTab) {
     return (
       <div className="flex flex-col gap-6">
-        <Card>
+        <Card className="relative">
           <CardContent className="py-8 text-center">
             <h1 className="text-2xl font-bold">{title}</h1>
           </CardContent>
+          {titleAction && (
+            <div className="absolute right-4 top-4">{titleAction}</div>
+          )}
         </Card>
-        <MonthlyKpi m={monthly} />
-        <WeeklyCharts weekly={weekly} />
-        <WeeklyTable weekly={weekly} />
-        <CampaignSection
-          campaigns={filteredCampaigns}
-          title="🎯 캠페인 성과 분석 (TikTok)"
-          onFilterClick={isAdmin && campaignItems.length > 0 ? () => setCampaignDialogOpen(true) : undefined}
-        />
-        <AdgroupSection
-          adgroups={filteredAdgroups}
-          onFilterClick={isAdmin && adgroupItems.length > 0 ? () => setAdgroupDialogOpen(true) : undefined}
-        />
-        <CreativeSection
-          ads={ads}
-          widgets={tiktokCreativeWidgets}
-          onWidgetsChange={handleTiktokCreativeWidgetsChange}
-          isAdmin={isAdmin}
+        <SectionInsightCard
           reportId={reportId}
-        />
-        <InsightMemoCard
-          reportId={reportId}
-          initialContent={insightMemo}
-          initialTitle={insightMemoTitle}
-          titleFieldKey="insight_memo_title"
           role={role}
-          fieldKey="insight_memo"
-        />
+          sectionKey={TIKTOK_SECTION_KEYS.monthly}
+          defaultLabel="월간 요약 인사이트"
+          initialEntry={sectionInsights[TIKTOK_SECTION_KEYS.monthly]}
+        >
+          <MonthlyKpi m={monthly} />
+        </SectionInsightCard>
+        <SectionInsightCard
+          reportId={reportId}
+          role={role}
+          sectionKey={TIKTOK_SECTION_KEYS.weeklyCharts}
+          defaultLabel="주간 차트 인사이트"
+          initialEntry={sectionInsights[TIKTOK_SECTION_KEYS.weeklyCharts]}
+        >
+          <WeeklyCharts weekly={weekly} />
+        </SectionInsightCard>
+        <SectionInsightCard
+          reportId={reportId}
+          role={role}
+          sectionKey={TIKTOK_SECTION_KEYS.weeklyTable}
+          defaultLabel="주간 데이터 인사이트"
+          initialEntry={sectionInsights[TIKTOK_SECTION_KEYS.weeklyTable]}
+        >
+          <WeeklyTable weekly={weekly} />
+        </SectionInsightCard>
+        <SectionVisibilityWrapper
+          reportId={reportId}
+          sectionKey={TIKTOK_SECTION_KEYS.campaigns}
+          label="캠페인 성과 분석 (TikTok)"
+          role={role}
+          hiddenSections={currentFilters?.hiddenSections ?? []}
+          currentFilters={currentFilters}
+        >
+          <SectionInsightCard
+            reportId={reportId}
+            role={role}
+            sectionKey={TIKTOK_SECTION_KEYS.campaigns}
+            defaultLabel="캠페인 성과 인사이트"
+            initialEntry={sectionInsights[TIKTOK_SECTION_KEYS.campaigns]}
+          >
+            {(addButton) => (
+              <CampaignSection
+                campaigns={filteredCampaigns}
+                title="🎯 캠페인 성과 분석 (TikTok)"
+                onFilterClick={isAdmin && campaignItems.length > 0 ? () => setCampaignDialogOpen(true) : undefined}
+                headerAction={addButton}
+              />
+            )}
+          </SectionInsightCard>
+        </SectionVisibilityWrapper>
+        <SectionInsightCard
+          reportId={reportId}
+          role={role}
+          sectionKey={TIKTOK_SECTION_KEYS.adgroups}
+          defaultLabel="광고그룹 성과 인사이트"
+          initialEntry={sectionInsights[TIKTOK_SECTION_KEYS.adgroups]}
+        >
+          {(addButton) => (
+            <AdgroupSection
+              adgroups={filteredAdgroups}
+              onFilterClick={isAdmin && adgroupItems.length > 0 ? () => setAdgroupDialogOpen(true) : undefined}
+              headerAction={addButton}
+            />
+          )}
+        </SectionInsightCard>
+        <SectionInsightCard
+          reportId={reportId}
+          role={role}
+          sectionKey={TIKTOK_SECTION_KEYS.creatives}
+          defaultLabel="소재 성과 인사이트"
+          initialEntry={sectionInsights[TIKTOK_SECTION_KEYS.creatives]}
+        >
+          {(addButton) => (
+            <CreativeSection
+              ads={ads}
+              widgets={tiktokCreativeWidgets}
+              onWidgetsChange={handleTiktokCreativeWidgetsChange}
+              isAdmin={isAdmin}
+              reportId={reportId}
+              headerAction={addButton}
+            />
+          )}
+        </SectionInsightCard>
         {filterDialogs}
       </div>
     )
@@ -1375,61 +1460,155 @@ export function TiktokReportDetail({
 
         {/* 일반 캠페인 탭 */}
         <TabsContent value="normal" className="flex flex-col gap-6">
-          <MonthlyKpi m={monthly} />
-          <WeeklyCharts weekly={weekly} />
-          <WeeklyTable weekly={weekly} />
-          <CampaignSection
-            campaigns={filteredCampaigns}
-            title="🎯 캠페인 성과 분석 (TikTok)"
-            onFilterClick={isAdmin && campaignItems.length > 0 ? () => setCampaignDialogOpen(true) : undefined}
-          />
-          <AdgroupSection
-            adgroups={filteredAdgroups}
-            onFilterClick={isAdmin && adgroupItems.length > 0 ? () => setAdgroupDialogOpen(true) : undefined}
-          />
-          <CreativeSection
-            ads={ads}
-            widgets={tiktokCreativeWidgets}
-            onWidgetsChange={handleTiktokCreativeWidgetsChange}
-            isAdmin={isAdmin}
+          <SectionInsightCard
             reportId={reportId}
-          />
-          <InsightMemoCard
-            reportId={reportId}
-            initialContent={insightMemo}
-            initialTitle={insightMemoTitle}
-            titleFieldKey="insight_memo_title"
             role={role}
-            label="일반 캠페인 인사이트 & 메모"
-            fieldKey="insight_memo"
-          />
+            sectionKey={TIKTOK_SECTION_KEYS.monthly}
+            defaultLabel="월간 요약 인사이트"
+            initialEntry={sectionInsights[TIKTOK_SECTION_KEYS.monthly]}
+          >
+            <MonthlyKpi m={monthly} />
+          </SectionInsightCard>
+          <SectionInsightCard
+            reportId={reportId}
+            role={role}
+            sectionKey={TIKTOK_SECTION_KEYS.weeklyCharts}
+            defaultLabel="주간 차트 인사이트"
+            initialEntry={sectionInsights[TIKTOK_SECTION_KEYS.weeklyCharts]}
+          >
+            <WeeklyCharts weekly={weekly} />
+          </SectionInsightCard>
+          <SectionInsightCard
+            reportId={reportId}
+            role={role}
+            sectionKey={TIKTOK_SECTION_KEYS.weeklyTable}
+            defaultLabel="주간 데이터 인사이트"
+            initialEntry={sectionInsights[TIKTOK_SECTION_KEYS.weeklyTable]}
+          >
+            <WeeklyTable weekly={weekly} />
+          </SectionInsightCard>
+          <SectionInsightCard
+            reportId={reportId}
+            role={role}
+            sectionKey={TIKTOK_SECTION_KEYS.campaigns}
+            defaultLabel="캠페인 성과 인사이트"
+            initialEntry={sectionInsights[TIKTOK_SECTION_KEYS.campaigns]}
+          >
+            {(addButton) => (
+              <CampaignSection
+                campaigns={filteredCampaigns}
+                title="🎯 캠페인 성과 분석 (TikTok)"
+                onFilterClick={isAdmin && campaignItems.length > 0 ? () => setCampaignDialogOpen(true) : undefined}
+                headerAction={addButton}
+              />
+            )}
+          </SectionInsightCard>
+          <SectionInsightCard
+            reportId={reportId}
+            role={role}
+            sectionKey={TIKTOK_SECTION_KEYS.adgroups}
+            defaultLabel="광고그룹 성과 인사이트"
+            initialEntry={sectionInsights[TIKTOK_SECTION_KEYS.adgroups]}
+          >
+            {(addButton) => (
+              <AdgroupSection
+                adgroups={filteredAdgroups}
+                onFilterClick={isAdmin && adgroupItems.length > 0 ? () => setAdgroupDialogOpen(true) : undefined}
+                headerAction={addButton}
+              />
+            )}
+          </SectionInsightCard>
+          <SectionInsightCard
+            reportId={reportId}
+            role={role}
+            sectionKey={TIKTOK_SECTION_KEYS.creatives}
+            defaultLabel="소재 성과 인사이트"
+            initialEntry={sectionInsights[TIKTOK_SECTION_KEYS.creatives]}
+          >
+            {(addButton) => (
+              <CreativeSection
+                ads={ads}
+                widgets={tiktokCreativeWidgets}
+                onWidgetsChange={handleTiktokCreativeWidgetsChange}
+                isAdmin={isAdmin}
+                reportId={reportId}
+                headerAction={addButton}
+              />
+            )}
+          </SectionInsightCard>
         </TabsContent>
 
         {/* GMV Max 탭 */}
         <TabsContent value="gmvmax" className="flex flex-col gap-6">
-          <GmvMaxMonthlyKpi m={gmvMaxMonthly} />
-          <GmvMaxWeeklyCharts weekly={gmvMaxWeekly ?? []} />
-          <GmvMaxWeeklyTable weekly={gmvMaxWeekly ?? []} />
-          <GmvMaxCampaignSection
-            campaigns={filteredGmvMaxCampaigns}
-            onFilterClick={isAdmin && gmvMaxItems2.length > 0 ? () => setGmvMaxDialogOpen(true) : undefined}
-          />
-          <GmvMaxCreativeSection
-            items={gmvMaxItems ?? []}
-            widgets={gmvmaxCreativeWidgets}
-            onWidgetsChange={handleGmvmaxCreativeWidgetsChange}
-            isAdmin={isAdmin}
+          <SectionInsightCard
             reportId={reportId}
-          />
-          <InsightMemoCard
-            reportId={reportId}
-            initialContent={insightMemoGmvMax}
-            initialTitle={insightMemoGmvMaxTitle}
-            titleFieldKey="insight_memo_gmv_max_title"
             role={role}
-            label="GMV Max 인사이트 & 메모"
-            fieldKey="insight_memo_gmv_max"
-          />
+            sectionKey={TIKTOK_GMVMAX_SECTION_KEYS.monthly}
+            defaultLabel="GMV Max 월간 요약 인사이트"
+            initialEntry={sectionInsights[TIKTOK_GMVMAX_SECTION_KEYS.monthly]}
+          >
+            <GmvMaxMonthlyKpi m={gmvMaxMonthly} />
+          </SectionInsightCard>
+          <SectionInsightCard
+            reportId={reportId}
+            role={role}
+            sectionKey={TIKTOK_GMVMAX_SECTION_KEYS.weeklyCharts}
+            defaultLabel="GMV Max 주간 차트 인사이트"
+            initialEntry={sectionInsights[TIKTOK_GMVMAX_SECTION_KEYS.weeklyCharts]}
+          >
+            <GmvMaxWeeklyCharts weekly={gmvMaxWeekly ?? []} />
+          </SectionInsightCard>
+          <SectionInsightCard
+            reportId={reportId}
+            role={role}
+            sectionKey={TIKTOK_GMVMAX_SECTION_KEYS.weeklyTable}
+            defaultLabel="GMV Max 주간 데이터 인사이트"
+            initialEntry={sectionInsights[TIKTOK_GMVMAX_SECTION_KEYS.weeklyTable]}
+          >
+            <GmvMaxWeeklyTable weekly={gmvMaxWeekly ?? []} />
+          </SectionInsightCard>
+          <SectionVisibilityWrapper
+            reportId={reportId}
+            sectionKey={TIKTOK_GMVMAX_SECTION_KEYS.campaigns}
+            label="캠페인 성과 분석 (TikTok GMV Max)"
+            role={role}
+            hiddenSections={currentFilters?.hiddenSections ?? []}
+            currentFilters={currentFilters}
+          >
+            <SectionInsightCard
+              reportId={reportId}
+              role={role}
+              sectionKey={TIKTOK_GMVMAX_SECTION_KEYS.campaigns}
+              defaultLabel="GMV Max 캠페인 성과 인사이트"
+              initialEntry={sectionInsights[TIKTOK_GMVMAX_SECTION_KEYS.campaigns]}
+            >
+              {(addButton) => (
+                <GmvMaxCampaignSection
+                  campaigns={filteredGmvMaxCampaigns}
+                  onFilterClick={isAdmin && gmvMaxItems2.length > 0 ? () => setGmvMaxDialogOpen(true) : undefined}
+                  headerAction={addButton}
+                />
+              )}
+            </SectionInsightCard>
+          </SectionVisibilityWrapper>
+          <SectionInsightCard
+            reportId={reportId}
+            role={role}
+            sectionKey={TIKTOK_GMVMAX_SECTION_KEYS.creatives}
+            defaultLabel="GMV Max 소재 성과 인사이트"
+            initialEntry={sectionInsights[TIKTOK_GMVMAX_SECTION_KEYS.creatives]}
+          >
+            {(addButton) => (
+              <GmvMaxCreativeSection
+                items={gmvMaxItems ?? []}
+                widgets={gmvmaxCreativeWidgets}
+                onWidgetsChange={handleGmvmaxCreativeWidgetsChange}
+                isAdmin={isAdmin}
+                reportId={reportId}
+                headerAction={addButton}
+              />
+            )}
+          </SectionInsightCard>
         </TabsContent>
       </Tabs>
 

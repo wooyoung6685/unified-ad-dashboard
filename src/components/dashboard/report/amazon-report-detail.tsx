@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
@@ -17,7 +18,10 @@ import type {
   AmazonProductData,
   AmazonReportData,
   AmazonWeeklyData,
+  SectionInsights,
 } from '@/types/database'
+import { AMAZON_SECTION_KEYS } from '@/lib/reports/section-keys'
+import { SectionInsightCard } from './section-insight-card'
 import {
   Bar,
   CartesianGrid,
@@ -33,6 +37,10 @@ import {
 interface Props {
   data: AmazonReportData
   title: string
+  reportId: string
+  role: 'admin' | 'viewer'
+  sectionInsights: SectionInsights
+  titleAction?: ReactNode
 }
 
 // ── 헬퍼 ─────────────────────────────────────────
@@ -95,12 +103,15 @@ function GrowthCell({
 
 // ── 섹션 1: 제목 ──────────────────────────────────
 
-function TitleCard({ title }: { title: string }) {
+function TitleCard({ title, titleAction }: { title: string; titleAction?: ReactNode }) {
   return (
-    <Card className="border-2">
+    <Card className="relative border-2">
       <CardContent className="flex items-center justify-center py-8">
         <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
       </CardContent>
+      {titleAction && (
+        <div className="absolute right-4 top-4">{titleAction}</div>
+      )}
     </Card>
   )
 }
@@ -110,9 +121,11 @@ function TitleCard({ title }: { title: string }) {
 function MonthlySection({
   monthly: m,
   weekly,
+  headerAction,
 }: {
   monthly: AmazonMonthlyData
   weekly: AmazonWeeklyData[]
+  headerAction?: ReactNode
 }) {
   const dateRange = deriveDateRange(weekly)
   const prevDateRange = getPrevDateRange(dateRange)
@@ -138,96 +151,109 @@ function MonthlySection({
   const allCols = [...amazonCols, ...adsCols]
 
   return (
-    <section>
-      <h2 className="mb-3 text-base font-semibold">■ Amazon_DATA</h2>
-      <div className="overflow-x-auto rounded-lg border">
-        <Table>
-          <TableHeader>
-            {/* 그룹 헤더 행 */}
-            <TableRow className="bg-muted/50">
-              <TableHead rowSpan={2} className="whitespace-nowrap align-middle border-r">
-                날짜범위
-              </TableHead>
-              <TableHead
-                colSpan={amazonCols.length}
-                className="text-center font-semibold border-r"
-              >
-                Amazon
-              </TableHead>
-              <TableHead colSpan={adsCols.length} className="text-center font-semibold">
-                내부광고
-              </TableHead>
-            </TableRow>
-            {/* 컬럼명 행 */}
-            <TableRow className="bg-muted/30">
-              {amazonCols.map((c, i) => (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base">📊 월간 요약 (Amazon)</CardTitle>
+          {headerAction}
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              {/* 그룹 헤더 행 */}
+              <TableRow className="bg-muted/50">
+                <TableHead rowSpan={2} className="whitespace-nowrap align-middle border-r">
+                  날짜범위
+                </TableHead>
                 <TableHead
-                  key={`am-${c.label}`}
-                  className={`text-right whitespace-nowrap ${i === amazonCols.length - 1 ? 'border-r' : ''}`}
+                  colSpan={amazonCols.length}
+                  className="text-center font-semibold border-r"
                 >
-                  {c.label}
+                  Amazon
                 </TableHead>
-              ))}
-              {adsCols.map((c) => (
-                <TableHead key={`ad-${c.label}`} className="text-right whitespace-nowrap">
-                  {c.label}
+                <TableHead colSpan={adsCols.length} className="text-center font-semibold">
+                  내부광고
                 </TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {/* 당월 데이터 행 */}
-            <TableRow>
-              <TableCell className="whitespace-nowrap text-xs text-muted-foreground border-r">
-                {dateRange}
-              </TableCell>
-              {allCols.map((c, i) => (
-                <TableCell
-                  key={`curr-${c.label}`}
-                  className={`text-right font-medium ${i === amazonCols.length - 1 ? 'border-r' : ''}`}
-                >
-                  {c.fmt(c.curr)}
+              </TableRow>
+              {/* 컬럼명 행 */}
+              <TableRow className="bg-muted/30">
+                {amazonCols.map((c, i) => (
+                  <TableHead
+                    key={`am-${c.label}`}
+                    className={`text-right whitespace-nowrap ${i === amazonCols.length - 1 ? 'border-r' : ''}`}
+                  >
+                    {c.label}
+                  </TableHead>
+                ))}
+                {adsCols.map((c) => (
+                  <TableHead key={`ad-${c.label}`} className="text-right whitespace-nowrap">
+                    {c.label}
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {/* 당월 데이터 행 */}
+              <TableRow>
+                <TableCell className="whitespace-nowrap text-xs text-muted-foreground border-r">
+                  {dateRange}
                 </TableCell>
-              ))}
-            </TableRow>
-            {/* 전월 데이터 행 */}
-            <TableRow>
-              <TableCell className="whitespace-nowrap text-xs text-muted-foreground border-r">
-                {prevDateRange}
-              </TableCell>
-              {allCols.map((c, i) => (
-                <TableCell
-                  key={`prev-${c.label}`}
-                  className={`text-right text-muted-foreground ${i === amazonCols.length - 1 ? 'border-r' : ''}`}
-                >
-                  {c.fmt(c.prev)}
+                {allCols.map((c, i) => (
+                  <TableCell
+                    key={`curr-${c.label}`}
+                    className={`text-right font-medium ${i === amazonCols.length - 1 ? 'border-r' : ''}`}
+                  >
+                    {c.fmt(c.curr)}
+                  </TableCell>
+                ))}
+              </TableRow>
+              {/* 전월 데이터 행 */}
+              <TableRow>
+                <TableCell className="whitespace-nowrap text-xs text-muted-foreground border-r">
+                  {prevDateRange}
                 </TableCell>
-              ))}
-            </TableRow>
-            {/* 전월 대비 성장률 행 */}
-            <TableRow className="bg-muted/20">
-              <TableCell className="whitespace-nowrap text-xs font-medium border-r">
-                전월 대비 성장률
-              </TableCell>
-              {allCols.map((c, i) => (
-                <TableCell
-                  key={`growth-${c.label}`}
-                  className={`text-right ${i === amazonCols.length - 1 ? 'border-r' : ''}`}
-                >
-                  <GrowthCell curr={c.curr} prev={c.prev} goodUp={c.goodUp} />
+                {allCols.map((c, i) => (
+                  <TableCell
+                    key={`prev-${c.label}`}
+                    className={`text-right text-muted-foreground ${i === amazonCols.length - 1 ? 'border-r' : ''}`}
+                  >
+                    {c.fmt(c.prev)}
+                  </TableCell>
+                ))}
+              </TableRow>
+              {/* 전월 대비 성장률 행 */}
+              <TableRow className="bg-muted/20">
+                <TableCell className="whitespace-nowrap text-xs font-medium border-r">
+                  전월 대비 성장률
                 </TableCell>
-              ))}
-            </TableRow>
-          </TableBody>
-        </Table>
-      </div>
-    </section>
+                {allCols.map((c, i) => (
+                  <TableCell
+                    key={`growth-${c.label}`}
+                    className={`text-right ${i === amazonCols.length - 1 ? 'border-r' : ''}`}
+                  >
+                    <GrowthCell curr={c.curr} prev={c.prev} goodUp={c.goodUp} />
+                  </TableCell>
+                ))}
+              </TableRow>
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
 // ── 섹션 3: 주별 데이터 테이블 ──────────────────────
 
-function WeeklyTable({ weekly }: { weekly: AmazonWeeklyData[] }) {
+function WeeklyTable({
+  weekly,
+  headerAction,
+}: {
+  weekly: AmazonWeeklyData[]
+  headerAction?: ReactNode
+}) {
   const amazonCols = [
     { label: '전체매출', get: (w: AmazonWeeklyData) => w.organic_sales, fmt: fmtUSD },
     { label: '구매건수', get: (w: AmazonWeeklyData) => w.orders, fmt: fmtNum },
@@ -247,76 +273,89 @@ function WeeklyTable({ weekly }: { weekly: AmazonWeeklyData[] }) {
   ]
 
   return (
-    <section>
-      <h2 className="mb-3 text-base font-semibold">■ 주별기준_DATA</h2>
-      <div className="overflow-x-auto rounded-lg border">
-        <Table>
-          <TableHeader>
-            {/* 그룹 헤더 행 */}
-            <TableRow className="bg-muted/50">
-              <TableHead rowSpan={2} className="whitespace-nowrap align-middle border-r">
-                주차
-              </TableHead>
-              <TableHead rowSpan={2} className="whitespace-nowrap align-middle border-r">
-                날짜범위
-              </TableHead>
-              <TableHead
-                colSpan={amazonCols.length}
-                className="text-center font-semibold border-r"
-              >
-                Amazon
-              </TableHead>
-              <TableHead colSpan={adsCols.length} className="text-center font-semibold">
-                내부광고
-              </TableHead>
-            </TableRow>
-            {/* 컬럼명 행 */}
-            <TableRow className="bg-muted/30">
-              {amazonCols.map((c, i) => (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base">🗓️ 주별 데이터 (Amazon)</CardTitle>
+          {headerAction}
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              {/* 그룹 헤더 행 */}
+              <TableRow className="bg-muted/50">
+                <TableHead rowSpan={2} className="whitespace-nowrap align-middle border-r">
+                  주차
+                </TableHead>
+                <TableHead rowSpan={2} className="whitespace-nowrap align-middle border-r">
+                  날짜범위
+                </TableHead>
                 <TableHead
-                  key={`wam-${c.label}`}
-                  className={`text-right whitespace-nowrap ${i === amazonCols.length - 1 ? 'border-r' : ''}`}
+                  colSpan={amazonCols.length}
+                  className="text-center font-semibold border-r"
                 >
-                  {c.label}
+                  Amazon
                 </TableHead>
-              ))}
-              {adsCols.map((c) => (
-                <TableHead key={`wad-${c.label}`} className="text-right whitespace-nowrap">
-                  {c.label}
+                <TableHead colSpan={adsCols.length} className="text-center font-semibold">
+                  내부광고
                 </TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {weekly.map((w) => (
-              <TableRow key={w.week}>
-                <TableCell className="font-medium whitespace-nowrap border-r">{w.week}주차</TableCell>
-                <TableCell className="text-xs text-muted-foreground whitespace-nowrap border-r">{w.date_range}</TableCell>
+              </TableRow>
+              {/* 컬럼명 행 */}
+              <TableRow className="bg-muted/30">
                 {amazonCols.map((c, i) => (
-                  <TableCell
-                    key={`wr-am-${c.label}`}
-                    className={`text-right ${i === amazonCols.length - 1 ? 'border-r' : ''}`}
+                  <TableHead
+                    key={`wam-${c.label}`}
+                    className={`text-right whitespace-nowrap ${i === amazonCols.length - 1 ? 'border-r' : ''}`}
                   >
-                    {c.fmt(c.get(w))}
-                  </TableCell>
+                    {c.label}
+                  </TableHead>
                 ))}
                 {adsCols.map((c) => (
-                  <TableCell key={`wr-ad-${c.label}`} className="text-right">
-                    {c.fmt(c.get(w))}
-                  </TableCell>
+                  <TableHead key={`wad-${c.label}`} className="text-right whitespace-nowrap">
+                    {c.label}
+                  </TableHead>
                 ))}
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-    </section>
+            </TableHeader>
+            <TableBody>
+              {weekly.map((w) => (
+                <TableRow key={w.week}>
+                  <TableCell className="font-medium whitespace-nowrap border-r">{w.week}주차</TableCell>
+                  <TableCell className="text-xs text-muted-foreground whitespace-nowrap border-r">{w.date_range}</TableCell>
+                  {amazonCols.map((c, i) => (
+                    <TableCell
+                      key={`wr-am-${c.label}`}
+                      className={`text-right ${i === amazonCols.length - 1 ? 'border-r' : ''}`}
+                    >
+                      {c.fmt(c.get(w))}
+                    </TableCell>
+                  ))}
+                  {adsCols.map((c) => (
+                    <TableCell key={`wr-ad-${c.label}`} className="text-right">
+                      {c.fmt(c.get(w))}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
 // ── 섹션 4: 주별 차트 (2×2) ──────────────────────
 
-function WeeklyCharts({ weekly }: { weekly: AmazonWeeklyData[] }) {
+function WeeklyCharts({
+  weekly,
+  headerAction,
+}: {
+  weekly: AmazonWeeklyData[]
+  headerAction?: ReactNode
+}) {
   const chartData = weekly.map((w) => ({
     label: `${w.week}주차`,
     organic_sales: w.organic_sales,
@@ -331,215 +370,228 @@ function WeeklyCharts({ weekly }: { weekly: AmazonWeeklyData[] }) {
   }))
 
   return (
-    <section>
-      <h2 className="mb-4 text-base font-semibold">■ 주별 차트</h2>
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* 차트 1: 매출 & 세션수 */}
-        <Card>
-          <CardHeader className="pb-2 pt-4">
-            <CardTitle className="text-sm font-medium">매출 &amp; 세션수</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={240}>
-              <ComposedChart data={chartData} margin={{ top: 8, right: 32, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                <YAxis
-                  yAxisId="left"
-                  orientation="left"
-                  tick={{ fontSize: 10 }}
-                  width={60}
-                  tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}K`}
-                />
-                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} width={44} />
-                <Tooltip
-                  formatter={(value, name) =>
-                    name === '매출' ? [fmtUSD(value as number), name as string] : [fmtNum(value as number), name as string]
-                  }
-                />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar
-                  yAxisId="left"
-                  dataKey="organic_sales"
-                  name="매출"
-                  fill="#9ca3af"
-                  radius={[2, 2, 0, 0]}
-                  label={{ position: 'top', formatter: (v: unknown) => `$${((v as number) / 1000).toFixed(1)}K`, fontSize: 9 }}
-                />
-                <Line
-                  yAxisId="right"
-                  type="monotone"
-                  dataKey="sessions"
-                  name="세션수"
-                  stroke="#3b82f6"
-                  strokeWidth={2}
-                  dot={{ r: 3 }}
-                  label={{ position: 'top', fontSize: 9, fill: '#3b82f6' }}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base">📈 주별 차트 (Amazon)</CardTitle>
+          {headerAction}
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {/* 차트 1: 매출 & 세션수 */}
+          <Card>
+            <CardHeader className="pb-2 pt-4">
+              <CardTitle className="text-sm font-medium">매출 &amp; 세션수</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={240}>
+                <ComposedChart data={chartData} margin={{ top: 8, right: 32, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                  <YAxis
+                    yAxisId="left"
+                    orientation="left"
+                    tick={{ fontSize: 10 }}
+                    width={60}
+                    tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}K`}
+                  />
+                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} width={44} />
+                  <Tooltip
+                    formatter={(value, name) =>
+                      name === '매출' ? [fmtUSD(value as number), name as string] : [fmtNum(value as number), name as string]
+                    }
+                  />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar
+                    yAxisId="left"
+                    dataKey="organic_sales"
+                    name="매출"
+                    fill="#9ca3af"
+                    radius={[2, 2, 0, 0]}
+                    label={{ position: 'top', formatter: (v: unknown) => `$${((v as number) / 1000).toFixed(1)}K`, fontSize: 9 }}
+                  />
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="sessions"
+                    name="세션수"
+                    stroke="#3b82f6"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    label={{ position: 'top', fontSize: 9, fill: '#3b82f6' }}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
 
-        {/* 차트 2: 구매수 & 전환율 */}
-        <Card>
-          <CardHeader className="pb-2 pt-4">
-            <CardTitle className="text-sm font-medium">구매수 &amp; 전환율</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={240}>
-              <ComposedChart data={chartData} margin={{ top: 8, right: 32, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                <YAxis yAxisId="left" tick={{ fontSize: 10 }} width={40} />
-                <YAxis
-                  yAxisId="right"
-                  orientation="right"
-                  tickFormatter={(v: number) => `${v.toFixed(1)}%`}
-                  tick={{ fontSize: 10 }}
-                  width={48}
-                />
-                <Tooltip
-                  formatter={(value, name) =>
-                    name === '전환율'
-                      ? [`${Number(value).toFixed(2)}%`, name as string]
-                      : [fmtNum(value as number), name as string]
-                  }
-                />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar
-                  yAxisId="left"
-                  dataKey="orders"
-                  name="구매수"
-                  fill="#9ca3af"
-                  radius={[2, 2, 0, 0]}
-                  label={{ position: 'top', fontSize: 9 }}
-                />
-                <Line
-                  yAxisId="right"
-                  type="monotone"
-                  dataKey="conversion_rate"
-                  name="전환율"
-                  stroke="#3b82f6"
-                  strokeWidth={2}
-                  dot={{ r: 3 }}
-                  label={{ position: 'top', formatter: (v: unknown) => `${Number(v).toFixed(2)}%`, fontSize: 9, fill: '#3b82f6' }}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+          {/* 차트 2: 구매수 & 전환율 */}
+          <Card>
+            <CardHeader className="pb-2 pt-4">
+              <CardTitle className="text-sm font-medium">구매수 &amp; 전환율</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={240}>
+                <ComposedChart data={chartData} margin={{ top: 8, right: 32, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                  <YAxis yAxisId="left" tick={{ fontSize: 10 }} width={40} />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    tickFormatter={(v: number) => `${v.toFixed(1)}%`}
+                    tick={{ fontSize: 10 }}
+                    width={48}
+                  />
+                  <Tooltip
+                    formatter={(value, name) =>
+                      name === '전환율'
+                        ? [`${Number(value).toFixed(2)}%`, name as string]
+                        : [fmtNum(value as number), name as string]
+                    }
+                  />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar
+                    yAxisId="left"
+                    dataKey="orders"
+                    name="구매수"
+                    fill="#9ca3af"
+                    radius={[2, 2, 0, 0]}
+                    label={{ position: 'top', fontSize: 9 }}
+                  />
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="conversion_rate"
+                    name="전환율"
+                    stroke="#3b82f6"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    label={{ position: 'top', formatter: (v: unknown) => `${Number(v).toFixed(2)}%`, fontSize: 9, fill: '#3b82f6' }}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
 
-        {/* 차트 3: 광고비 & 광고매출 & ROAS */}
-        <Card>
-          <CardHeader className="pb-2 pt-4">
-            <CardTitle className="text-sm font-medium">광고비 &amp; 광고매출 &amp; ROAS</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={240}>
-              <ComposedChart data={chartData} margin={{ top: 8, right: 48, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                <YAxis
-                  yAxisId="left"
-                  orientation="left"
-                  tick={{ fontSize: 10 }}
-                  width={60}
-                  tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}K`}
-                />
-                <YAxis
-                  yAxisId="right"
-                  orientation="right"
-                  tickFormatter={(v: number) => `${(v * 100).toFixed(0)}%`}
-                  tick={{ fontSize: 10 }}
-                  width={52}
-                />
-                <Tooltip
-                  formatter={(value, name) => {
-                    if (name === 'ROAS') return [`${(Number(value) * 100).toFixed(2)}%`, name as string]
-                    return [fmtUSD(value as number), name as string]
-                  }}
-                />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar yAxisId="left" dataKey="ad_cost" name="전체광고비" fill="#4b5563" radius={[2, 2, 0, 0]} />
-                <Bar yAxisId="left" dataKey="ad_sales" name="광고매출" fill="#9ca3af" radius={[2, 2, 0, 0]} />
-                <Line
-                  yAxisId="right"
-                  type="monotone"
-                  dataKey="ad_roas"
-                  name="ROAS"
-                  stroke="#3b82f6"
-                  strokeWidth={2}
-                  dot={{ r: 3 }}
-                  label={{ position: 'top', formatter: (v: unknown) => `${(Number(v) * 100).toFixed(2)}%`, fontSize: 9, fill: '#3b82f6' }}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+          {/* 차트 3: 광고비 & 광고매출 & ROAS */}
+          <Card>
+            <CardHeader className="pb-2 pt-4">
+              <CardTitle className="text-sm font-medium">광고비 &amp; 광고매출 &amp; ROAS</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={240}>
+                <ComposedChart data={chartData} margin={{ top: 8, right: 48, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                  <YAxis
+                    yAxisId="left"
+                    orientation="left"
+                    tick={{ fontSize: 10 }}
+                    width={60}
+                    tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}K`}
+                  />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    tickFormatter={(v: number) => `${(v * 100).toFixed(0)}%`}
+                    tick={{ fontSize: 10 }}
+                    width={52}
+                  />
+                  <Tooltip
+                    formatter={(value, name) => {
+                      if (name === 'ROAS') return [`${(Number(value) * 100).toFixed(2)}%`, name as string]
+                      return [fmtUSD(value as number), name as string]
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar yAxisId="left" dataKey="ad_cost" name="전체광고비" fill="#4b5563" radius={[2, 2, 0, 0]} />
+                  <Bar yAxisId="left" dataKey="ad_sales" name="광고매출" fill="#9ca3af" radius={[2, 2, 0, 0]} />
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="ad_roas"
+                    name="ROAS"
+                    stroke="#3b82f6"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    label={{ position: 'top', formatter: (v: unknown) => `${(Number(v) * 100).toFixed(2)}%`, fontSize: 9, fill: '#3b82f6' }}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
 
-        {/* 차트 4: CPC & CTR — CPC=Bar, CTR=Line (큐텐과 동일 순서) */}
-        <Card>
-          <CardHeader className="pb-2 pt-4">
-            <CardTitle className="text-sm font-medium">CPC &amp; CTR</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={240}>
-              <ComposedChart data={chartData} margin={{ top: 8, right: 48, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                <YAxis
-                  yAxisId="left"
-                  orientation="left"
-                  tickFormatter={(v: number) => `$${v.toFixed(2)}`}
-                  tick={{ fontSize: 10 }}
-                  width={44}
-                />
-                <YAxis
-                  yAxisId="right"
-                  orientation="right"
-                  tickFormatter={(v: number) => `${v.toFixed(1)}%`}
-                  tick={{ fontSize: 10 }}
-                  width={48}
-                />
-                <Tooltip
-                  formatter={(value, name) =>
-                    name === 'CTR'
-                      ? [`${Number(value).toFixed(2)}%`, name as string]
-                      : [fmtUSD(value as number), name as string]
-                  }
-                />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar
-                  yAxisId="left"
-                  dataKey="ad_cpc"
-                  name="CPC"
-                  fill="#9ca3af"
-                  radius={[2, 2, 0, 0]}
-                  label={{ position: 'top', formatter: (v: unknown) => fmtUSD(v as number), fontSize: 9 }}
-                />
-                <Line
-                  yAxisId="right"
-                  type="monotone"
-                  dataKey="ad_ctr"
-                  name="CTR"
-                  stroke="#3b82f6"
-                  strokeWidth={2}
-                  dot={{ r: 3 }}
-                  label={{ position: 'top', formatter: (v: unknown) => `${Number(v).toFixed(2)}%`, fontSize: 9, fill: '#3b82f6' }}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-    </section>
+          {/* 차트 4: CPC & CTR — CPC=Bar, CTR=Line (큐텐과 동일 순서) */}
+          <Card>
+            <CardHeader className="pb-2 pt-4">
+              <CardTitle className="text-sm font-medium">CPC &amp; CTR</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={240}>
+                <ComposedChart data={chartData} margin={{ top: 8, right: 48, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                  <YAxis
+                    yAxisId="left"
+                    orientation="left"
+                    tickFormatter={(v: number) => `$${v.toFixed(2)}`}
+                    tick={{ fontSize: 10 }}
+                    width={44}
+                  />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    tickFormatter={(v: number) => `${v.toFixed(1)}%`}
+                    tick={{ fontSize: 10 }}
+                    width={48}
+                  />
+                  <Tooltip
+                    formatter={(value, name) =>
+                      name === 'CTR'
+                        ? [`${Number(value).toFixed(2)}%`, name as string]
+                        : [fmtUSD(value as number), name as string]
+                    }
+                  />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar
+                    yAxisId="left"
+                    dataKey="ad_cpc"
+                    name="CPC"
+                    fill="#9ca3af"
+                    radius={[2, 2, 0, 0]}
+                    label={{ position: 'top', formatter: (v: unknown) => fmtUSD(v as number), fontSize: 9 }}
+                  />
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="ad_ctr"
+                    name="CTR"
+                    stroke="#3b82f6"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    label={{ position: 'top', formatter: (v: unknown) => `${Number(v).toFixed(2)}%`, fontSize: 9, fill: '#3b82f6' }}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
 // ── 섹션 5: 키워드 분석 (Amazon 전용) ──────────────────────────────
 
-function KeywordSection({ keywords }: { keywords: AmazonKeywordData[] }) {
+function KeywordSection({
+  keywords,
+  headerAction,
+}: {
+  keywords: AmazonKeywordData[]
+  headerAction?: ReactNode
+}) {
   const filtered = keywords.filter((kw) => !kw.keyword.startsWith('B0'))
   if (filtered.length === 0) return null
 
@@ -552,71 +604,84 @@ function KeywordSection({ keywords }: { keywords: AmazonKeywordData[] }) {
   const chartHeight = Math.max(sorted.length * 36 + 48, 240)
 
   return (
-    <section>
-      <h2 className="mb-4 text-base font-semibold">■ 키워드_DATA (Top {filtered.length})</h2>
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* 테이블 */}
-        <div className="overflow-x-auto rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50">
-                <TableHead>#</TableHead>
-                <TableHead>키워드</TableHead>
-                <TableHead className="text-right">노출수</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((kw, i) => (
-                <TableRow key={kw.keyword}>
-                  <TableCell className="text-sm">{i + 1}</TableCell>
-                  <TableCell className="text-sm">{kw.keyword}</TableCell>
-                  <TableCell className="text-right text-sm">{fmtNum(kw.impressions)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base">🔍 키워드 분석 (Amazon) — Top {filtered.length}</CardTitle>
+          {headerAction}
         </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {/* 테이블 */}
+          <div className="overflow-x-auto rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead>#</TableHead>
+                  <TableHead>키워드</TableHead>
+                  <TableHead className="text-right">노출수</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((kw, i) => (
+                  <TableRow key={kw.keyword}>
+                    <TableCell className="text-sm">{i + 1}</TableCell>
+                    <TableCell className="text-sm">{kw.keyword}</TableCell>
+                    <TableCell className="text-right text-sm">{fmtNum(kw.impressions)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
 
-        {/* 수직 막대 차트 */}
-        <Card>
-          <CardHeader className="pb-2 pt-4">
-            <CardTitle className="text-sm font-medium">키워드별 노출수</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={chartHeight}>
-              <ComposedChart
-                layout="vertical"
-                data={chartData}
-                margin={{ top: 4, right: 80, left: 0, bottom: 4 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                <XAxis type="number" tickFormatter={(v) => fmtNum(v)} tick={{ fontSize: 10 }} />
-                <YAxis type="category" dataKey="idx" tick={{ fontSize: 10 }} width={28} />
-                <Tooltip
-                  formatter={(v) => [fmtNum(v as number), '노출수']}
-                  labelFormatter={(label, payload) => {
-                    const p = payload?.[0]?.payload as { name?: string } | undefined
-                    return p?.name ?? `#${label}`
-                  }}
-                />
-                <Bar
-                  dataKey="impressions"
-                  fill="#6b7280"
-                  radius={[0, 2, 2, 0]}
-                  label={{ position: 'right', formatter: (v: unknown) => fmtNum(v as number), fontSize: 10 }}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-    </section>
+          {/* 수직 막대 차트 */}
+          <Card>
+            <CardHeader className="pb-2 pt-4">
+              <CardTitle className="text-sm font-medium">키워드별 노출수</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={chartHeight}>
+                <ComposedChart
+                  layout="vertical"
+                  data={chartData}
+                  margin={{ top: 4, right: 80, left: 0, bottom: 4 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                  <XAxis type="number" tickFormatter={(v) => fmtNum(v)} tick={{ fontSize: 10 }} />
+                  <YAxis type="category" dataKey="idx" tick={{ fontSize: 10 }} width={28} />
+                  <Tooltip
+                    formatter={(v) => [fmtNum(v as number), '노출수']}
+                    labelFormatter={(label, payload) => {
+                      const p = payload?.[0]?.payload as { name?: string } | undefined
+                      return p?.name ?? `#${label}`
+                    }}
+                  />
+                  <Bar
+                    dataKey="impressions"
+                    fill="#6b7280"
+                    radius={[0, 2, 2, 0]}
+                    label={{ position: 'right', formatter: (v: unknown) => fmtNum(v as number), fontSize: 10 }}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
 // ── 섹션 6: 일별 데이터 ──────────────────────────────
 
-function DailySection({ daily }: { daily: AmazonDailyData[] }) {
+function DailySection({
+  daily,
+  headerAction,
+}: {
+  daily: AmazonDailyData[]
+  headerAction?: ReactNode
+}) {
   const sortedDaily = [...daily].sort((a, b) => a.date.localeCompare(b.date))
 
   const chartData = sortedDaily.map((d) => ({
@@ -627,99 +692,112 @@ function DailySection({ daily }: { daily: AmazonDailyData[] }) {
   const chartHeight = Math.max(sortedDaily.length * 36 + 48, 360)
 
   return (
-    <section>
-      <h2 className="mb-4 text-base font-semibold">■ 일별기준_DATA</h2>
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* 일별 표 */}
-        <div className="overflow-x-auto rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50">
-                <TableHead>날짜</TableHead>
-                <TableHead className="text-right">매출</TableHead>
-                <TableHead className="text-right">구매수</TableHead>
-                <TableHead className="text-right">세션수</TableHead>
-                <TableHead className="text-right">구매전환율</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedDaily.map((d) => (
-                <TableRow key={d.date}>
-                  <TableCell className="text-sm">{d.date}</TableCell>
-                  <TableCell className="text-right text-sm">{fmtUSD(d.organic_sales)}</TableCell>
-                  <TableCell className="text-right text-sm">{fmtNum(d.orders)}</TableCell>
-                  <TableCell className="text-right text-sm">{fmtNum(d.sessions)}</TableCell>
-                  <TableCell className="text-right text-sm">{fmtPct(d.conversion_rate)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base">📅 일별 데이터 (Amazon)</CardTitle>
+          {headerAction}
         </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {/* 일별 표 */}
+          <div className="overflow-x-auto rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead>날짜</TableHead>
+                  <TableHead className="text-right">매출</TableHead>
+                  <TableHead className="text-right">구매수</TableHead>
+                  <TableHead className="text-right">세션수</TableHead>
+                  <TableHead className="text-right">구매전환율</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedDaily.map((d) => (
+                  <TableRow key={d.date}>
+                    <TableCell className="text-sm">{d.date}</TableCell>
+                    <TableCell className="text-right text-sm">{fmtUSD(d.organic_sales)}</TableCell>
+                    <TableCell className="text-right text-sm">{fmtNum(d.orders)}</TableCell>
+                    <TableCell className="text-right text-sm">{fmtNum(d.sessions)}</TableCell>
+                    <TableCell className="text-right text-sm">{fmtPct(d.conversion_rate)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
 
-        {/* 일별 매출 막대 차트 */}
-        <Card>
-          <CardHeader className="pb-2 pt-4">
-            <CardTitle className="text-sm font-medium">일별 매출</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={chartHeight}>
-              <ComposedChart
-                layout="vertical"
-                data={chartData}
-                margin={{ top: 8, right: 80, left: 0, bottom: 24 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                <XAxis
-                  type="number"
-                  domain={[0, (dataMax: number) => Math.ceil(dataMax * 1.15)]}
-                  tickFormatter={(v) => `$${(v / 1000).toFixed(0)}K`}
-                  tick={{ fontSize: 10 }}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="date"
-                  tick={{ fontSize: 10 }}
-                  tickMargin={2}
-                  width={48}
-                />
-                <Tooltip formatter={(v) => [fmtUSD(v as number), '매출']} />
-                <Bar
-                  dataKey="revenue"
-                  fill="#6b7280"
-                  radius={[0, 2, 2, 0]}
-                  label={{
-                    content: (props) => {
-                      const { x, y, width, height, value } = props as {
-                        x: number; y: number; width: number; height: number; value: number
-                      }
-                      if (!value) return <text />
-                      return (
-                        <text
-                          x={x + width + 4}
-                          y={y + height / 2}
-                          textAnchor="start"
-                          dominantBaseline="middle"
-                          fontSize={10}
-                          fill="#374151"
-                        >
-                          {fmtUSD(value)}
-                        </text>
-                      )
-                    },
-                  }}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-    </section>
+          {/* 일별 매출 막대 차트 */}
+          <Card>
+            <CardHeader className="pb-2 pt-4">
+              <CardTitle className="text-sm font-medium">일별 매출</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={chartHeight}>
+                <ComposedChart
+                  layout="vertical"
+                  data={chartData}
+                  margin={{ top: 8, right: 80, left: 0, bottom: 24 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                  <XAxis
+                    type="number"
+                    domain={[0, (dataMax: number) => Math.ceil(dataMax * 1.15)]}
+                    tickFormatter={(v) => `$${(v / 1000).toFixed(0)}K`}
+                    tick={{ fontSize: 10 }}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="date"
+                    tick={{ fontSize: 10 }}
+                    tickMargin={2}
+                    width={48}
+                  />
+                  <Tooltip formatter={(v) => [fmtUSD(v as number), '매출']} />
+                  <Bar
+                    dataKey="revenue"
+                    fill="#6b7280"
+                    radius={[0, 2, 2, 0]}
+                    label={{
+                      content: (props) => {
+                        const { x, y, width, height, value } = props as {
+                          x: number; y: number; width: number; height: number; value: number
+                        }
+                        if (!value) return <text />
+                        return (
+                          <text
+                            x={x + width + 4}
+                            y={y + height / 2}
+                            textAnchor="start"
+                            dominantBaseline="middle"
+                            fontSize={10}
+                            fill="#374151"
+                          >
+                            {fmtUSD(value)}
+                          </text>
+                        )
+                      },
+                    }}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
 // ── 섹션 7: 제품별 데이터 ──────────────────────────────
 
-function ProductSection({ products }: { products: AmazonProductData[] }) {
+function ProductSection({
+  products,
+  headerAction,
+}: {
+  products: AmazonProductData[]
+  headerAction?: ReactNode
+}) {
   // 공통 브랜드 접두사 자동 제거 (Amazon 특화)
   const firstWords = products.map((p) => p.title.split(' ')[0]?.toLowerCase() ?? '')
   const commonPrefix =
@@ -742,103 +820,177 @@ function ProductSection({ products }: { products: AmazonProductData[] }) {
   const chartHeight = Math.max(sorted.length * 56 + 48, 360)
 
   return (
-    <section>
-      <h2 className="mb-4 text-base font-semibold">■ 제품별기준_DATA</h2>
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* 제품별 표 */}
-        <div className="overflow-x-auto rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50">
-                <TableHead>판매 제품</TableHead>
-                <TableHead className="text-right">판매매출</TableHead>
-                <TableHead className="text-right">판매수량</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {products.map((p) => (
-                <TableRow key={p.child_asin ?? p.title}>
-                  <TableCell className="max-w-[220px]">
-                    <p className="truncate text-sm" title={p.title}>{shortenTitle(p.title, 45)}</p>
-                  </TableCell>
-                  <TableCell className="text-right text-sm">{fmtUSD(p.sales)}</TableCell>
-                  <TableCell className="text-right text-sm">{fmtNum(p.quantity)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base">🛒 제품별 성과 (Amazon)</CardTitle>
+          {headerAction}
         </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {/* 제품별 표 */}
+          <div className="overflow-x-auto rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead>판매 제품</TableHead>
+                  <TableHead className="text-right">판매매출</TableHead>
+                  <TableHead className="text-right">판매수량</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {products.map((p) => (
+                  <TableRow key={p.child_asin ?? p.title}>
+                    <TableCell className="max-w-[220px]">
+                      <p className="truncate text-sm" title={p.title}>{shortenTitle(p.title, 45)}</p>
+                    </TableCell>
+                    <TableCell className="text-right text-sm">{fmtUSD(p.sales)}</TableCell>
+                    <TableCell className="text-right text-sm">{fmtNum(p.quantity)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
 
-        {/* 제품별 매출 막대 차트 */}
-        <Card>
-          <CardHeader className="pb-2 pt-4">
-            <CardTitle className="text-sm font-medium">제품별 매출</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={chartHeight}>
-              <ComposedChart
-                layout="vertical"
-                data={chartData}
-                margin={{ top: 4, right: 96, left: 0, bottom: 4 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                <XAxis
-                  type="number"
-                  tickFormatter={(v) => `$${(v / 1000).toFixed(0)}K`}
-                  tick={{ fontSize: 10 }}
-                />
-                <YAxis type="category" dataKey="idx" tick={{ fontSize: 10 }} width={28} />
-                <Tooltip
-                  formatter={(v) => [fmtUSD(v as number), '판매매출']}
-                  labelFormatter={(label, payload) => {
-                    const p = payload?.[0]?.payload as { name?: string } | undefined
-                    return p?.name ?? `#${label}`
-                  }}
-                />
-                <Bar
-                  dataKey="sales"
-                  fill="#6b7280"
-                  radius={[0, 2, 2, 0]}
-                  label={{
-                    position: 'right',
-                    formatter: (v: unknown) => fmtUSD(v as number),
-                    fontSize: 10,
-                  }}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-    </section>
+          {/* 제품별 매출 막대 차트 */}
+          <Card>
+            <CardHeader className="pb-2 pt-4">
+              <CardTitle className="text-sm font-medium">제품별 매출</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={chartHeight}>
+                <ComposedChart
+                  layout="vertical"
+                  data={chartData}
+                  margin={{ top: 4, right: 96, left: 0, bottom: 4 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                  <XAxis
+                    type="number"
+                    tickFormatter={(v) => `$${(v / 1000).toFixed(0)}K`}
+                    tick={{ fontSize: 10 }}
+                  />
+                  <YAxis type="category" dataKey="idx" tick={{ fontSize: 10 }} width={28} />
+                  <Tooltip
+                    formatter={(v) => [fmtUSD(v as number), '판매매출']}
+                    labelFormatter={(label, payload) => {
+                      const p = payload?.[0]?.payload as { name?: string } | undefined
+                      return p?.name ?? `#${label}`
+                    }}
+                  />
+                  <Bar
+                    dataKey="sales"
+                    fill="#6b7280"
+                    radius={[0, 2, 2, 0]}
+                    label={{
+                      position: 'right',
+                      formatter: (v: unknown) => fmtUSD(v as number),
+                      fontSize: 10,
+                    }}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
 // ── 메인 컴포넌트 ──────────────────────────────────
 
-export function AmazonReportDetail({ data, title }: Props) {
+export function AmazonReportDetail({
+  data,
+  title,
+  reportId,
+  role,
+  sectionInsights,
+  titleAction,
+}: Props) {
   return (
     <div className="space-y-10">
       {/* 섹션 1: 제목 */}
-      <TitleCard title={title} />
+      <TitleCard title={title} titleAction={titleAction} />
 
       {/* 섹션 2: 월간 요약 */}
-      <MonthlySection monthly={data.monthly} weekly={data.weekly} />
+      <SectionInsightCard
+        reportId={reportId}
+        role={role}
+        sectionKey={AMAZON_SECTION_KEYS.monthly}
+        defaultLabel="월간 요약 인사이트"
+        initialEntry={sectionInsights[AMAZON_SECTION_KEYS.monthly]}
+      >
+        {(addButton) => (
+          <MonthlySection monthly={data.monthly} weekly={data.weekly} headerAction={addButton} />
+        )}
+      </SectionInsightCard>
 
       {/* 섹션 3: 주별 데이터 테이블 */}
-      {data.weekly.length > 0 && <WeeklyTable weekly={data.weekly} />}
+      {data.weekly.length > 0 && (
+        <SectionInsightCard
+          reportId={reportId}
+          role={role}
+          sectionKey={AMAZON_SECTION_KEYS.weeklyTable}
+          defaultLabel="주간 데이터 인사이트"
+          initialEntry={sectionInsights[AMAZON_SECTION_KEYS.weeklyTable]}
+        >
+          {(addButton) => <WeeklyTable weekly={data.weekly} headerAction={addButton} />}
+        </SectionInsightCard>
+      )}
 
       {/* 섹션 4: 주별 차트 (2×2 그리드) */}
-      {data.weekly.length > 0 && <WeeklyCharts weekly={data.weekly} />}
+      {data.weekly.length > 0 && (
+        <SectionInsightCard
+          reportId={reportId}
+          role={role}
+          sectionKey={AMAZON_SECTION_KEYS.weeklyCharts}
+          defaultLabel="주간 차트 인사이트"
+          initialEntry={sectionInsights[AMAZON_SECTION_KEYS.weeklyCharts]}
+        >
+          {(addButton) => <WeeklyCharts weekly={data.weekly} headerAction={addButton} />}
+        </SectionInsightCard>
+      )}
 
       {/* 섹션 5: 키워드 분석 (Amazon 전용) */}
-      {data.keywords.length > 0 && <KeywordSection keywords={data.keywords} />}
+      {data.keywords.length > 0 && (
+        <SectionInsightCard
+          reportId={reportId}
+          role={role}
+          sectionKey={AMAZON_SECTION_KEYS.keywords}
+          defaultLabel="키워드 분석 인사이트"
+          initialEntry={sectionInsights[AMAZON_SECTION_KEYS.keywords]}
+        >
+          {(addButton) => <KeywordSection keywords={data.keywords} headerAction={addButton} />}
+        </SectionInsightCard>
+      )}
 
       {/* 섹션 6: 일별 데이터 + 차트 */}
-      {data.daily.length > 0 && <DailySection daily={data.daily} />}
+      {data.daily.length > 0 && (
+        <SectionInsightCard
+          reportId={reportId}
+          role={role}
+          sectionKey={AMAZON_SECTION_KEYS.daily}
+          defaultLabel="일별 데이터 인사이트"
+          initialEntry={sectionInsights[AMAZON_SECTION_KEYS.daily]}
+        >
+          {(addButton) => <DailySection daily={data.daily} headerAction={addButton} />}
+        </SectionInsightCard>
+      )}
 
       {/* 섹션 7: 제품별 데이터 + 차트 */}
-      {data.products.length > 0 && <ProductSection products={data.products} />}
+      {data.products.length > 0 && (
+        <SectionInsightCard
+          reportId={reportId}
+          role={role}
+          sectionKey={AMAZON_SECTION_KEYS.products}
+          defaultLabel="제품별 성과 인사이트"
+          initialEntry={sectionInsights[AMAZON_SECTION_KEYS.products]}
+        >
+          {(addButton) => <ProductSection products={data.products} headerAction={addButton} />}
+        </SectionInsightCard>
+      )}
     </div>
   )
 }

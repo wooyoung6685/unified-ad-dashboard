@@ -12,6 +12,7 @@ import {
   sumRows,
   type ShopeeInappRow,
   type ShopeeShoppingRow,
+  type ShopeeSalesOverviewRow,
   type MetaSpendRow,
   type TiktokDailyRow,
   type Qoo10DailyOrganicRow,
@@ -27,6 +28,7 @@ import {
   mergeMetaAdsetPrev,
 } from '@/lib/reports/metaApi'
 import { fetchTiktokCampaigns, fetchTiktokAdgroups, fetchTiktokAds } from '@/lib/reports/tiktokApi'
+import { countryToCurrency } from '@/lib/shopee/constants'
 import { fetchGmvMaxCampaignReport, fetchGmvMaxItems } from '@/lib/tiktok/gmvMax'
 import type {
   AmazonDailyData,
@@ -38,7 +40,6 @@ import type {
   Qoo10MonthlyData,
   Qoo10ProductData,
   ReportSnapshot,
-  ShopeeAdsBreakdownData,
 } from '@/types/database'
 
 import {
@@ -328,25 +329,32 @@ async function buildShopeeSnapshot(args: {
   const shoppingAccountIds = (shoppingAccounts ?? []).map((a) => a.id)
   const metaAccountIds = (metaAccounts ?? []).map((a) => a.id)
 
+  const yearMonth = `${year}-${String(month).padStart(2, '0')}`
+
   // 모든 데이터 병렬 조회
   const [
     { data: curInappStats },
     { data: prevInappStats },
     { data: curShoppingStats },
     { data: prevShoppingStats },
+    { data: curSalesOverviewStats },
+    { data: prevSalesOverviewStats },
     { data: curMetaStats },
     { data: prevMetaStats },
+    { data: voucherStats },
+    { data: productStats },
+    { data: curAdStats },
   ] = await Promise.all([
-    // inapp: 주간차트/breakdown + 월간 items_sold/expense_krw
+    // inapp: 주간차트/breakdown + 월간 expense_krw
     supabaseAdmin
       .from('shopee_inapp_stats')
-      .select('date, ads_type, expense_krw, gmv_krw, conversions, clicks, impressions, items_sold')
+      .select('date, ads_type, expense_krw, gmv_krw, conversions, clicks, impressions')
       .eq('shopee_account_id', internal_account_id)
       .gte('date', thisMonthStart)
       .lte('date', thisMonthEnd),
     supabaseAdmin
       .from('shopee_inapp_stats')
-      .select('date, ads_type, expense_krw, gmv_krw, conversions, clicks, impressions, items_sold')
+      .select('date, ads_type, expense_krw, gmv_krw, conversions, clicks, impressions')
       .eq('shopee_account_id', internal_account_id)
       .gte('date', prevMonthStart)
       .lte('date', prevMonthEnd),
@@ -363,6 +371,23 @@ async function buildShopeeSnapshot(args: {
       ? supabaseAdmin
           .from('shopee_shopping_stats')
           .select('date, sales_krw, orders, product_clicks, visitors, buyers, new_buyers, existing_buyers')
+          .in('shopee_account_id', shoppingAccountIds)
+          .gte('date', prevMonthStart)
+          .lte('date', prevMonthEnd)
+      : Promise.resolve({ data: [] }),
+    // sales_overview: 월간 Units (Paid Order) — Units Sold 지표 소스
+    shoppingAccountIds.length > 0
+      ? supabaseAdmin
+          .from('shopee_sales_overview_stats')
+          .select('date, units_paid_order')
+          .in('shopee_account_id', shoppingAccountIds)
+          .gte('date', thisMonthStart)
+          .lte('date', thisMonthEnd)
+      : Promise.resolve({ data: [] }),
+    shoppingAccountIds.length > 0
+      ? supabaseAdmin
+          .from('shopee_sales_overview_stats')
+          .select('date, units_paid_order')
           .in('shopee_account_id', shoppingAccountIds)
           .gte('date', prevMonthStart)
           .lte('date', prevMonthEnd)
@@ -384,65 +409,263 @@ async function buildShopeeSnapshot(args: {
           .gte('date', prevMonthStart)
           .lte('date', prevMonthEnd)
       : Promise.resolve({ data: [] }),
+    // voucher (월별): 해당 월의 바우처 전체 조회 → 서버에서 Top3 추출
+    shoppingAccountIds.length > 0
+      ? supabaseAdmin
+          .from('shopee_voucher_stats')
+          .select('voucher_name, currency, orders_paid, usage_rate_paid, sales_paid, cost_paid, units_sold_paid')
+          .in('shopee_account_id', shoppingAccountIds)
+          .eq('year_month', yearMonth)
+      : Promise.resolve({ data: [] }),
+    // product performance (월별): 해당 월 상품 전체 조회 → 서버에서 sales_confirmed DESC Top5 추출
+    shoppingAccountIds.length > 0
+      ? supabaseAdmin
+          .from('shopee_product_performance_stats')
+          .select(
+            'product_name, product_visitors, product_page_views, add_to_cart_visitors, add_to_cart_units, add_to_cart_conv_rate, buyers_paid, units_paid, sales_confirmed, order_conv_rate_paid',
+          )
+          .in('shopee_account_id', shoppingAccountIds)
+          .eq('year_month', yearMonth)
+      : Promise.resolve({ data: [] }),
+    // per-ad stats: ROAS TOP5 산출용 (일별 저장 → 월 범위 조회)
+    supabaseAdmin
+      .from('shopee_inapp_ad_stats')
+      .select('ad_name, ads_type, impressions, clicks, conversions, gmv, expense, gmv_krw, expense_krw, currency')
+      .eq('shopee_account_id', internal_account_id)
+      .gte('date', thisMonthStart)
+      .lte('date', thisMonthEnd),
   ])
 
   const curRows: ShopeeInappRow[] = curInappStats ?? []
   const prevRows: ShopeeInappRow[] = prevInappStats ?? []
   const curShopping: ShopeeShoppingRow[] = (curShoppingStats ?? []) as ShopeeShoppingRow[]
   const prevShopping: ShopeeShoppingRow[] = (prevShoppingStats ?? []) as ShopeeShoppingRow[]
+  const curSalesOverview: ShopeeSalesOverviewRow[] = (curSalesOverviewStats ?? []) as ShopeeSalesOverviewRow[]
+  const prevSalesOverview: ShopeeSalesOverviewRow[] = (prevSalesOverviewStats ?? []) as ShopeeSalesOverviewRow[]
   const curMeta: MetaSpendRow[] = (curMetaStats ?? []) as MetaSpendRow[]
   const prevMeta: MetaSpendRow[] = (prevMetaStats ?? []) as MetaSpendRow[]
 
-  const monthly = aggregateShopeeMonthly(curShopping, prevShopping, curRows, prevRows, curMeta, prevMeta)
+  const monthly = aggregateShopeeMonthly(
+    curShopping,
+    prevShopping,
+    curRows,
+    prevRows,
+    curSalesOverview,
+    prevSalesOverview,
+    curMeta,
+    prevMeta,
+  )
   const weekly = groupShopeeByWeek(curRows, year, month)
 
-  // ads_type별 브레이크다운 (기존 inapp 데이터 기반 유지)
-  const ADS_TYPES: Array<{ type: 'shop_ad' | 'product_ad'; label: string }> = [
-    { type: 'shop_ad', label: 'Shop Ads' },
-    { type: 'product_ad', label: 'Product Ads' },
-  ]
+  // per-ad ROAS TOP 5 집계
+  type AdDayRow = {
+    ad_name: string
+    ads_type: string
+    impressions: number | null
+    clicks: number | null
+    conversions: number | null
+    gmv: number | null
+    expense: number | null
+    gmv_krw: number | null
+    expense_krw: number | null
+    currency: string | null
+  }
+  const adDayRows: AdDayRow[] = (curAdStats ?? []) as AdDayRow[]
 
-  const calcBreakdown = (rows: ShopeeInappRow[]) => {
-    const spend_krw = sumRows(rows.map((r) => r.expense_krw))
-    const revenue_krw = sumRows(rows.map((r) => r.gmv_krw))
-    const purchases = sumRows(rows.map((r) => r.conversions))
-    const clicks = sumRows(rows.map((r) => r.clicks))
-    const impressions = sumRows(rows.map((r) => r.impressions))
-    return {
-      spend_krw: spend_krw || null,
-      revenue_krw: revenue_krw || null,
-      roas: divOrNull(revenue_krw * 100, spend_krw),
-      purchases: purchases || null,
-      clicks: clicks || null,
-      impressions: impressions || null,
-      cpc_krw: divOrNull(spend_krw, clicks),
-      ctr: divOrNull(clicks * 100, impressions),
-      conversion_rate: divOrNull(purchases * 100, clicks),
+  const byAd = new Map<string, {
+    ad_name: string
+    ads_type: string
+    impressions: number
+    clicks: number
+    conversions: number
+    gmv: number
+    expense: number
+    gmv_krw: number
+    expense_krw: number
+    currency: string
+  }>()
+
+  for (const r of adDayRows) {
+    const key = r.ad_name
+    const cur = byAd.get(key) ?? {
+      ad_name: r.ad_name,
+      ads_type: r.ads_type,
+      impressions: 0, clicks: 0, conversions: 0,
+      gmv: 0, expense: 0, gmv_krw: 0, expense_krw: 0,
+      currency: r.currency ?? '',
     }
+    cur.impressions += r.impressions ?? 0
+    cur.clicks += r.clicks ?? 0
+    cur.conversions += r.conversions ?? 0
+    cur.gmv += r.gmv ?? 0
+    cur.expense += r.expense ?? 0
+    cur.gmv_krw += r.gmv_krw ?? 0
+    cur.expense_krw += r.expense_krw ?? 0
+    byAd.set(key, cur)
   }
 
-  const ads_breakdown: ShopeeAdsBreakdownData[] = ADS_TYPES.map(({ type, label }) => {
-    const cur = calcBreakdown(curRows.filter((r) => r.ads_type === type))
-    const prev = calcBreakdown(prevRows.filter((r) => r.ads_type === type))
-    return {
-      ads_type: type,
-      label,
-      ...cur,
-      prev_spend_krw: prev.spend_krw,
-      prev_revenue_krw: prev.revenue_krw,
-      prev_roas: prev.roas,
-      prev_purchases: prev.purchases,
-      prev_clicks: prev.clicks,
-      prev_impressions: prev.impressions,
-      prev_cpc_krw: prev.cpc_krw,
-      prev_ctr: prev.ctr,
-      prev_conversion_rate: prev.conversion_rate,
+  const allAgg = Array.from(byAd.values())
+  const ads_top5 = allAgg
+    .filter((a) => a.expense > 0)
+    .map((a) => ({
+      product: a.ad_name,
+      ads_type: a.ads_type,
+      impressions: a.impressions || null,
+      clicks: a.clicks || null,
+      ctr: a.impressions > 0 ? (a.clicks / a.impressions) * 100 : null,
+      conversions: a.conversions || null,
+      conversion_rate: a.clicks > 0 ? (a.conversions / a.clicks) * 100 : null,
+      gmv: a.gmv || null,
+      expense: a.expense || null,
+      roas: a.expense > 0 ? a.gmv / a.expense : null,
+      gmv_krw: a.gmv_krw || null,
+      expense_krw: a.expense_krw || null,
+      currency: a.currency,
+    }))
+    .sort((a, b) => (b.roas ?? 0) - (a.roas ?? 0))
+    .slice(0, 5)
+
+  const adSum = ads_top5.reduce(
+    (s, r) => ({
+      impressions: s.impressions + (r.impressions ?? 0),
+      clicks: s.clicks + (r.clicks ?? 0),
+      conversions: s.conversions + (r.conversions ?? 0),
+      gmv: s.gmv + (r.gmv ?? 0),
+      expense: s.expense + (r.expense ?? 0),
+      gmv_krw: s.gmv_krw + (r.gmv_krw ?? 0),
+      expense_krw: s.expense_krw + (r.expense_krw ?? 0),
+    }),
+    { impressions: 0, clicks: 0, conversions: 0, gmv: 0, expense: 0, gmv_krw: 0, expense_krw: 0 },
+  )
+  const ads_top5_total = {
+    impressions: adSum.impressions || null,
+    clicks: adSum.clicks || null,
+    ctr: adSum.impressions > 0 ? (adSum.clicks / adSum.impressions) * 100 : null,
+    conversions: adSum.conversions || null,
+    conversion_rate: adSum.clicks > 0 ? (adSum.conversions / adSum.clicks) * 100 : null,
+    gmv: adSum.gmv || null,
+    expense: adSum.expense || null,
+    roas: adSum.expense > 0 ? adSum.gmv / adSum.expense : null,
+    gmv_krw: adSum.gmv_krw || null,
+    expense_krw: adSum.expense_krw || null,
+  }
+
+  // 환율 표기: exchange_rates에서 조회
+  const inappCountry = (shopeeAccount?.country ?? '').toLowerCase()
+  const ads_currency = countryToCurrency(inappCountry)
+
+  const { data: adRateRows } = await supabaseAdmin
+    .from('exchange_rates')
+    .select('rate, owner_user_id')
+    .eq('year_month', yearMonth)
+    .eq('country', inappCountry)
+  const adRateRow =
+    (adRateRows ?? []).find((r) => r.owner_user_id !== null) ??
+    (adRateRows ?? []).find((r) => r.owner_user_id === null)
+  const ads_fx_rate_krw: number | null = (adRateRow?.rate as number) ?? null
+
+  // 바우처 Top3: 같은 voucher_name 끼리 합산 후 orders_paid DESC로 정렬해 상위 3개
+  type VoucherRow = {
+    voucher_name: string
+    currency: string | null
+    orders_paid: number | null
+    usage_rate_paid: number | null
+    sales_paid: number | null
+    cost_paid: number | null
+    units_sold_paid: number | null
+  }
+  const voucherRows: VoucherRow[] = (voucherStats ?? []) as VoucherRow[]
+  const voucherMap = new Map<string, VoucherRow>()
+  for (const v of voucherRows) {
+    if (!v.voucher_name) continue
+    const prev = voucherMap.get(v.voucher_name)
+    if (!prev) {
+      voucherMap.set(v.voucher_name, { ...v })
+    } else {
+      voucherMap.set(v.voucher_name, {
+        voucher_name: v.voucher_name,
+        currency: prev.currency ?? v.currency,
+        orders_paid: (prev.orders_paid ?? 0) + (v.orders_paid ?? 0),
+        usage_rate_paid: prev.usage_rate_paid ?? v.usage_rate_paid,
+        sales_paid: (prev.sales_paid ?? 0) + (v.sales_paid ?? 0),
+        cost_paid: (prev.cost_paid ?? 0) + (v.cost_paid ?? 0),
+        units_sold_paid: (prev.units_sold_paid ?? 0) + (v.units_sold_paid ?? 0),
+      })
     }
-  })
+  }
+  const voucher_top3 = Array.from(voucherMap.values())
+    .sort((a, b) => (b.orders_paid ?? 0) - (a.orders_paid ?? 0))
+    .slice(0, 3)
+    .map((v) => ({
+      voucher_name: v.voucher_name,
+      currency: v.currency ?? '',
+      orders_paid: v.orders_paid,
+      usage_rate_paid: v.usage_rate_paid,
+      sales_paid: v.sales_paid,
+      cost_paid: v.cost_paid,
+      units_sold_paid: v.units_sold_paid,
+    }))
+
+  // 프로덕트 퍼포먼스 Top5: 같은 product_name 끼리 합산 후 sales_confirmed DESC로 정렬
+  const country = (shopeeAccount?.country ?? '').toLowerCase()
+  const productCurrency = countryToCurrency(country)
+
+  type ProductRow = {
+    product_name: string | null
+    product_visitors: number | null
+    product_page_views: number | null
+    add_to_cart_visitors: number | null
+    add_to_cart_units: number | null
+    add_to_cart_conv_rate: number | null
+    buyers_paid: number | null
+    units_paid: number | null
+    sales_confirmed: number | null
+    order_conv_rate_paid: number | null
+  }
+  const productRows: ProductRow[] = (productStats ?? []) as ProductRow[]
+  const productMap = new Map<string, ProductRow & { _visitors_sum_for_rate: number }>()
+  for (const p of productRows) {
+    const name = p.product_name ?? ''
+    if (!name) continue
+    const prev = productMap.get(name)
+    if (!prev) {
+      productMap.set(name, { ...p, _visitors_sum_for_rate: p.product_visitors ?? 0 })
+    } else {
+      productMap.set(name, {
+        product_name: name,
+        product_visitors: (prev.product_visitors ?? 0) + (p.product_visitors ?? 0),
+        product_page_views: (prev.product_page_views ?? 0) + (p.product_page_views ?? 0),
+        add_to_cart_visitors: (prev.add_to_cart_visitors ?? 0) + (p.add_to_cart_visitors ?? 0),
+        add_to_cart_units: (prev.add_to_cart_units ?? 0) + (p.add_to_cart_units ?? 0),
+        add_to_cart_conv_rate: prev.add_to_cart_conv_rate ?? p.add_to_cart_conv_rate,
+        buyers_paid: (prev.buyers_paid ?? 0) + (p.buyers_paid ?? 0),
+        units_paid: (prev.units_paid ?? 0) + (p.units_paid ?? 0),
+        sales_confirmed: (prev.sales_confirmed ?? 0) + (p.sales_confirmed ?? 0),
+        order_conv_rate_paid: prev.order_conv_rate_paid ?? p.order_conv_rate_paid,
+        _visitors_sum_for_rate: prev._visitors_sum_for_rate + (p.product_visitors ?? 0),
+      })
+    }
+  }
+  const product_top5 = Array.from(productMap.values())
+    .sort((a, b) => (b.sales_confirmed ?? 0) - (a.sales_confirmed ?? 0))
+    .slice(0, 5)
+    .map((p) => ({
+      product_name: p.product_name ?? '',
+      currency: productCurrency,
+      product_visitors: p.product_visitors,
+      product_page_views: p.product_page_views,
+      add_to_cart_visitors: p.add_to_cart_visitors,
+      add_to_cart_units: p.add_to_cart_units,
+      add_to_cart_conv_rate: p.add_to_cart_conv_rate,
+      buyers_paid: p.buyers_paid,
+      units_paid: p.units_paid,
+      sales_confirmed: p.sales_confirmed,
+      order_conv_rate_paid: p.order_conv_rate_paid,
+    }))
 
   return {
     platform: 'shopee_inapp',
-    data: { monthly, weekly, ads_breakdown },
+    data: { monthly, weekly, ads_top5, ads_top5_total, ads_currency, ads_fx_rate_krw, voucher_top3, product_top5 },
   }
 }
 

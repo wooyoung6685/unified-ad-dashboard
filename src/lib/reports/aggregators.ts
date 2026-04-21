@@ -138,6 +138,11 @@ export type ShopeeShoppingRow = {
   existing_buyers: number | null
 }
 
+export type ShopeeSalesOverviewRow = {
+  date: string
+  units_paid_order: number | null
+}
+
 export type MetaSpendRow = {
   date: string
   spend: number | null
@@ -166,6 +171,7 @@ function calcShopeeAgg(rows: ShopeeInappRow[]) {
 function calcShopeeMonthlyAgg(
   shoppingRows: ShopeeShoppingRow[],
   inappRows: ShopeeInappRow[],
+  salesOverviewRows: ShopeeSalesOverviewRow[],
   metaRows: MetaSpendRow[],
 ) {
   const sales_krw = sumRows(shoppingRows.map((r) => r.sales_krw))
@@ -175,7 +181,7 @@ function calcShopeeMonthlyAgg(
   const buyers = sumRows(shoppingRows.map((r) => r.buyers))
   const new_buyers = sumRows(shoppingRows.map((r) => r.new_buyers))
   const existing_buyers = sumRows(shoppingRows.map((r) => r.existing_buyers))
-  const units_sold = sumRows(inappRows.map((r) => r.items_sold))
+  const units_sold = sumRows(salesOverviewRows.map((r) => r.units_paid_order))
   const ad_spend_inapp_krw = sumRows(inappRows.map((r) => r.expense_krw))
   const ad_spend_meta = sumRows(metaRows.map((r) => r.spend))
   return {
@@ -198,11 +204,13 @@ export function aggregateShopeeMonthly(
   prevShopping: ShopeeShoppingRow[],
   curInapp: ShopeeInappRow[],
   prevInapp: ShopeeInappRow[],
+  curSalesOverview: ShopeeSalesOverviewRow[],
+  prevSalesOverview: ShopeeSalesOverviewRow[],
   curMeta: MetaSpendRow[],
   prevMeta: MetaSpendRow[],
 ): ShopeeMonthlyData {
-  const cur = calcShopeeMonthlyAgg(curShopping, curInapp, curMeta)
-  const prev = calcShopeeMonthlyAgg(prevShopping, prevInapp, prevMeta)
+  const cur = calcShopeeMonthlyAgg(curShopping, curInapp, curSalesOverview, curMeta)
+  const prev = calcShopeeMonthlyAgg(prevShopping, prevInapp, prevSalesOverview, prevMeta)
   return {
     ...cur,
     prev_sales_krw: prev.sales_krw,

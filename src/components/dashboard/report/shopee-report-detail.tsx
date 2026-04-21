@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
@@ -11,11 +12,18 @@ import {
 } from '@/components/ui/table'
 import { fmtDec, fmtKRW, fmtNum, fmtPct } from '@/lib/format'
 import type {
-  ShopeeAdsBreakdownData,
+  SectionInsights,
   ShopeeMonthlyData,
+  ShopeePromotionRow,
   ShopeeReportData,
   ShopeeWeeklyData,
 } from '@/types/database'
+import { SHOPEE_SECTION_KEYS } from '@/lib/reports/section-keys'
+import { SectionInsightCard } from './section-insight-card'
+import { ShopeePromotionSection } from './shopee-promotion-section'
+import { ShopeeVoucherTop3Section } from './shopee-voucher-top3-section'
+import { ShopeeProductTop5Section } from './shopee-product-top5-section'
+import { ShopeeAdsRoasTop5Section } from './shopee-ads-roas-top5-section'
 import {
   Bar,
   CartesianGrid,
@@ -31,6 +39,11 @@ import {
 interface Props {
   data: ShopeeReportData
   title: string
+  reportId: string
+  initialPromotionRows: ShopeePromotionRow[]
+  role: 'admin' | 'viewer'
+  sectionInsights: SectionInsights
+  titleAction?: ReactNode
 }
 
 // ── 헬퍼 ─────────────────────────────────────────
@@ -181,94 +194,6 @@ function MonthlyKpi({ m }: { m: ShopeeMonthlyData }) {
             format="krw"
             goodUp={false}
           />
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-// 광고 유형별 셀 (현재값 + 전월 + 증감)
-function AdsCell({
-  curr,
-  prev,
-  format,
-  goodUp = true,
-}: {
-  curr: number | null
-  prev: number | null
-  format: 'krw' | 'num' | 'pct' | 'dec'
-  goodUp?: boolean
-}) {
-  const fmt = (v: number | null) => {
-    if (format === 'krw') return fmtKRW(v)
-    if (format === 'num') return fmtNum(v)
-    if (format === 'pct') return fmtPct(v)
-    return fmtDec(v)
-  }
-  return (
-    <TableCell className="whitespace-nowrap">
-      <div className="flex flex-col gap-0.5">
-        <span>{fmt(curr)}</span>
-        <div className="flex items-center gap-1">
-          <span className="text-xs text-muted-foreground">Prev: {fmt(prev)}</span>
-          <DeltaBadge curr={curr} prev={prev} goodUp={goodUp} />
-        </div>
-      </div>
-    </TableCell>
-  )
-}
-
-// 섹션 3: Shopee Ads 성과 테이블
-function AdsBreakdownTable({ breakdown }: { breakdown: ShopeeAdsBreakdownData[] }) {
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">🎯 Shopee Ads 성과</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="whitespace-nowrap">구분</TableHead>
-                <TableHead className="whitespace-nowrap">노출수</TableHead>
-                <TableHead className="whitespace-nowrap">클릭수</TableHead>
-                <TableHead className="whitespace-nowrap">클릭당 비용(CPC) (한화)</TableHead>
-                <TableHead className="whitespace-nowrap">클릭률(CTR)</TableHead>
-                <TableHead className="whitespace-nowrap">지출금액 (한화)</TableHead>
-                <TableHead className="whitespace-nowrap">구매(전환)수</TableHead>
-                <TableHead className="whitespace-nowrap">매출 (한화)</TableHead>
-                <TableHead className="whitespace-nowrap">ROAS</TableHead>
-                <TableHead className="whitespace-nowrap">전환율</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {breakdown.map((b) => (
-                <TableRow key={b.ads_type}>
-                  <TableCell className="whitespace-nowrap font-medium">{b.label}</TableCell>
-                  <AdsCell curr={b.impressions} prev={b.prev_impressions} format="num" goodUp />
-                  <AdsCell curr={b.clicks} prev={b.prev_clicks} format="num" goodUp />
-                  <AdsCell curr={b.cpc_krw} prev={b.prev_cpc_krw} format="krw" goodUp={false} />
-                  <AdsCell curr={b.ctr} prev={b.prev_ctr} format="pct" goodUp />
-                  <AdsCell
-                    curr={b.spend_krw}
-                    prev={b.prev_spend_krw}
-                    format="krw"
-                    goodUp={false}
-                  />
-                  <AdsCell curr={b.purchases} prev={b.prev_purchases} format="num" goodUp />
-                  <AdsCell curr={b.revenue_krw} prev={b.prev_revenue_krw} format="krw" goodUp />
-                  <AdsCell curr={b.roas} prev={b.prev_roas} format="pct" goodUp />
-                  <AdsCell
-                    curr={b.conversion_rate}
-                    prev={b.prev_conversion_rate}
-                    format="pct"
-                    goodUp
-                  />
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
         </div>
       </CardContent>
     </Card>
@@ -448,27 +373,129 @@ function WeeklyTable({ weekly }: { weekly: ShopeeWeeklyData[] }) {
 
 // ── 메인 컴포넌트 ──────────────────────────────────
 
-export function ShopeeReportDetail({ data, title }: Props) {
+export function ShopeeReportDetail({
+  data,
+  title,
+  reportId,
+  initialPromotionRows,
+  role,
+  sectionInsights,
+  titleAction,
+}: Props) {
+  const canEdit = role === 'admin'
   return (
     <div className="flex flex-col gap-6">
       {/* 섹션 1: 리포트 제목 */}
-      <Card>
+      <Card className="relative">
         <CardContent className="py-8 text-center">
           <h1 className="text-2xl font-bold">{title}</h1>
         </CardContent>
+        {titleAction && (
+          <div className="absolute right-4 top-4">{titleAction}</div>
+        )}
       </Card>
 
       {/* 섹션 2: 월간 요약 */}
-      <MonthlyKpi m={data.monthly} />
+      <SectionInsightCard
+        reportId={reportId}
+        role={role}
+        sectionKey={SHOPEE_SECTION_KEYS.monthly}
+        defaultLabel="월간 요약 인사이트"
+        initialEntry={sectionInsights[SHOPEE_SECTION_KEYS.monthly]}
+      >
+        <MonthlyKpi m={data.monthly} />
+      </SectionInsightCard>
 
-      {/* 섹션 3: Shopee Ads 성과 */}
-      <AdsBreakdownTable breakdown={data.ads_breakdown} />
+      {/* 섹션 3: Shopee Ads (ROAS TOP 5) */}
+      <SectionInsightCard
+        reportId={reportId}
+        role={role}
+        sectionKey={SHOPEE_SECTION_KEYS.adsRoasTop5}
+        defaultLabel="Shopee Ads ROAS TOP 5 인사이트"
+        initialEntry={sectionInsights[SHOPEE_SECTION_KEYS.adsRoasTop5]}
+      >
+        {(addButton) => (
+          <ShopeeAdsRoasTop5Section
+            rows={data.ads_top5 ?? []}
+            total={
+              data.ads_top5_total ?? {
+                impressions: null,
+                clicks: null,
+                ctr: null,
+                conversions: null,
+                conversion_rate: null,
+                gmv: null,
+                expense: null,
+                roas: null,
+                gmv_krw: null,
+                expense_krw: null,
+              }
+            }
+            currency={data.ads_currency ?? ''}
+            fxRateKrw={data.ads_fx_rate_krw ?? null}
+            headerAction={addButton}
+          />
+        )}
+      </SectionInsightCard>
 
       {/* 섹션 4: 주간 차트 */}
-      <WeeklyCharts weekly={data.weekly} />
+      <SectionInsightCard
+        reportId={reportId}
+        role={role}
+        sectionKey={SHOPEE_SECTION_KEYS.weeklyCharts}
+        defaultLabel="주간 차트 인사이트"
+        initialEntry={sectionInsights[SHOPEE_SECTION_KEYS.weeklyCharts]}
+      >
+        <WeeklyCharts weekly={data.weekly} />
+      </SectionInsightCard>
 
       {/* 섹션 5: 주간 데이터 */}
-      <WeeklyTable weekly={data.weekly} />
+      <SectionInsightCard
+        reportId={reportId}
+        role={role}
+        sectionKey={SHOPEE_SECTION_KEYS.weeklyTable}
+        defaultLabel="주간 데이터 인사이트"
+        initialEntry={sectionInsights[SHOPEE_SECTION_KEYS.weeklyTable]}
+      >
+        <WeeklyTable weekly={data.weekly} />
+      </SectionInsightCard>
+
+      {/* 섹션 6: 프로모션 성과 */}
+      <SectionInsightCard
+        reportId={reportId}
+        role={role}
+        sectionKey={SHOPEE_SECTION_KEYS.promotion}
+        defaultLabel="프로모션 성과 인사이트"
+        initialEntry={sectionInsights[SHOPEE_SECTION_KEYS.promotion]}
+      >
+        <ShopeePromotionSection
+          reportId={reportId}
+          initialRows={initialPromotionRows}
+          canEdit={canEdit}
+        />
+      </SectionInsightCard>
+
+      {/* 섹션 7: 바우처 데이터 (Top 3) */}
+      <SectionInsightCard
+        reportId={reportId}
+        role={role}
+        sectionKey={SHOPEE_SECTION_KEYS.voucherTop3}
+        defaultLabel="바우처 TOP 3 인사이트"
+        initialEntry={sectionInsights[SHOPEE_SECTION_KEYS.voucherTop3]}
+      >
+        <ShopeeVoucherTop3Section rows={data.voucher_top3 ?? []} />
+      </SectionInsightCard>
+
+      {/* 섹션 8: 프로덕트 퍼포먼스 (Sales TOP 5) */}
+      <SectionInsightCard
+        reportId={reportId}
+        role={role}
+        sectionKey={SHOPEE_SECTION_KEYS.productTop5}
+        defaultLabel="프로덕트 성과 TOP 5 인사이트"
+        initialEntry={sectionInsights[SHOPEE_SECTION_KEYS.productTop5]}
+      >
+        <ShopeeProductTop5Section rows={data.product_top5 ?? []} />
+      </SectionInsightCard>
     </div>
   )
 }
