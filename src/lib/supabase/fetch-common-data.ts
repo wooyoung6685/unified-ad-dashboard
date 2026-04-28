@@ -5,6 +5,7 @@ import { createClient } from './server'
 export type CommonDashboardData = {
   role: 'admin' | 'viewer'
   initialBrandId: string
+  brandIds: string[]
   brands: Brand[]
   metaAccounts: (MetaAccount & { brands: { name: string } | null })[]
   tiktokAccounts: (TiktokAccount & { brands: { name: string } | null })[]
@@ -13,9 +14,12 @@ export type CommonDashboardData = {
   qoo10Accounts: (Qoo10Account & { brands: { name: string } | null })[]
 }
 
+// 빈 배열일 때 0행을 반환하기 위한 sentinel UUID
+const SENTINEL_UUID = '00000000-0000-0000-0000-000000000000'
+
 // React cache()로 감싸서 동일 요청 내 중복 DB 호출 방지
 export const getCachedCommonData = cache(
-  async (userId: string, role: string, brandId: string | null): Promise<CommonDashboardData> => {
+  async (userId: string, role: string, brandIds: string[]): Promise<CommonDashboardData> => {
     const supabase = await createClient()
 
     let brands: Brand[] = []
@@ -83,13 +87,36 @@ export const getCachedCommonData = cache(
         brands: { name: string } | null
       })[]
     } else {
+      // viewer: 본인 매핑 브랜드만 명시적 필터 적용 (RLS와 이중 방어)
+      const inFilter = brandIds.length > 0 ? brandIds : [SENTINEL_UUID]
+
       const [brandsRes, metaRes, tiktokRes, shopeeRes, amazonRes, qoo10Res] = await Promise.all([
-        supabase.from('brands').select('*').order('name'),
-        supabase.from('meta_accounts').select('*, brands(name)').eq('is_active', true),
-        supabase.from('tiktok_accounts').select('*, brands(name)').eq('is_active', true),
-        supabase.from('shopee_accounts').select('*, brands(name)').eq('is_active', true),
-        supabase.from('amazon_accounts').select('*, brands(name)').eq('is_active', true),
-        supabase.from('qoo10_accounts').select('*, brands(name)').eq('is_active', true),
+        supabase.from('brands').select('*').in('id', inFilter).order('name'),
+        supabase
+          .from('meta_accounts')
+          .select('*, brands(name)')
+          .eq('is_active', true)
+          .in('brand_id', inFilter),
+        supabase
+          .from('tiktok_accounts')
+          .select('*, brands(name)')
+          .eq('is_active', true)
+          .in('brand_id', inFilter),
+        supabase
+          .from('shopee_accounts')
+          .select('*, brands(name)')
+          .eq('is_active', true)
+          .in('brand_id', inFilter),
+        supabase
+          .from('amazon_accounts')
+          .select('*, brands(name)')
+          .eq('is_active', true)
+          .in('brand_id', inFilter),
+        supabase
+          .from('qoo10_accounts')
+          .select('*, brands(name)')
+          .eq('is_active', true)
+          .in('brand_id', inFilter),
       ])
 
       brands = (brandsRes.data ?? []) as Brand[]
@@ -110,7 +137,8 @@ export const getCachedCommonData = cache(
 
     return {
       role: role as 'admin' | 'viewer',
-      initialBrandId: brandId ?? '',
+      initialBrandId: brandIds[0] ?? '',
+      brandIds,
       brands,
       metaAccounts,
       tiktokAccounts,

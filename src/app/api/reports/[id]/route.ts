@@ -42,6 +42,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   const body = await req.json()
   const {
     title,
+    is_visible,
     insight_memo,
     insight_memo_gmv_max,
     insight_memo_title,
@@ -51,6 +52,13 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   } = body
 
   const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }
+
+  if (is_visible !== undefined) {
+    if (typeof is_visible !== 'boolean') {
+      return NextResponse.json({ error: 'is_visible 형식이 잘못되었습니다.' }, { status: 400 })
+    }
+    updateData.is_visible = is_visible
+  }
 
   if (title !== undefined) {
     if (!title || typeof title !== 'string') {

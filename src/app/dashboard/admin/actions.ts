@@ -97,18 +97,30 @@ export async function toggleQoo10Account(id: string, isActive: boolean) {
 // Brand 생성
 export async function createBrand(formData: FormData) {
   const supabase = await createClient()
-  const name = formData.get('name') as string
+  const name = (formData.get('name') as string)?.trim()
   const manager = (formData.get('manager') as string) || null
-  // slug는 자동 생성 (timestamp base36)
-  const slug = Date.now().toString(36)
+
+  if (!name) return { error: '브랜드 이름을 입력하세요.' }
 
   const {
     data: { user },
   } = await supabase.auth.getUser()
+  if (!user) return { error: '인증이 필요합니다.' }
+
+  const { data: dup } = await supabase
+    .from('brands')
+    .select('id')
+    .eq('owner_user_id', user.id)
+    .ilike('name', name)
+    .maybeSingle()
+  if (dup) return { error: '이미 동일한 이름의 브랜드가 존재합니다.' }
+
+  // slug는 자동 생성 (timestamp base36)
+  const slug = Date.now().toString(36)
 
   const { data, error } = await supabase
     .from('brands')
-    .insert({ name, slug, manager, owner_user_id: user?.id ?? null })
+    .insert({ name, slug, manager, owner_user_id: user.id })
     .select()
     .single()
 
@@ -121,8 +133,24 @@ export async function createBrand(formData: FormData) {
 export async function updateBrand(formData: FormData) {
   const supabase = await createClient()
   const id = formData.get('id') as string
-  const name = formData.get('name') as string
+  const name = (formData.get('name') as string)?.trim()
   const manager = (formData.get('manager') as string) || null
+
+  if (!name) return { error: '브랜드 이름을 입력하세요.' }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: '인증이 필요합니다.' }
+
+  const { data: dup } = await supabase
+    .from('brands')
+    .select('id')
+    .eq('owner_user_id', user.id)
+    .ilike('name', name)
+    .neq('id', id)
+    .maybeSingle()
+  if (dup) return { error: '이미 동일한 이름의 브랜드가 존재합니다.' }
 
   const { error } = await supabase
     .from('brands')
@@ -138,9 +166,9 @@ export async function updateBrand(formData: FormData) {
 export async function deleteBrand(id: string) {
   const supabase = await createClient()
 
-  // 연결된 사용자 확인
+  // 연결된 사용자 확인 (user_brands 기준)
   const { count: userCount } = await supabase
-    .from('users')
+    .from('user_brands')
     .select('*', { count: 'exact', head: true })
     .eq('brand_id', id)
 

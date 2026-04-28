@@ -57,6 +57,18 @@ export function BrandsTab({ brands: initialBrands }: BrandsTabProps) {
 
   async function handleCreate(formData: FormData) {
     setAddError(null)
+    const trimmed = (formData.get('name') as string)?.trim() ?? ''
+    if (!trimmed) {
+      setAddError('브랜드 이름을 입력하세요.')
+      return
+    }
+    const isDup = brands.some(
+      (b) => b.name.trim().toLowerCase() === trimmed.toLowerCase(),
+    )
+    if (isDup) {
+      setAddError('이미 동일한 이름의 브랜드가 존재합니다.')
+      return
+    }
     const result = await createBrand(formData)
     if ('error' in result) {
       setAddError(result.error ?? '알 수 없는 오류가 발생했습니다.')
@@ -70,6 +82,22 @@ export function BrandsTab({ brands: initialBrands }: BrandsTabProps) {
   async function handleUpdate(formData: FormData) {
     setMessage(null)
     const id = formData.get('id') as string
+    const trimmed = (formData.get('name') as string)?.trim() ?? ''
+    if (!trimmed) {
+      setIsError(true)
+      setMessage('오류: 브랜드 이름을 입력하세요.')
+      return
+    }
+    const isDup = brands.some(
+      (b) =>
+        b.id !== id &&
+        b.name.trim().toLowerCase() === trimmed.toLowerCase(),
+    )
+    if (isDup) {
+      setIsError(true)
+      setMessage('오류: 이미 동일한 이름의 브랜드가 존재합니다.')
+      return
+    }
     const result = await updateBrand(formData)
     if ('error' in result) {
       setIsError(true)
@@ -77,7 +105,7 @@ export function BrandsTab({ brands: initialBrands }: BrandsTabProps) {
     } else {
       setIsError(false)
       setMessage('브랜드가 수정되었습니다.')
-      const name = formData.get('name') as string
+      const name = trimmed
       const manager = (formData.get('manager') as string) || null
       setBrands((prev) =>
         prev.map((b) => (b.id === id ? { ...b, name, manager } : b)),

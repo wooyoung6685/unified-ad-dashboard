@@ -40,6 +40,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { Switch } from '@/components/ui/switch'
 import { useCreateReport, useDeleteReport, useGenerateSnapshot, useReports } from '@/hooks/use-reports'
 import type { Brand, ReportListItem } from '@/types/database'
 import { useQuery } from '@tanstack/react-query'
@@ -121,13 +122,35 @@ interface ReportRowProps {
 function ReportRow({ report, role, onDeleteClick }: ReportRowProps) {
   const router = useRouter()
   const monthStr = String(report.month).padStart(2, '0')
+  const [isVisible, setIsVisible] = useState(report.is_visible)
+  const [isPending, setIsPending] = useState(false)
+
+  const handleVisibilityToggle = async (checked: boolean) => {
+    const prev = isVisible
+    setIsVisible(checked)
+    setIsPending(true)
+    try {
+      const res = await fetch(`/api/reports/${report.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_visible: checked }),
+      })
+      if (!res.ok) {
+        setIsVisible(prev)
+      }
+    } catch {
+      setIsVisible(prev)
+    } finally {
+      setIsPending(false)
+    }
+  }
 
   return (
     <div
       role="button"
       tabIndex={0}
       aria-label={`${report.title} 리포트 보기`}
-      className="hover:bg-muted/30 focus-visible:ring-ring flex cursor-pointer items-center gap-3 border-t px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-inset"
+      className={`hover:bg-muted/30 focus-visible:ring-ring flex cursor-pointer items-center gap-3 border-t px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-inset${!isVisible ? ' opacity-60' : ''}`}
       onClick={() => router.push(`/dashboard/report/${report.id}`)}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -136,6 +159,24 @@ function ReportRow({ report, role, onDeleteClick }: ReportRowProps) {
         }
       }}
     >
+      {role === 'admin' && (
+        <div
+          className="flex shrink-0 items-center gap-1.5"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          <Switch
+            size="sm"
+            checked={isVisible}
+            onCheckedChange={handleVisibilityToggle}
+            disabled={isPending}
+            aria-label={`${report.title} 노출 토글`}
+          />
+          <span className="text-muted-foreground w-8 text-xs">
+            {isVisible ? '노출' : '비공개'}
+          </span>
+        </div>
+      )}
       <span className="min-w-0 flex-1 truncate text-sm font-medium">{report.title}</span>
       <div className="flex shrink-0 items-center gap-2">
         <PlatformBadge platform={report.platform} />

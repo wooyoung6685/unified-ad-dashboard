@@ -22,13 +22,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { MultiSelect } from '@/components/ui/multi-select'
 import {
   Table,
   TableBody,
@@ -44,8 +38,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 interface UserRow {
   id: string
   email: string
-  brand_id: string | null
-  brand_name: string
+  brand_ids: string[]
+  brand_names: string[]
   role: 'admin' | 'viewer'
   created_at: string
 }
@@ -58,7 +52,7 @@ interface UserManagerProps {
 const EMPTY_FORM = {
   email: '',
   password: '',
-  brand_id: '',
+  brand_ids: [] as string[],
   role: 'viewer' as 'admin' | 'viewer',
 }
 
@@ -111,6 +105,10 @@ export function UserManager({ brands, openAddRef }: UserManagerProps) {
       setAddError('이메일과 비밀번호는 필수입니다.')
       return
     }
+    if (form.brand_ids.length === 0) {
+      setAddError('브랜드를 1개 이상 선택해주세요.')
+      return
+    }
     setAddError(null)
     setSubmitting(true)
     try {
@@ -120,7 +118,7 @@ export function UserManager({ brands, openAddRef }: UserManagerProps) {
         body: JSON.stringify({
           email: form.email,
           password: form.password,
-          brand_id: form.brand_id || null,
+          brand_ids: form.brand_ids,
           role: form.role,
         }),
       })
@@ -184,8 +182,18 @@ export function UserManager({ brands, openAddRef }: UserManagerProps) {
               {users.map((u) => (
                 <TableRow key={u.id}>
                   <TableCell>{u.email}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {u.brand_name || '—'}
+                  <TableCell>
+                    {u.brand_names.length === 0 ? (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {u.brand_names.map((n) => (
+                          <Badge key={n} variant="outline" className="text-xs">
+                            {n}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge variant={u.role === 'admin' ? 'default' : 'secondary'}>
@@ -246,22 +254,14 @@ export function UserManager({ brands, openAddRef }: UserManagerProps) {
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="user-brand">브랜드 (선택)</Label>
-              <Select
-                value={form.brand_id}
-                onValueChange={(v) => setForm((prev) => ({ ...prev, brand_id: v }))}
-              >
-                <SelectTrigger id="user-brand">
-                  <SelectValue placeholder="브랜드 선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  {brands.map((b) => (
-                    <SelectItem key={b.id} value={b.id}>
-                      {b.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="user-brand">브랜드</Label>
+              <MultiSelect
+                id="user-brand"
+                placeholder="브랜드 선택 (1개 이상)"
+                options={brands.map((b) => ({ value: b.id, label: b.name }))}
+                value={form.brand_ids}
+                onChange={(v) => setForm((prev) => ({ ...prev, brand_ids: v }))}
+              />
             </div>
             <div className="space-y-1">
               <Label>역할</Label>

@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   let query = supabase
     .from('reports')
     .select(
-      'id, brand_id, title, platform, country, internal_account_id, year, month, status, created_by, created_at, updated_at, brands(name)',
+      'id, brand_id, title, platform, country, internal_account_id, year, month, status, is_visible, created_by, created_at, updated_at, brands(name)',
     )
     .order('created_at', { ascending: false })
 
@@ -128,6 +128,7 @@ export async function POST(req: NextRequest) {
       year,
       month,
       status: 'published',
+      is_visible: false,
       snapshot: null,
     })
     .select()
@@ -147,6 +148,7 @@ export async function POST(req: NextRequest) {
         year,
         month,
         status: 'published',
+        is_visible: false,
         snapshot: null,
       })
       .select()

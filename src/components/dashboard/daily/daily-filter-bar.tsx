@@ -167,7 +167,7 @@ export function DailyFilterBar({
           <Select
             value={filters.brandId}
             onValueChange={handleBrandChange}
-            disabled={role === 'viewer'}
+            disabled={role === 'viewer' && brands.length <= 1}
           >
             <SelectTrigger className="h-9 w-36">
               <SelectValue placeholder="브랜드 선택" />
