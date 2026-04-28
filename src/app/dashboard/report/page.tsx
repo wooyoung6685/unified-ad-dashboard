@@ -31,7 +31,7 @@ export default async function ReportPage() {
       const { data: reportsData } = await supabase
         .from('reports')
         .select(
-          'id, brand_id, title, platform, country, internal_account_id, year, month, status, insight_memo, insight_memo_gmv_max, insight_memo_title, insight_memo_gmv_max_title, section_insights, filters, created_by, created_at, updated_at, brands(name)',
+          'id, brand_id, title, platform, country, internal_account_id, year, month, status, is_visible, insight_memo, insight_memo_gmv_max, insight_memo_title, insight_memo_gmv_max_title, section_insights, filters, created_by, created_at, updated_at, brands(name)',
         )
         .in('brand_id', myBrandIds)
         .order('created_at', { ascending: false })
@@ -49,7 +49,7 @@ export default async function ReportPage() {
       supabase
         .from('reports')
         .select(
-          'id, brand_id, title, platform, country, internal_account_id, year, month, status, insight_memo, insight_memo_gmv_max, insight_memo_title, insight_memo_gmv_max_title, section_insights, filters, created_by, created_at, updated_at, brands(name)',
+          'id, brand_id, title, platform, country, internal_account_id, year, month, status, is_visible, insight_memo, insight_memo_gmv_max, insight_memo_title, insight_memo_gmv_max_title, section_insights, filters, created_by, created_at, updated_at, brands(name)',
         )
         .order('created_at', { ascending: false }),
     ])
