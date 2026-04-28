@@ -102,6 +102,17 @@ const COUNTRY_OPTIONS = [
   { code: 'ID', flag: '🇮🇩' },
 ]
 
+function getSubBrandPlaceholder(platform: PlatformType | ''): string {
+  if (platform === 'shopee') return 'Shopee_국가'
+  return '광고계정명'
+}
+
+function getAccountIdPlaceholder(platform: PlatformType | ''): string {
+  if (platform === 'shopee') return 'User Name'
+  if (platform === 'qoo10') return '브랜드명을 입력하세요'
+  return '광고계정ID'
+}
+
 function isShopee(platform: PlatformType | ''): boolean {
   return platform === 'shopee'
 }
@@ -534,7 +545,7 @@ export function AccountManager({ brands }: AccountManagerProps) {
                 <TableRow>
                   <TableHead>활성</TableHead>
                   <TableHead>매체</TableHead>
-                  <TableHead>서브 브랜드</TableHead>
+                  <TableHead>구분</TableHead>
                   <TableHead>국가</TableHead>
                   <TableHead>광고계정 ID</TableHead>
                   <TableHead>비고</TableHead>
@@ -576,7 +587,7 @@ export function AccountManager({ brands }: AccountManagerProps) {
                     <TableCell>
                       <Input
                         className="w-28"
-                        placeholder="서브 브랜드 (선택)"
+                        placeholder={getSubBrandPlaceholder(row.platform)}
                         value={row.sub_brand}
                         onChange={(e) =>
                           updatePending(row._key, { sub_brand: e.target.value })
@@ -594,7 +605,7 @@ export function AccountManager({ brands }: AccountManagerProps) {
                     <TableCell>
                       <Input
                         className="w-44"
-                        placeholder={row.platform === 'qoo10' ? '브랜드명을 입력하세요' : 'act_xxxxxxxx'}
+                        placeholder={getAccountIdPlaceholder(row.platform)}
                         value={row.account_id}
                         onChange={(e) =>
                           updatePending(row._key, {
@@ -661,7 +672,7 @@ export function AccountManager({ brands }: AccountManagerProps) {
                 <TableRow>
                   <TableHead>상태</TableHead>
                   <TableHead>매체</TableHead>
-                  <TableHead>서브 브랜드</TableHead>
+                  <TableHead>구분</TableHead>
                   <TableHead>국가</TableHead>
                   <TableHead>광고계정 ID</TableHead>
                   <TableHead>비고</TableHead>
@@ -696,7 +707,7 @@ export function AccountManager({ brands }: AccountManagerProps) {
                         {isEditing ? (
                           <Input
                             className="w-28"
-                            placeholder="서브 브랜드 (선택)"
+                            placeholder={getSubBrandPlaceholder(account.platform)}
                             value={editingValues.sub_brand}
                             onChange={(e) =>
                               setEditingValues((prev) => ({
@@ -736,6 +747,7 @@ export function AccountManager({ brands }: AccountManagerProps) {
                         {isEditing ? (
                           <Input
                             className="w-44"
+                            placeholder={getAccountIdPlaceholder(account.platform)}
                             value={editingValues.account_id}
                             onChange={(e) =>
                               setEditingValues((prev) => ({
