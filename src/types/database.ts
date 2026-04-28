@@ -1,9 +1,17 @@
 // DB 테이블 타입
 export type UserProfile = {
   id: string
+  /** @deprecated user_brands 테이블로 이전 완료. 035 마이그레이션에서 컬럼 DROP 예정. */
   brand_id: string | null
+  brand_ids: string[]
   role: 'admin' | 'viewer'
   created_by: string | null
+  created_at: string
+}
+
+export type UserBrand = {
+  user_id: string
+  brand_id: string
   created_at: string
 }
 
@@ -753,6 +761,7 @@ export type Report = {
   year: number
   month: number
   status: 'published'
+  is_visible: boolean
   snapshot: ReportSnapshot | null
   insight_memo: string | null
   insight_memo_gmv_max: string | null

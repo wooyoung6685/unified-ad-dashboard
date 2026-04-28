@@ -15,10 +15,10 @@ export default async function DashboardLayout({
 
   const profile = await getCachedProfile(user.id)
   const role = profile?.role ?? 'viewer'
-  const brandId = profile?.brand_id ?? null
+  const brandIds = profile?.brandIds ?? []
 
   // 공통 데이터를 layout에서 1회 fetch — 탭 전환 시 re-fetch 없음
-  const commonData = await getCachedCommonData(user.id, role, brandId)
+  const commonData = await getCachedCommonData(user.id, role, brandIds)
 
   return (
     <DashboardDataProvider data={commonData}>
