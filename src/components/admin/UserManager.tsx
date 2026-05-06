@@ -67,6 +67,12 @@ export function UserManager({ brands, openAddRef }: UserManagerProps) {
   const [submitting, setSubmitting] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
 
+  // 수정 Dialog 상태
+  const [editTarget, setEditTarget] = useState<UserRow | null>(null)
+  const [editBrandIds, setEditBrandIds] = useState<string[]>([])
+  const [editSubmitting, setEditSubmitting] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+
   // 목록 오류 메시지
   const [listError, setListError] = useState<string | null>(null)
 
@@ -131,6 +137,38 @@ export function UserManager({ brands, openAddRef }: UserManagerProps) {
       }
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  function openEditDialog(u: UserRow) {
+    setEditTarget(u)
+    setEditBrandIds(u.brand_ids)
+    setEditError(null)
+  }
+
+  async function handleEdit() {
+    if (!editTarget) return
+    if (editBrandIds.length === 0) {
+      setEditError('브랜드를 1개 이상 선택해주세요.')
+      return
+    }
+    setEditError(null)
+    setEditSubmitting(true)
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editTarget.id, brand_ids: editBrandIds }),
+      })
+      const json = await res.json()
+      if (json.error) {
+        setEditError(json.error)
+      } else {
+        setUsers((prev) => prev.map((u) => (u.id === json.user.id ? json.user : u)))
+        setEditTarget(null)
+      }
+    } finally {
+      setEditSubmitting(false)
     }
   }
 
@@ -204,14 +242,24 @@ export function UserManager({ brands, openAddRef }: UserManagerProps) {
                     {u.created_at.slice(0, 10)}
                   </TableCell>
                   <TableCell className="w-px whitespace-nowrap">
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      aria-label={`${u.email} 삭제`}
-                      onClick={() => setDeleteTarget(u.id)}
-                    >
-                      삭제
-                    </Button>
+                    <div className="flex gap-1.5">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        aria-label={`${u.email} 수정`}
+                        onClick={() => openEditDialog(u)}
+                      >
+                        수정
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        aria-label={`${u.email} 삭제`}
+                        onClick={() => setDeleteTarget(u.id)}
+                      >
+                        삭제
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -281,6 +329,55 @@ export function UserManager({ brands, openAddRef }: UserManagerProps) {
             </Button>
             <Button onClick={handleAdd} disabled={submitting}>
               {submitting ? '추가 중...' : '추가'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 유저 수정 Dialog */}
+      <Dialog
+        open={editTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditTarget(null)
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>유저 수정</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <Label>이메일</Label>
+              <Input disabled value={editTarget?.email ?? ''} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="edit-brand">브랜드</Label>
+              <MultiSelect
+                id="edit-brand"
+                placeholder="브랜드 선택 (1개 이상)"
+                options={brands.map((b) => ({ value: b.id, label: b.name }))}
+                value={editBrandIds}
+                onChange={setEditBrandIds}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>역할</Label>
+              <div className="border-input bg-muted text-muted-foreground flex h-9 w-full items-center rounded-md border px-3 py-1 text-sm">
+                {editTarget?.role ?? ''}
+              </div>
+            </div>
+            {editError && (
+              <Alert variant="destructive">
+                <AlertDescription>{editError}</AlertDescription>
+              </Alert>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditTarget(null)}>
+              취소
+            </Button>
+            <Button onClick={handleEdit} disabled={editSubmitting}>
+              {editSubmitting ? '저장 중...' : '저장'}
             </Button>
           </DialogFooter>
         </DialogContent>

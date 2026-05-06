@@ -172,6 +172,7 @@ export function AccountManager({ brands }: AccountManagerProps) {
     country: '',
   })
   const [saveErrors, setSaveErrors] = useState<Record<string, string>>({})
+  const [editingError, setEditingError] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<{
     id: string
     platform: PlatformType
@@ -360,6 +361,25 @@ export function AccountManager({ brands }: AccountManagerProps) {
   async function savePending(row: PendingRow) {
     if (!row.brand_id || !row.platform || !row.account_id) return
 
+    const trimmedId = row.account_id.trim()
+    const isDup =
+      registered.some(
+        (a) => a.platform === row.platform && a.account_id.trim() === trimmedId
+      ) ||
+      pendingRows.some(
+        (r) =>
+          r._key !== row._key &&
+          r.platform === row.platform &&
+          r.account_id.trim() === trimmedId
+      )
+    if (isDup) {
+      setSaveErrors((prev) => ({
+        ...prev,
+        [row._key]: '이미 등록된 광고계정입니다.',
+      }))
+      return
+    }
+
     const endpoint = getApiEndpoint(row.platform as PlatformType)
     const body: Record<string, unknown> = {
       brand_id: row.brand_id,
@@ -430,6 +450,7 @@ export function AccountManager({ brands }: AccountManagerProps) {
   // 수정 모드 진입
   function startEditing(account: RegisteredAccount) {
     setEditingId(account.id)
+    setEditingError(null)
     setEditingValues({
       account_id: account.account_id,
       sub_brand: account.sub_brand ?? '',
@@ -440,10 +461,22 @@ export function AccountManager({ brands }: AccountManagerProps) {
 
   // 인라인 수정 저장
   async function saveEditing(account: RegisteredAccount) {
+    const trimmedId = editingValues.account_id.trim()
+    const isDup = registered.some(
+      (a) =>
+        a.id !== account.id &&
+        a.platform === account.platform &&
+        a.account_id.trim() === trimmedId
+    )
+    if (isDup) {
+      setEditingError('이미 등록된 광고계정입니다.')
+      return
+    }
+
     const endpoint = getApiEndpoint(account.platform)
     const body: Record<string, unknown> = {
       brand_id: account.brand_id,
-      account_id: editingValues.account_id,
+      account_id: trimmedId,
       sub_brand: editingValues.sub_brand || null,
       note: editingValues.note || null,
       country: editingValues.country || null,
@@ -459,6 +492,7 @@ export function AccountManager({ brands }: AccountManagerProps) {
     const json = await res.json()
     if (!json.error) {
       setEditingId(null)
+      setEditingError(null)
       await fetchAll()
     }
   }
@@ -794,10 +828,18 @@ export function AccountManager({ brands }: AccountManagerProps) {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => setEditingId(null)}
+                                onClick={() => {
+                                  setEditingId(null)
+                                  setEditingError(null)
+                                }}
                               >
                                 취소
                               </Button>
+                              {editingError && (
+                                <span className="text-xs text-red-600">
+                                  {editingError}
+                                </span>
+                              )}
                             </>
                           ) : (
                             <>
