@@ -144,6 +144,91 @@ export async function POST(req: NextRequest) {
   })
 }
 
+// user_brands 매핑 교체 (브랜드 할당 수정)
+export async function PATCH(req: NextRequest) {
+  const supabase = await createClient()
+  const {
+    data: { user: currentUser },
+  } = await supabase.auth.getUser()
+  if (!currentUser) return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 })
+
+  const body = await req.json()
+  const { id, brand_ids } = body as { id: string; brand_ids: string[] }
+
+  if (!id) return NextResponse.json({ error: 'id는 필수입니다.' }, { status: 400 })
+
+  if (!Array.isArray(brand_ids) || brand_ids.length === 0) {
+    return NextResponse.json({ error: '브랜드를 1개 이상 선택해주세요.' }, { status: 400 })
+  }
+
+  if (id === currentUser.id) {
+    return NextResponse.json({ error: '자기 자신은 수정할 수 없습니다.' }, { status: 403 })
+  }
+
+  // 대상 유저 소유권 검증 (DELETE와 동일 패턴)
+  const { data: targetUser } = await supabaseAdmin
+    .from('users')
+    .select('created_by, role, created_at')
+    .eq('id', id)
+    .single()
+
+  if (!targetUser) return NextResponse.json({ error: '유저를 찾을 수 없습니다.' }, { status: 404 })
+
+  const myBrandIds = await getMyBrandIds(currentUser.id)
+  const isMyCreation = targetUser.created_by === currentUser.id
+
+  if (!isMyCreation) {
+    const { data: ubRows } = await supabaseAdmin
+      .from('user_brands')
+      .select('brand_id')
+      .eq('user_id', id)
+    const targetBrandIds = (ubRows ?? []).map((r) => r.brand_id)
+    const isMyBrandUser = targetBrandIds.some((b) => myBrandIds.includes(b))
+    if (!isMyBrandUser) {
+      return NextResponse.json({ error: '해당 유저에 대한 권한이 없습니다.' }, { status: 403 })
+    }
+  }
+
+  // 새로 할당할 브랜드가 모두 본인 소유인지 검증
+  const invalid = brand_ids.filter((b) => !myBrandIds.includes(b))
+  if (invalid.length > 0) {
+    return NextResponse.json({ error: '권한 없는 브랜드가 포함되어 있습니다.' }, { status: 403 })
+  }
+
+  // user_brands delete-then-insert
+  const { error: delErr } = await supabaseAdmin
+    .from('user_brands')
+    .delete()
+    .eq('user_id', id)
+  if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 })
+
+  const { error: insErr } = await supabaseAdmin
+    .from('user_brands')
+    .insert(brand_ids.map((bid) => ({ user_id: id, brand_id: bid })))
+  if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 })
+
+  // 호환용 users.brand_id 갱신 (035 마이그레이션 적용 전까지)
+  await supabaseAdmin.from('users').update({ brand_id: brand_ids[0] }).eq('id', id)
+
+  // 이메일 + 브랜드명 조회 후 응답
+  const [{ data: authUser }, { data: brandRows }] = await Promise.all([
+    supabaseAdmin.auth.admin.getUserById(id),
+    supabaseAdmin.from('brands').select('id, name').in('id', brand_ids),
+  ])
+  const nameMap = new Map((brandRows ?? []).map((b) => [b.id, b.name]))
+
+  return NextResponse.json({
+    user: {
+      id,
+      email: authUser.user?.email ?? '',
+      brand_ids,
+      brand_names: brand_ids.map((b) => nameMap.get(b) ?? ''),
+      role: targetUser.role,
+      created_at: targetUser.created_at,
+    },
+  })
+}
+
 // users 테이블 + Auth 유저 삭제 (?id=<uuid>)
 export async function DELETE(req: NextRequest) {
   const supabase = await createClient()
