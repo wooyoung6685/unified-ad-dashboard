@@ -152,13 +152,24 @@ export function UserManager({ brands, openAddRef }: UserManagerProps) {
       setEditError('브랜드를 1개 이상 선택해주세요.')
       return
     }
+    const brandsChanged =
+      editBrandIds.length !== editTarget.brand_ids.length ||
+      editBrandIds.some((b) => !editTarget.brand_ids.includes(b))
+    if (!brandsChanged) {
+      setEditError('변경된 항목이 없습니다.')
+      return
+    }
     setEditError(null)
     setEditSubmitting(true)
     try {
+      const payload: { id: string; brand_ids?: string[] } = {
+        id: editTarget.id,
+        brand_ids: editBrandIds,
+      }
       const res = await fetch('/api/admin/users', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: editTarget.id, brand_ids: editBrandIds }),
+        body: JSON.stringify(payload),
       })
       const json = await res.json()
       if (json.error) {
