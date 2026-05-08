@@ -1,6 +1,7 @@
 'use client'
 
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
+import { useSearchParams } from 'next/navigation'
 
 interface DashboardLayoutClientProps {
   children: React.ReactNode
@@ -8,6 +9,12 @@ interface DashboardLayoutClientProps {
 }
 
 export function DashboardLayoutClient({ children, sidebar }: DashboardLayoutClientProps) {
+  const searchParams = useSearchParams()
+
+  if (searchParams.get('print') === '1') {
+    return <main className="min-w-0">{children}</main>
+  }
+
   return (
     <SidebarProvider>
       {sidebar}

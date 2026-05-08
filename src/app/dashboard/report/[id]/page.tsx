@@ -7,10 +7,13 @@ import { notFound, redirect } from 'next/navigation'
 
 export default async function ReportDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ print?: string }>
 }) {
-  const { id } = await params
+  const [{ id }, { print }] = await Promise.all([params, searchParams])
+  const printMode = print === '1'
   const user = await getCachedUser()
   if (!user) redirect('/login')
 
@@ -48,6 +51,7 @@ export default async function ReportDetailPage({
       report={report}
       role={(profile?.role ?? 'viewer') as 'admin' | 'viewer'}
       creatorEmail={creatorEmail}
+      printMode={printMode}
     />
   )
 }

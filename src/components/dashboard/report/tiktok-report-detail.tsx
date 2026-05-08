@@ -67,6 +67,7 @@ interface Props {
   sectionInsights: SectionInsights
   filters?: ReportFilters | null
   titleAction?: ReactNode
+  printMode?: boolean
 }
 
 // ── 헬퍼 ─────────────────────────────────────────
@@ -1213,6 +1214,7 @@ export function TiktokReportDetail({
   sectionInsights,
   filters: initialFilters,
   titleAction,
+  printMode = false,
 }: Props) {
   const isAdmin = role === 'admin'
   const {
@@ -1452,14 +1454,10 @@ export function TiktokReportDetail({
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="normal">
-        <TabsList className="mb-2">
-          <TabsTrigger value="normal">일반 캠페인</TabsTrigger>
-          <TabsTrigger value="gmvmax">GMV Max</TabsTrigger>
-        </TabsList>
-
-        {/* 일반 캠페인 탭 */}
-        <TabsContent value="normal" className="flex flex-col gap-6">
+      {printMode ? (
+        /* print 모드: 두 탭을 세로로 펼쳐 모두 렌더 */
+        <div className="flex flex-col gap-6">
+          {/* 일반 캠페인 */}
           <SectionInsightCard
             reportId={reportId}
             role={role}
@@ -1498,7 +1496,7 @@ export function TiktokReportDetail({
               <CampaignSection
                 campaigns={filteredCampaigns}
                 title="🎯 캠페인 성과 분석 (TikTok)"
-                onFilterClick={isAdmin && campaignItems.length > 0 ? () => setCampaignDialogOpen(true) : undefined}
+                onFilterClick={undefined}
                 headerAction={addButton}
               />
             )}
@@ -1513,7 +1511,7 @@ export function TiktokReportDetail({
             {(addButton) => (
               <AdgroupSection
                 adgroups={filteredAdgroups}
-                onFilterClick={isAdmin && adgroupItems.length > 0 ? () => setAdgroupDialogOpen(true) : undefined}
+                onFilterClick={undefined}
                 headerAction={addButton}
               />
             )}
@@ -1530,87 +1528,252 @@ export function TiktokReportDetail({
                 ads={ads}
                 widgets={tiktokCreativeWidgets}
                 onWidgetsChange={handleTiktokCreativeWidgetsChange}
-                isAdmin={isAdmin}
+                isAdmin={false}
                 reportId={reportId}
                 headerAction={addButton}
               />
             )}
           </SectionInsightCard>
-        </TabsContent>
 
-        {/* GMV Max 탭 */}
-        <TabsContent value="gmvmax" className="flex flex-col gap-6">
-          <SectionInsightCard
-            reportId={reportId}
-            role={role}
-            sectionKey={TIKTOK_GMVMAX_SECTION_KEYS.monthly}
-            defaultLabel="GMV Max 월간 요약 인사이트"
-            initialEntry={sectionInsights[TIKTOK_GMVMAX_SECTION_KEYS.monthly]}
-          >
-            <GmvMaxMonthlyKpi m={gmvMaxMonthly} />
-          </SectionInsightCard>
-          <SectionInsightCard
-            reportId={reportId}
-            role={role}
-            sectionKey={TIKTOK_GMVMAX_SECTION_KEYS.weeklyCharts}
-            defaultLabel="GMV Max 주간 차트 인사이트"
-            initialEntry={sectionInsights[TIKTOK_GMVMAX_SECTION_KEYS.weeklyCharts]}
-          >
-            <GmvMaxWeeklyCharts weekly={gmvMaxWeekly ?? []} />
-          </SectionInsightCard>
-          <SectionInsightCard
-            reportId={reportId}
-            role={role}
-            sectionKey={TIKTOK_GMVMAX_SECTION_KEYS.weeklyTable}
-            defaultLabel="GMV Max 주간 데이터 인사이트"
-            initialEntry={sectionInsights[TIKTOK_GMVMAX_SECTION_KEYS.weeklyTable]}
-          >
-            <GmvMaxWeeklyTable weekly={gmvMaxWeekly ?? []} />
-          </SectionInsightCard>
-          <SectionVisibilityWrapper
-            reportId={reportId}
-            sectionKey={TIKTOK_GMVMAX_SECTION_KEYS.campaigns}
-            label="캠페인 성과 분석 (TikTok GMV Max)"
-            role={role}
-            hiddenSections={currentFilters?.hiddenSections ?? []}
-            currentFilters={currentFilters}
-          >
+          {/* GMV Max (데이터가 있을 때만) */}
+          {showGmvMaxTab && (
+            <>
+              <div className="my-2 h-px bg-border" />
+              <SectionInsightCard
+                reportId={reportId}
+                role={role}
+                sectionKey={TIKTOK_GMVMAX_SECTION_KEYS.monthly}
+                defaultLabel="GMV Max 월간 요약 인사이트"
+                initialEntry={sectionInsights[TIKTOK_GMVMAX_SECTION_KEYS.monthly]}
+              >
+                <GmvMaxMonthlyKpi m={gmvMaxMonthly} />
+              </SectionInsightCard>
+              <SectionInsightCard
+                reportId={reportId}
+                role={role}
+                sectionKey={TIKTOK_GMVMAX_SECTION_KEYS.weeklyCharts}
+                defaultLabel="GMV Max 주간 차트 인사이트"
+                initialEntry={sectionInsights[TIKTOK_GMVMAX_SECTION_KEYS.weeklyCharts]}
+              >
+                <GmvMaxWeeklyCharts weekly={gmvMaxWeekly ?? []} />
+              </SectionInsightCard>
+              <SectionInsightCard
+                reportId={reportId}
+                role={role}
+                sectionKey={TIKTOK_GMVMAX_SECTION_KEYS.weeklyTable}
+                defaultLabel="GMV Max 주간 데이터 인사이트"
+                initialEntry={sectionInsights[TIKTOK_GMVMAX_SECTION_KEYS.weeklyTable]}
+              >
+                <GmvMaxWeeklyTable weekly={gmvMaxWeekly ?? []} />
+              </SectionInsightCard>
+              <SectionVisibilityWrapper
+                reportId={reportId}
+                sectionKey={TIKTOK_GMVMAX_SECTION_KEYS.campaigns}
+                label="캠페인 성과 분석 (TikTok GMV Max)"
+                role={role}
+                hiddenSections={currentFilters?.hiddenSections ?? []}
+                currentFilters={currentFilters}
+                printMode={printMode}
+              >
+                <SectionInsightCard
+                  reportId={reportId}
+                  role={role}
+                  sectionKey={TIKTOK_GMVMAX_SECTION_KEYS.campaigns}
+                  defaultLabel="GMV Max 캠페인 성과 인사이트"
+                  initialEntry={sectionInsights[TIKTOK_GMVMAX_SECTION_KEYS.campaigns]}
+                >
+                  {(addButton) => (
+                    <GmvMaxCampaignSection
+                      campaigns={filteredGmvMaxCampaigns}
+                      onFilterClick={undefined}
+                      headerAction={addButton}
+                    />
+                  )}
+                </SectionInsightCard>
+              </SectionVisibilityWrapper>
+              <SectionInsightCard
+                reportId={reportId}
+                role={role}
+                sectionKey={TIKTOK_GMVMAX_SECTION_KEYS.creatives}
+                defaultLabel="GMV Max 소재 성과 인사이트"
+                initialEntry={sectionInsights[TIKTOK_GMVMAX_SECTION_KEYS.creatives]}
+              >
+                {(addButton) => (
+                  <GmvMaxCreativeSection
+                    items={gmvMaxItems ?? []}
+                    widgets={gmvmaxCreativeWidgets}
+                    onWidgetsChange={handleGmvmaxCreativeWidgetsChange}
+                    isAdmin={false}
+                    reportId={reportId}
+                    headerAction={addButton}
+                  />
+                )}
+              </SectionInsightCard>
+            </>
+          )}
+        </div>
+      ) : (
+        /* 일반 모드: Tabs UI */
+        <Tabs defaultValue="normal">
+          <TabsList className="mb-2">
+            <TabsTrigger value="normal">일반 캠페인</TabsTrigger>
+            <TabsTrigger value="gmvmax">GMV Max</TabsTrigger>
+          </TabsList>
+
+          {/* 일반 캠페인 탭 */}
+          <TabsContent value="normal" className="flex flex-col gap-6">
             <SectionInsightCard
               reportId={reportId}
               role={role}
-              sectionKey={TIKTOK_GMVMAX_SECTION_KEYS.campaigns}
-              defaultLabel="GMV Max 캠페인 성과 인사이트"
-              initialEntry={sectionInsights[TIKTOK_GMVMAX_SECTION_KEYS.campaigns]}
+              sectionKey={TIKTOK_SECTION_KEYS.monthly}
+              defaultLabel="월간 요약 인사이트"
+              initialEntry={sectionInsights[TIKTOK_SECTION_KEYS.monthly]}
+            >
+              <MonthlyKpi m={monthly} />
+            </SectionInsightCard>
+            <SectionInsightCard
+              reportId={reportId}
+              role={role}
+              sectionKey={TIKTOK_SECTION_KEYS.weeklyCharts}
+              defaultLabel="주간 차트 인사이트"
+              initialEntry={sectionInsights[TIKTOK_SECTION_KEYS.weeklyCharts]}
+            >
+              <WeeklyCharts weekly={weekly} />
+            </SectionInsightCard>
+            <SectionInsightCard
+              reportId={reportId}
+              role={role}
+              sectionKey={TIKTOK_SECTION_KEYS.weeklyTable}
+              defaultLabel="주간 데이터 인사이트"
+              initialEntry={sectionInsights[TIKTOK_SECTION_KEYS.weeklyTable]}
+            >
+              <WeeklyTable weekly={weekly} />
+            </SectionInsightCard>
+            <SectionInsightCard
+              reportId={reportId}
+              role={role}
+              sectionKey={TIKTOK_SECTION_KEYS.campaigns}
+              defaultLabel="캠페인 성과 인사이트"
+              initialEntry={sectionInsights[TIKTOK_SECTION_KEYS.campaigns]}
             >
               {(addButton) => (
-                <GmvMaxCampaignSection
-                  campaigns={filteredGmvMaxCampaigns}
-                  onFilterClick={isAdmin && gmvMaxItems2.length > 0 ? () => setGmvMaxDialogOpen(true) : undefined}
+                <CampaignSection
+                  campaigns={filteredCampaigns}
+                  title="🎯 캠페인 성과 분석 (TikTok)"
+                  onFilterClick={isAdmin && campaignItems.length > 0 ? () => setCampaignDialogOpen(true) : undefined}
                   headerAction={addButton}
                 />
               )}
             </SectionInsightCard>
-          </SectionVisibilityWrapper>
-          <SectionInsightCard
-            reportId={reportId}
-            role={role}
-            sectionKey={TIKTOK_GMVMAX_SECTION_KEYS.creatives}
-            defaultLabel="GMV Max 소재 성과 인사이트"
-            initialEntry={sectionInsights[TIKTOK_GMVMAX_SECTION_KEYS.creatives]}
-          >
-            {(addButton) => (
-              <GmvMaxCreativeSection
-                items={gmvMaxItems ?? []}
-                widgets={gmvmaxCreativeWidgets}
-                onWidgetsChange={handleGmvmaxCreativeWidgetsChange}
-                isAdmin={isAdmin}
+            <SectionInsightCard
+              reportId={reportId}
+              role={role}
+              sectionKey={TIKTOK_SECTION_KEYS.adgroups}
+              defaultLabel="광고그룹 성과 인사이트"
+              initialEntry={sectionInsights[TIKTOK_SECTION_KEYS.adgroups]}
+            >
+              {(addButton) => (
+                <AdgroupSection
+                  adgroups={filteredAdgroups}
+                  onFilterClick={isAdmin && adgroupItems.length > 0 ? () => setAdgroupDialogOpen(true) : undefined}
+                  headerAction={addButton}
+                />
+              )}
+            </SectionInsightCard>
+            <SectionInsightCard
+              reportId={reportId}
+              role={role}
+              sectionKey={TIKTOK_SECTION_KEYS.creatives}
+              defaultLabel="소재 성과 인사이트"
+              initialEntry={sectionInsights[TIKTOK_SECTION_KEYS.creatives]}
+            >
+              {(addButton) => (
+                <CreativeSection
+                  ads={ads}
+                  widgets={tiktokCreativeWidgets}
+                  onWidgetsChange={handleTiktokCreativeWidgetsChange}
+                  isAdmin={isAdmin}
+                  reportId={reportId}
+                  headerAction={addButton}
+                />
+              )}
+            </SectionInsightCard>
+          </TabsContent>
+
+          {/* GMV Max 탭 */}
+          <TabsContent value="gmvmax" className="flex flex-col gap-6">
+            <SectionInsightCard
+              reportId={reportId}
+              role={role}
+              sectionKey={TIKTOK_GMVMAX_SECTION_KEYS.monthly}
+              defaultLabel="GMV Max 월간 요약 인사이트"
+              initialEntry={sectionInsights[TIKTOK_GMVMAX_SECTION_KEYS.monthly]}
+            >
+              <GmvMaxMonthlyKpi m={gmvMaxMonthly} />
+            </SectionInsightCard>
+            <SectionInsightCard
+              reportId={reportId}
+              role={role}
+              sectionKey={TIKTOK_GMVMAX_SECTION_KEYS.weeklyCharts}
+              defaultLabel="GMV Max 주간 차트 인사이트"
+              initialEntry={sectionInsights[TIKTOK_GMVMAX_SECTION_KEYS.weeklyCharts]}
+            >
+              <GmvMaxWeeklyCharts weekly={gmvMaxWeekly ?? []} />
+            </SectionInsightCard>
+            <SectionInsightCard
+              reportId={reportId}
+              role={role}
+              sectionKey={TIKTOK_GMVMAX_SECTION_KEYS.weeklyTable}
+              defaultLabel="GMV Max 주간 데이터 인사이트"
+              initialEntry={sectionInsights[TIKTOK_GMVMAX_SECTION_KEYS.weeklyTable]}
+            >
+              <GmvMaxWeeklyTable weekly={gmvMaxWeekly ?? []} />
+            </SectionInsightCard>
+            <SectionVisibilityWrapper
+              reportId={reportId}
+              sectionKey={TIKTOK_GMVMAX_SECTION_KEYS.campaigns}
+              label="캠페인 성과 분석 (TikTok GMV Max)"
+              role={role}
+              hiddenSections={currentFilters?.hiddenSections ?? []}
+              currentFilters={currentFilters}
+            >
+              <SectionInsightCard
                 reportId={reportId}
-                headerAction={addButton}
-              />
-            )}
-          </SectionInsightCard>
-        </TabsContent>
-      </Tabs>
+                role={role}
+                sectionKey={TIKTOK_GMVMAX_SECTION_KEYS.campaigns}
+                defaultLabel="GMV Max 캠페인 성과 인사이트"
+                initialEntry={sectionInsights[TIKTOK_GMVMAX_SECTION_KEYS.campaigns]}
+              >
+                {(addButton) => (
+                  <GmvMaxCampaignSection
+                    campaigns={filteredGmvMaxCampaigns}
+                    onFilterClick={isAdmin && gmvMaxItems2.length > 0 ? () => setGmvMaxDialogOpen(true) : undefined}
+                    headerAction={addButton}
+                  />
+                )}
+              </SectionInsightCard>
+            </SectionVisibilityWrapper>
+            <SectionInsightCard
+              reportId={reportId}
+              role={role}
+              sectionKey={TIKTOK_GMVMAX_SECTION_KEYS.creatives}
+              defaultLabel="GMV Max 소재 성과 인사이트"
+              initialEntry={sectionInsights[TIKTOK_GMVMAX_SECTION_KEYS.creatives]}
+            >
+              {(addButton) => (
+                <GmvMaxCreativeSection
+                  items={gmvMaxItems ?? []}
+                  widgets={gmvmaxCreativeWidgets}
+                  onWidgetsChange={handleGmvmaxCreativeWidgetsChange}
+                  isAdmin={isAdmin}
+                  reportId={reportId}
+                  headerAction={addButton}
+                />
+              )}
+            </SectionInsightCard>
+          </TabsContent>
+        </Tabs>
+      )}
 
       {filterDialogs}
     </div>

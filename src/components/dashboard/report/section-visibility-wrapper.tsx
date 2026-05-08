@@ -13,6 +13,7 @@ interface Props {
   hiddenSections: string[]
   currentFilters: ReportFilters | null
   children: ReactNode
+  printMode?: boolean
 }
 
 export function SectionVisibilityWrapper({
@@ -23,6 +24,7 @@ export function SectionVisibilityWrapper({
   hiddenSections,
   currentFilters,
   children,
+  printMode = false,
 }: Props) {
   const router = useRouter()
   const [isPending, setIsPending] = useState(false)
@@ -34,7 +36,8 @@ export function SectionVisibilityWrapper({
     setIsHidden(hiddenSections.includes(sectionKey))
   }, [hiddenSections, sectionKey])
 
-  if (isHidden && !isAdmin) return null
+  // print 모드에서는 admin이라도 hidden 섹션 차단 (viewer 시점 PDF)
+  if (isHidden && (printMode || !isAdmin)) return null
 
   const toggleVisibility = async (checked: boolean) => {
     const prev = isHidden
@@ -67,7 +70,7 @@ export function SectionVisibilityWrapper({
 
   return (
     <div className="space-y-2">
-      {isAdmin && (
+      {isAdmin && !printMode && (
         <div className="flex items-center justify-between rounded-md border bg-muted/40 px-4 py-2">
           <span className="text-sm font-medium text-muted-foreground">{label}</span>
           <div className="flex items-center gap-2">
