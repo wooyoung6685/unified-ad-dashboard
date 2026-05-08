@@ -55,17 +55,30 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
     await page.goto(targetUrl, { waitUntil: 'networkidle0', timeout: 45_000 })
 
     // 폰트 및 차트 렌더 완료 대기
-    await page.evaluate(async () => {
-      await (document as Document & { fonts?: { ready: Promise<void> } }).fonts?.ready
-    })
     await page.waitForSelector('[data-print-ready="1"]', { timeout: 30_000 })
+    await page.evaluate(async () => {
+      // 자체 호스팅 한글 폰트(NotoSansKRLocal) 강제 preload + fonts.ready
+      await Promise.all([
+        document.fonts.load('400 1em NotoSansKRLocal', '가나다라마바사아자차카타파하'),
+        document.fonts.load('500 1em NotoSansKRLocal', '가나다라마바사아자차카타파하'),
+        document.fonts.load('700 1em NotoSansKRLocal', '가나다라마바사아자차카타파하'),
+        document.fonts.load('400 1em "Noto Sans KR"', '가나다라마바사아자차카타파하'),
+        document.fonts.load('700 1em "Noto Sans KR"', '가나다라마바사아자차카타파하'),
+        (document as Document & { fonts?: { ready: Promise<void> } }).fonts?.ready,
+      ])
+    })
+
+    // 콘텐츠 전체 높이를 측정해 단일 페이지 PDF로 출력 (페이지 분할 없음)
+    const dimensions = await page.evaluate(() => ({
+      width: document.documentElement.scrollWidth,
+      height: document.documentElement.scrollHeight,
+    }))
 
     const pdf = await page.pdf({
-      format: 'A4',
-      landscape: true,
+      width: `${dimensions.width}px`,
+      height: `${dimensions.height}px`,
       printBackground: true,
-      scale: 0.85,
-      margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' },
+      margin: { top: 0, bottom: 0, left: 0, right: 0 },
     })
 
     const brandsData = report.brands as { name: string } | { name: string }[] | null

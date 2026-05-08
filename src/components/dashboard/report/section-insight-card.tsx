@@ -129,7 +129,7 @@ export function SectionInsightCard({
   const isRenderProp = typeof children === 'function'
 
   return (
-    <>
+    <div className="report-section-card">
       {/* 섹션 자체. render prop이면 섹션이 헤더 slot에 버튼을 직접 꽂고, 아니면 우상단 오버레이 */}
       {isRenderProp ? (
         (children as (addButton: ReactNode | null) => ReactNode)(addButton)
@@ -228,6 +228,6 @@ export function SectionInsightCard({
           </CardContent>
         </Card>
       )}
-    </>
+    </div>
   )
 }

@@ -176,7 +176,7 @@ export function ReportDetail({ report, role, creatorEmail, printMode = false }: 
       {/* 본문 */}
       <div
         className="flex flex-col gap-6 bg-background"
-        style={printMode ? { width: 1180 } : undefined}
+        style={printMode ? { width: 1180, marginLeft: 'auto', marginRight: 'auto' } : undefined}
       >
         {!snapshot ? (
           <Card>

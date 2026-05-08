@@ -540,7 +540,7 @@ function TiktokCreativeCard({
   const metrics = getCardMetrics('tiktok', rankBy)
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden break-inside-avoid">
       <div className="relative w-full overflow-hidden bg-gray-100" style={{ paddingBottom: '100%' }}>
         {thumbSrc && !imgError ? (
           // eslint-disable-next-line @next/next/no-img-element
