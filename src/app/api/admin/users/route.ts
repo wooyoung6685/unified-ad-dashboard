@@ -144,7 +144,7 @@ export async function POST(req: NextRequest) {
   })
 }
 
-// user_brands 매핑 교체 (브랜드 할당 수정)
+// user_brands 매핑 교체
 export async function PATCH(req: NextRequest) {
   const supabase = await createClient()
   const {
@@ -153,12 +153,20 @@ export async function PATCH(req: NextRequest) {
   if (!currentUser) return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 })
 
   const body = await req.json()
-  const { id, brand_ids } = body as { id: string; brand_ids: string[] }
+  const { id, brand_ids } = body as {
+    id: string
+    brand_ids?: string[]
+  }
 
   if (!id) return NextResponse.json({ error: 'id는 필수입니다.' }, { status: 400 })
 
-  if (!Array.isArray(brand_ids) || brand_ids.length === 0) {
-    return NextResponse.json({ error: '브랜드를 1개 이상 선택해주세요.' }, { status: 400 })
+  const hasBrands = Array.isArray(brand_ids) && brand_ids.length > 0
+
+  if (!hasBrands) {
+    return NextResponse.json(
+      { error: '브랜드를 1개 이상 선택해주세요.' },
+      { status: 400 },
+    )
   }
 
   if (id === currentUser.id) {
@@ -189,13 +197,12 @@ export async function PATCH(req: NextRequest) {
     }
   }
 
-  // 새로 할당할 브랜드가 모두 본인 소유인지 검증
-  const invalid = brand_ids.filter((b) => !myBrandIds.includes(b))
+  // 브랜드 변경 처리
+  const invalid = brand_ids!.filter((b) => !myBrandIds.includes(b))
   if (invalid.length > 0) {
     return NextResponse.json({ error: '권한 없는 브랜드가 포함되어 있습니다.' }, { status: 403 })
   }
 
-  // user_brands delete-then-insert
   const { error: delErr } = await supabaseAdmin
     .from('user_brands')
     .delete()
@@ -204,16 +211,17 @@ export async function PATCH(req: NextRequest) {
 
   const { error: insErr } = await supabaseAdmin
     .from('user_brands')
-    .insert(brand_ids.map((bid) => ({ user_id: id, brand_id: bid })))
+    .insert(brand_ids!.map((bid) => ({ user_id: id, brand_id: bid })))
   if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 })
 
   // 호환용 users.brand_id 갱신 (035 마이그레이션 적용 전까지)
-  await supabaseAdmin.from('users').update({ brand_id: brand_ids[0] }).eq('id', id)
+  await supabaseAdmin.from('users').update({ brand_id: brand_ids![0] }).eq('id', id)
 
-  // 이메일 + 브랜드명 조회 후 응답
+  const finalBrandIds = brand_ids!
+
   const [{ data: authUser }, { data: brandRows }] = await Promise.all([
     supabaseAdmin.auth.admin.getUserById(id),
-    supabaseAdmin.from('brands').select('id, name').in('id', brand_ids),
+    supabaseAdmin.from('brands').select('id, name').in('id', finalBrandIds),
   ])
   const nameMap = new Map((brandRows ?? []).map((b) => [b.id, b.name]))
 
@@ -221,8 +229,8 @@ export async function PATCH(req: NextRequest) {
     user: {
       id,
       email: authUser.user?.email ?? '',
-      brand_ids,
-      brand_names: brand_ids.map((b) => nameMap.get(b) ?? ''),
+      brand_ids: finalBrandIds,
+      brand_names: finalBrandIds.map((b) => nameMap.get(b) ?? ''),
       role: targetUser.role,
       created_at: targetUser.created_at,
     },

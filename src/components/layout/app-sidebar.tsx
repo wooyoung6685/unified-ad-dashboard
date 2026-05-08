@@ -1,6 +1,7 @@
 'use client'
 
 import { logout } from '@/app/dashboard/actions'
+import { ChangePasswordDialog } from './change-password-dialog'
 import {
   Sidebar,
   SidebarContent,
@@ -149,6 +150,11 @@ export function AppSidebar({ role, userEmail }: AppSidebarProps) {
         <p className="text-muted-foreground mb-2 truncate text-xs">
           {userEmail}
         </p>
+        {role === 'viewer' && (
+          <div className="mb-2">
+            <ChangePasswordDialog />
+          </div>
+        )}
         <form action={logout} onSubmit={() => queryClient.clear()}>
           <button
             type="submit"

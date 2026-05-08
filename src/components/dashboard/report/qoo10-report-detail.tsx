@@ -40,6 +40,7 @@ interface Props {
   role: 'admin' | 'viewer'
   sectionInsights: SectionInsights
   titleAction?: ReactNode
+  printMode?: boolean
 }
 
 // ── 헬퍼 ─────────────────────────────────────────

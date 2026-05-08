@@ -19,6 +19,7 @@ interface Props {
    * ReactNode를 직접 넘기면 버튼이 절대 위치로 섹션 우상단에 오버레이된다 (단순 섹션용).
    */
   children: ReactNode | ((addButton: ReactNode | null) => ReactNode)
+  printMode?: boolean
 }
 
 export function SectionInsightCard({
@@ -28,6 +29,7 @@ export function SectionInsightCard({
   defaultLabel,
   role,
   children,
+  printMode = false,
 }: Props) {
   const [savedContent, setSavedContent] = useState(initialEntry?.content ?? '')
   const [savedTitle, setSavedTitle] = useState(initialEntry?.title ?? '')
@@ -42,8 +44,8 @@ export function SectionInsightCard({
   const displayTitle = savedTitle || defaultLabel
   // 인사이트 카드(편집 UI/read-only) 표시 여부
   const showInsightCard = isEditing || hasContent
-  // admin이고 비어있을 때 섹션 우상단에 "+ 추가" 버튼만 노출
-  const showAddOverlay = isAdmin && !hasContent && !isEditing
+  // admin이고 비어있을 때 섹션 우상단에 "+ 추가" 버튼만 노출 (print 모드 제외)
+  const showAddOverlay = isAdmin && !printMode && !hasContent && !isEditing
 
   const handleEdit = () => {
     setEditingTitle(savedTitle)
@@ -159,7 +161,7 @@ export function SectionInsightCard({
               )}
             </div>
             <div className="ml-2 flex shrink-0 items-center gap-1">
-              {isAdmin && !isEditing && (
+              {isAdmin && !printMode && !isEditing && (
                 <>
                   <Button
                     variant="ghost"

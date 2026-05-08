@@ -59,6 +59,7 @@ interface Props {
   filters?: ReportFilters | null
   sectionInsights?: SectionInsights
   titleAction?: ReactNode
+  printMode?: boolean
 }
 
 // ── 헬퍼 ─────────────────────────────────────────
