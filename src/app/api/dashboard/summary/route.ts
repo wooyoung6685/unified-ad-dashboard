@@ -114,13 +114,13 @@ export async function GET(req: NextRequest) {
     // 날짜별 데이터 변환
     const dailyData: SummaryDayData[] = rows.map((r) => {
       const content_views = (r.content_views as number | null) ?? null
-      const outboundClicks = (r.outbound_clicks as number | null) ?? null
+      const inline_link_clicks = (r.inline_link_clicks as number | null) ?? null
       const metrics = calcMetrics(
         r.spend,
         r.revenue,
         r.impressions,
         r.reach ?? null,
-        outboundClicks,
+        inline_link_clicks,
         r.purchases,
         content_views
       )
@@ -135,6 +135,7 @@ export async function GET(req: NextRequest) {
         add_to_cart: r.add_to_cart ?? null,
         content_views,
         outbound_clicks: (r.outbound_clicks as number | null) ?? null,
+        inline_link_clicks,
         video_views: null, // Meta는 항상 null
         views_2s: null,
         views_6s: null,
@@ -159,6 +160,8 @@ export async function GET(req: NextRequest) {
           (acc.content_views ?? 0) + ((r.content_views as number | null) ?? 0),
         outbound_clicks:
           (acc.outbound_clicks ?? 0) + ((r.outbound_clicks as number | null) ?? 0),
+        inline_link_clicks:
+          (acc.inline_link_clicks ?? 0) + ((r.inline_link_clicks as number | null) ?? 0),
       }),
       {
         spend: 0,
@@ -170,6 +173,7 @@ export async function GET(req: NextRequest) {
         add_to_cart: 0,
         content_views: 0,
         outbound_clicks: 0,
+        inline_link_clicks: 0,
       }
     )
 
@@ -177,6 +181,7 @@ export async function GET(req: NextRequest) {
       ...sum,
       content_views: sum.content_views || null,
       outbound_clicks: sum.outbound_clicks || null,
+      inline_link_clicks: sum.inline_link_clicks || null,
       video_views: null, // Meta는 항상 null
       views_2s: null,
       views_6s: null,
@@ -187,7 +192,7 @@ export async function GET(req: NextRequest) {
         sum.revenue || null,
         sum.impressions || null,
         sum.reach || null,
-        sum.outbound_clicks || null,
+        sum.inline_link_clicks || null,
         sum.purchases || null,
         sum.content_views || null
       ),

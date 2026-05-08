@@ -56,8 +56,7 @@ const CAMPAIGN_FIELDS = [
   'frequency',
   'cpm',
   'clicks',
-  'ctr',
-  'cpc',
+  'inline_link_clicks',
   'actions',
   'action_values',
   'catalog_segment_actions',
@@ -93,6 +92,7 @@ export async function fetchMetaCampaigns(
     const impressions = parseFloat(row.impressions ?? '0')
     const reach = parseFloat(row.reach ?? '0')
     const clicks = parseFloat(row.clicks ?? '0')
+    const inline_link_clicks = parseFloat(row.inline_link_clicks ?? '0')
 
     const purchases = findAction(
       row.actions,
@@ -128,8 +128,9 @@ export async function fetchMetaCampaigns(
       frequency: reach > 0 ? impressions / reach : null,
       cpm: impressions > 0 ? (spend / impressions) * 1000 : null,
       clicks: clicks || null,
-      ctr: impressions > 0 ? (clicks / impressions) * 100 : null,
-      cpc: clicks > 0 ? spend / clicks : null,
+      inline_link_clicks: inline_link_clicks || null,
+      ctr: inline_link_clicks > 0 && impressions > 0 ? (inline_link_clicks / impressions) * 100 : null,
+      cpc: inline_link_clicks > 0 ? spend / inline_link_clicks : null,
       add_to_cart: add_to_cart != null ? Math.round(add_to_cart) : null,
       cost_per_add_to_cart,
       add_to_cart_value,
@@ -155,6 +156,7 @@ export function mergeMetaCampaignPrev(
       prev_frequency: p?.frequency ?? null,
       prev_cpm: p?.cpm ?? null,
       prev_clicks: p?.clicks ?? null,
+      prev_inline_link_clicks: p?.inline_link_clicks ?? null,
       prev_ctr: p?.ctr ?? null,
       prev_cpc: p?.cpc ?? null,
       prev_add_to_cart: p?.add_to_cart ?? null,
@@ -175,8 +177,7 @@ const ADSET_FIELDS = [
   'frequency',
   'cpm',
   'clicks',
-  'ctr',
-  'cpc',
+  'inline_link_clicks',
   'actions',
   'action_values',
   'catalog_segment_actions',
@@ -212,6 +213,7 @@ export async function fetchMetaAdsets(
     const impressions = parseFloat(row.impressions ?? '0')
     const reach = parseFloat(row.reach ?? '0')
     const clicks = parseFloat(row.clicks ?? '0')
+    const inline_link_clicks = parseFloat(row.inline_link_clicks ?? '0')
 
     const purchases = findAction(row.actions, PURCHASE_CANDIDATES, row.catalog_segment_actions)
     const revenue = findAction(row.action_values, PURCHASE_CANDIDATES, row.catalog_segment_value)
@@ -232,8 +234,9 @@ export async function fetchMetaAdsets(
       frequency: reach > 0 ? impressions / reach : null,
       cpm: impressions > 0 ? (spend / impressions) * 1000 : null,
       clicks: clicks || null,
-      ctr: impressions > 0 ? (clicks / impressions) * 100 : null,
-      cpc: clicks > 0 ? spend / clicks : null,
+      inline_link_clicks: inline_link_clicks || null,
+      ctr: inline_link_clicks > 0 && impressions > 0 ? (inline_link_clicks / impressions) * 100 : null,
+      cpc: inline_link_clicks > 0 ? spend / inline_link_clicks : null,
       add_to_cart: add_to_cart != null ? Math.round(add_to_cart) : null,
       cost_per_add_to_cart,
       add_to_cart_value,
@@ -259,6 +262,7 @@ export function mergeMetaAdsetPrev(
       prev_frequency: p?.frequency ?? null,
       prev_cpm: p?.cpm ?? null,
       prev_clicks: p?.clicks ?? null,
+      prev_inline_link_clicks: p?.inline_link_clicks ?? null,
       prev_ctr: p?.ctr ?? null,
       prev_cpc: p?.cpc ?? null,
       prev_add_to_cart: p?.add_to_cart ?? null,

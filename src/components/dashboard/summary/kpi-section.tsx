@@ -35,8 +35,8 @@ const META_EFFICIENCY: MetricDef[] = [
   { key: 'cpa', label: '구매당 비용', format: 'currency', icon: ShoppingCart },
   { key: 'purchase_rate', label: '구매율', format: 'percent', icon: RefreshCw },
   { key: 'aov', label: '객단가', format: 'currency', icon: Banknote },
-  { key: 'cpc', label: 'CPC (클릭당 비용)', format: 'currency', icon: DollarSign },
-  { key: 'ctr', label: 'CTR (클릭률)', format: 'percent', icon: MousePointer },
+  { key: 'cpc', label: 'CPC (링크 클릭당 비용)', format: 'currency', icon: DollarSign },
+  { key: 'ctr', label: 'CTR (링크 클릭률)', format: 'percent', icon: MousePointer },
   { key: 'cpm', label: 'CPM', format: 'currency', icon: DollarSign },
   { key: 'frequency', label: '빈도', format: 'number2', icon: RefreshCw },
 ]
@@ -49,6 +49,7 @@ const META_RAW: MetricDef[] = [
   { key: 'add_to_cart', label: '장바구니 담기', format: 'number' },
   { key: 'impressions', label: '노출수', format: 'number' },
   { key: 'reach', label: '도달수', format: 'number' },
+  { key: 'inline_link_clicks', label: '링크 클릭수', format: 'number' },
   { key: 'outbound_clicks', label: '아웃바운드 클릭', format: 'number' },
   { key: 'clicks', label: '전체 클릭 (참고)', format: 'number' },
   { key: 'content_views', label: '조회수', format: 'number' },

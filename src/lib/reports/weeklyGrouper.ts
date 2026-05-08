@@ -61,6 +61,7 @@ export function groupMetaByWeek(
     const impressions = sumRows(rs.map((r) => r.impressions))
     const reach = sumRows(rs.map((r) => r.reach))
     const clicks = sumRows(rs.map((r) => r.clicks))
+    const inline_link_clicks = sumRows(rs.map((r) => r.inline_link_clicks))
     const purchases = sumRows(rs.map((r) => r.purchases))
     const add_to_cart = sumRows(rs.map((r) => r.add_to_cart))
     const add_to_cart_value = sumRows(rs.map((r) => r.add_to_cart_value))
@@ -76,8 +77,9 @@ export function groupMetaByWeek(
       frequency: divOrNull(impressions, reach),
       cpm: divOrNull(spend * 1000, impressions),
       clicks: clicks || null,
-      ctr: divOrNull(clicks * 100, impressions),
-      cpc: divOrNull(spend, clicks),
+      inline_link_clicks: inline_link_clicks || null,
+      ctr: divOrNull(inline_link_clicks * 100, impressions),
+      cpc: divOrNull(spend, inline_link_clicks),
       add_to_cart: add_to_cart || null,
       add_to_cart_value: add_to_cart_value || null,
     }

@@ -201,7 +201,7 @@ async function buildMetaSnapshot(args: {
     supabaseAdmin
       .from('meta_daily_stats')
       .select(
-        'date, spend, revenue, impressions, reach, clicks, purchases, add_to_cart, add_to_cart_value',
+        'date, spend, revenue, impressions, reach, clicks, inline_link_clicks, purchases, add_to_cart, add_to_cart_value',
       )
       .eq('meta_account_id', internal_account_id)
       .gte('date', thisMonthStart)
@@ -209,7 +209,7 @@ async function buildMetaSnapshot(args: {
     supabaseAdmin
       .from('meta_daily_stats')
       .select(
-        'date, spend, revenue, impressions, reach, clicks, purchases, add_to_cart, add_to_cart_value',
+        'date, spend, revenue, impressions, reach, clicks, inline_link_clicks, purchases, add_to_cart, add_to_cart_value',
       )
       .eq('meta_account_id', internal_account_id)
       .gte('date', prevMonthStart)

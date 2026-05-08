@@ -25,6 +25,7 @@ export type MetaDailyRow = {
   impressions: number | null
   reach: number | null
   clicks: number | null
+  inline_link_clicks: number | null
   purchases: number | null
   add_to_cart: number | null
   add_to_cart_value: number | null
@@ -42,6 +43,7 @@ export type MetaCampaignCurrent = Omit<
   | 'prev_frequency'
   | 'prev_cpm'
   | 'prev_clicks'
+  | 'prev_inline_link_clicks'
   | 'prev_ctr'
   | 'prev_cpc'
   | 'prev_add_to_cart'
@@ -59,6 +61,7 @@ export type MetaAdsetCurrent = Omit<
   | 'prev_frequency'
   | 'prev_cpm'
   | 'prev_clicks'
+  | 'prev_inline_link_clicks'
   | 'prev_ctr'
   | 'prev_cpc'
   | 'prev_add_to_cart'
@@ -71,6 +74,7 @@ function calcMetaAgg(rows: MetaDailyRow[]) {
   const impressions = sumRows(rows.map((r) => r.impressions))
   const reach = sumRows(rows.map((r) => r.reach))
   const clicks = sumRows(rows.map((r) => r.clicks))
+  const inline_link_clicks = sumRows(rows.map((r) => r.inline_link_clicks))
   const purchases = sumRows(rows.map((r) => r.purchases))
   const add_to_cart = sumRows(rows.map((r) => r.add_to_cart))
   return {
@@ -83,8 +87,9 @@ function calcMetaAgg(rows: MetaDailyRow[]) {
     frequency: divOrNull(impressions, reach),
     cpm: divOrNull(spend * 1000, impressions),
     clicks: clicks || null,
-    ctr: divOrNull(clicks * 100, impressions),
-    cpc: divOrNull(spend, clicks),
+    inline_link_clicks: inline_link_clicks || null,
+    ctr: divOrNull(inline_link_clicks * 100, impressions),
+    cpc: divOrNull(spend, inline_link_clicks),
     add_to_cart: add_to_cart || null,
     cost_per_add_to_cart: divOrNull(spend, add_to_cart),
   }
@@ -107,6 +112,7 @@ export function aggregateMetaMonthly(
     prev_frequency: prev.frequency,
     prev_cpm: prev.cpm,
     prev_clicks: prev.clicks,
+    prev_inline_link_clicks: prev.inline_link_clicks,
     prev_ctr: prev.ctr,
     prev_cpc: prev.cpc,
     prev_add_to_cart: prev.add_to_cart,

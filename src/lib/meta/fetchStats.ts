@@ -22,6 +22,7 @@ export type MetaStatPayload = {
   add_to_cart_value: number | null
   outbound_clicks: number | null
   cost_per_outbound_click: number | null
+  inline_link_clicks: number | null
 }
 
 // action_type 우선순위 후보 (앞에 있을수록 우선)
@@ -95,6 +96,7 @@ export async function fetchStats(params: {
     'catalog_segment_actions',   // 카탈로그/다이나믹 광고 전환
     'catalog_segment_value',     // 카탈로그/다이나믹 광고 매출
     'outbound_clicks',           // 외부 링크 클릭 (actions 내부가 아닌 별도 필드)
+    'inline_link_clicks',        // 링크 클릭수 (CTR/CPC 계산 기준)
     'cost_per_action_type',
   ].join(',')
 
@@ -129,6 +131,7 @@ export async function fetchStats(params: {
       catalog_segment_actions?: ActionEntry[]
       catalog_segment_value?: ActionEntry[]
       outbound_clicks?: Array<{ action_type: string; value: string }>
+      inline_link_clicks?: string
       cost_per_action_type?: ActionEntry[]
     }>
   }
@@ -136,15 +139,23 @@ export async function fetchStats(params: {
   const row = data.data?.[0]
   if (!row) return null
 
-  // 기본 지표 (Meta API가 account 레벨에서 직접 계산한 값 사용)
+  // 기본 지표
   const spend = row.spend ? parseFloat(row.spend) : null
   const impressions = row.impressions ? parseFloat(row.impressions) : null
   const reach = row.reach ? parseFloat(row.reach) : null
   const frequency = row.frequency ? parseFloat(row.frequency) : null
   const clicks = row.clicks ? parseFloat(row.clicks) : null
   const cpm = row.cpm ? parseFloat(row.cpm) : null
-  const ctr = row.ctr ? parseFloat(row.ctr) : null
-  const cpc = row.cpc ? parseFloat(row.cpc) : null
+  const inline_link_clicks = row.inline_link_clicks ? parseFloat(row.inline_link_clicks) : null
+  // ctr/cpc는 inline_link_clicks 기준으로 계산
+  const ctr =
+    inline_link_clicks !== null && inline_link_clicks > 0 && impressions !== null && impressions > 0
+      ? (inline_link_clicks / impressions) * 100
+      : null
+  const cpc =
+    inline_link_clicks !== null && inline_link_clicks > 0 && spend !== null
+      ? spend / inline_link_clicks
+      : null
 
   // actions + catalog_segment_actions 병합 → 전환 지표
   const purchases = roundOrNull(
@@ -227,5 +238,6 @@ export async function fetchStats(params: {
     add_to_cart_value,
     outbound_clicks,
     cost_per_outbound_click,
+    inline_link_clicks,
   }
 }

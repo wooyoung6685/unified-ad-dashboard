@@ -143,9 +143,9 @@ function MonthlyKpi({ m }: { m: MetaMonthlyData }) {
           <MetaKpiCard label="도달" curr={m.reach} prev={m.prev_reach} format="num" goodUp />
           <MetaKpiCard label="빈도" curr={m.frequency} prev={m.prev_frequency} format="dec" goodUp />
           <MetaKpiCard label="CPM" curr={m.cpm} prev={m.prev_cpm} format="krw" goodUp={false} />
-          <MetaKpiCard label="클릭수" curr={m.clicks} prev={m.prev_clicks} format="num" goodUp />
-          <MetaKpiCard label="CTR (클릭률)" curr={m.ctr} prev={m.prev_ctr} format="pct" goodUp />
-          <MetaKpiCard label="CPC (클릭당 비용)" curr={m.cpc} prev={m.prev_cpc} format="krw" goodUp={false} />
+          <MetaKpiCard label="링크 클릭수" curr={m.inline_link_clicks} prev={m.prev_inline_link_clicks} format="num" goodUp />
+          <MetaKpiCard label="CTR (링크 클릭률)" curr={m.ctr} prev={m.prev_ctr} format="pct" goodUp />
+          <MetaKpiCard label="CPC (링크 클릭당 비용)" curr={m.cpc} prev={m.prev_cpc} format="krw" goodUp={false} />
         </div>
       </CardContent>
     </Card>
@@ -310,8 +310,9 @@ function WeeklyTable({ weekly }: { weekly: MetaWeeklyData[] }) {
                 <TableHead className="whitespace-nowrap">빈도</TableHead>
                 <TableHead className="whitespace-nowrap">CPM</TableHead>
                 <TableHead className="whitespace-nowrap">클릭수</TableHead>
-                <TableHead className="whitespace-nowrap">클릭당 비용(CPC)</TableHead>
-                <TableHead className="whitespace-nowrap">클릭률(CTR)</TableHead>
+                <TableHead className="whitespace-nowrap">링크 클릭수</TableHead>
+                <TableHead className="whitespace-nowrap">링크 클릭당 비용(CPC)</TableHead>
+                <TableHead className="whitespace-nowrap">링크 클릭률(CTR)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -332,6 +333,7 @@ function WeeklyTable({ weekly }: { weekly: MetaWeeklyData[] }) {
                   <TableCell className="whitespace-nowrap">{fmtDec(w.frequency)}</TableCell>
                   <TableCell className="whitespace-nowrap">{fmtKRW(w.cpm)}</TableCell>
                   <TableCell className="whitespace-nowrap">{fmtNum(w.clicks)}</TableCell>
+                  <TableCell className="whitespace-nowrap">{fmtNum(w.inline_link_clicks)}</TableCell>
                   <TableCell className="whitespace-nowrap">{fmtKRW(w.cpc)}</TableCell>
                   <TableCell className="whitespace-nowrap">{fmtPct(w.ctr)}</TableCell>
                 </TableRow>
@@ -426,8 +428,8 @@ function CampaignTable({
                 <TableHead className="whitespace-nowrap">노출수</TableHead>
                 <TableHead className="whitespace-nowrap">도달수</TableHead>
                 <TableHead className="whitespace-nowrap">빈도</TableHead>
-                <TableHead className="whitespace-nowrap">CPC</TableHead>
-                <TableHead className="whitespace-nowrap">클릭률(CTR)</TableHead>
+                <TableHead className="whitespace-nowrap">CPC (링크)</TableHead>
+                <TableHead className="whitespace-nowrap">링크 클릭률(CTR)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -519,8 +521,8 @@ function AdsetTable({
                 <TableHead className="whitespace-nowrap">노출수</TableHead>
                 <TableHead className="whitespace-nowrap">도달수</TableHead>
                 <TableHead className="whitespace-nowrap">빈도</TableHead>
-                <TableHead className="whitespace-nowrap">CPC</TableHead>
-                <TableHead className="whitespace-nowrap">클릭률(CTR)</TableHead>
+                <TableHead className="whitespace-nowrap">CPC (링크)</TableHead>
+                <TableHead className="whitespace-nowrap">링크 클릭률(CTR)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

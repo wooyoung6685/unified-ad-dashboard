@@ -22,6 +22,7 @@ function calcTotal(rows: MetaDailyStatFull[]): MetaDailyStatFull {
   const totalSpend = sum('spend')
   const totalImpressions = sum('impressions')
   const totalClicks = sum('clicks')
+  const totalLinkClicks = sum('inline_link_clicks')
   const totalPurchases = sum('purchases')
   const totalRevenue = sum('revenue')
   const totalOutboundClicks = sum('outbound_clicks')
@@ -37,14 +38,15 @@ function calcTotal(rows: MetaDailyStatFull[]): MetaDailyStatFull {
     spend: totalSpend,
     impressions: totalImpressions,
     clicks: totalClicks,
+    inline_link_clicks: totalLinkClicks,
     purchases: totalPurchases,
     revenue: totalRevenue,
     roas: totalSpend > 0 ? totalRevenue / totalSpend : null,
-    ctr: totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : null,
-    cpc: totalClicks > 0 ? totalSpend / totalClicks : null,
+    ctr: totalImpressions > 0 && totalLinkClicks > 0 ? (totalLinkClicks / totalImpressions) * 100 : null,
+    cpc: totalLinkClicks > 0 ? totalSpend / totalLinkClicks : null,
     cpa: totalPurchases > 0 ? totalSpend / totalPurchases : null,
     conversion_rate:
-      totalClicks > 0 ? (totalPurchases / totalClicks) * 100 : null,
+      totalLinkClicks > 0 ? (totalPurchases / totalLinkClicks) * 100 : null,
     avg_order_value: totalPurchases > 0 ? totalRevenue / totalPurchases : null,
     reach: sum('reach'),
     frequency: null,
@@ -99,6 +101,7 @@ export function MetaDailyTable({ rows }: MetaDailyTableProps) {
             <TableHead className="min-w-20 text-right">빈도</TableHead>
             <TableHead className="min-w-24 text-right">CPM</TableHead>
             <TableHead className="min-w-24 text-right">클릭수</TableHead>
+            <TableHead className="min-w-28 text-right">링크 클릭수</TableHead>
             <TableHead className="min-w-28 text-right">CPC(링크)</TableHead>
             <TableHead className="min-w-28 text-right">CTR(링크)(%)</TableHead>
             <TableHead className="min-w-28 text-right">콘텐츠 조회</TableHead>
@@ -163,6 +166,7 @@ export function MetaDailyTable({ rows }: MetaDailyTableProps) {
               </TableCell>
               <TableCell className="text-right">{fmtKRW(row.cpm)}</TableCell>
               <TableCell className="text-right">{fmtNum(row.clicks)}</TableCell>
+              <TableCell className="text-right">{fmtNum(row.inline_link_clicks)}</TableCell>
               <TableCell className="text-right">{fmtKRW(row.cpc)}</TableCell>
               <TableCell className="text-right">{fmtPct(row.ctr)}</TableCell>
               <TableCell className="text-right">

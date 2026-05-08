@@ -93,6 +93,7 @@ export type MetaDailyStat = {
   add_to_cart_value: number | null
   outbound_clicks: number | null
   cost_per_outbound_click: number | null
+  inline_link_clicks: number | null
 }
 
 export type TiktokDailyStat = {
@@ -480,6 +481,7 @@ export type SummaryDayData = {
   // Meta 전용 원본 지표
   content_views: number | null
   outbound_clicks: number | null
+  inline_link_clicks?: number | null
   // 계산 지표
   roas: number | null
   frequency: number | null
@@ -892,6 +894,7 @@ export type MetaMonthlyData = {
   frequency: number | null
   cpm: number | null
   clicks: number | null
+  inline_link_clicks: number | null
   ctr: number | null
   cpc: number | null
   add_to_cart: number | null
@@ -906,6 +909,7 @@ export type MetaMonthlyData = {
   prev_frequency: number | null
   prev_cpm: number | null
   prev_clicks: number | null
+  prev_inline_link_clicks: number | null
   prev_ctr: number | null
   prev_cpc: number | null
   prev_add_to_cart: number | null
@@ -924,6 +928,7 @@ export type MetaWeeklyData = {
   frequency: number | null
   cpm: number | null
   clicks: number | null
+  inline_link_clicks: number | null
   ctr: number | null
   cpc: number | null
   add_to_cart: number | null
@@ -942,6 +947,7 @@ export type MetaCampaignData = {
   frequency: number | null
   cpm: number | null
   clicks: number | null
+  inline_link_clicks: number | null
   ctr: number | null
   cpc: number | null
   add_to_cart: number | null
@@ -956,6 +962,7 @@ export type MetaCampaignData = {
   prev_frequency: number | null
   prev_cpm: number | null
   prev_clicks: number | null
+  prev_inline_link_clicks: number | null
   prev_ctr: number | null
   prev_cpc: number | null
   prev_add_to_cart: number | null
@@ -975,6 +982,7 @@ export type MetaAdsetData = {
   frequency: number | null
   cpm: number | null
   clicks: number | null
+  inline_link_clicks: number | null
   ctr: number | null
   cpc: number | null
   add_to_cart: number | null
@@ -989,6 +997,7 @@ export type MetaAdsetData = {
   prev_frequency: number | null
   prev_cpm: number | null
   prev_clicks: number | null
+  prev_inline_link_clicks: number | null
   prev_ctr: number | null
   prev_cpc: number | null
   prev_add_to_cart: number | null
