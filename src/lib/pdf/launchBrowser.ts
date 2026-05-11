@@ -9,17 +9,19 @@ const FONTS = [
     url: 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/notosanskr/NotoSansKR%5Bwght%5D.ttf',
   },
   {
+    // NotoColorEmoji(약 24MB)는 jsdelivr가 거부하므로 GitHub raw 직접 사용
     fileName: 'NotoColorEmoji.ttf',
-    url: 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/notocoloremoji/NotoColorEmoji-Regular.ttf',
+    url: 'https://raw.githubusercontent.com/google/fonts/main/ofl/notocoloremoji/NotoColorEmoji-Regular.ttf',
   },
 ]
 
 // serverless Chromium은 한글·이모지 시스템 폰트가 없으므로
 // fontconfig가 스캔하는 /tmp/fonts/에 사전 배치 (콜드 스타트당 1회, 이후 캐시)
+// allSettled로 일부 폰트 실패해도 나머지는 진행 (한글 회귀 방지)
 async function ensureFonts(): Promise<void> {
   const fontDir = join(tmpdir(), 'fonts')
   await fs.mkdir(fontDir, { recursive: true })
-  await Promise.all(
+  const results = await Promise.allSettled(
     FONTS.map(async (f) => {
       const fontPath = join(fontDir, f.fileName)
       try {
@@ -33,6 +35,11 @@ async function ensureFonts(): Promise<void> {
       await fs.writeFile(fontPath, Buffer.from(await res.arrayBuffer()))
     }),
   )
+  results.forEach((r, i) => {
+    if (r.status === 'rejected') {
+      console.warn(`[pdf] ${FONTS[i].fileName} 로드 실패:`, r.reason)
+    }
+  })
 }
 
 export async function launchBrowser(): Promise<Browser> {
