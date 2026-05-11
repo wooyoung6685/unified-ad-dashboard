@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono, Noto_Sans_KR } from 'next/font/google'
+import { Geist, Geist_Mono } from 'next/font/google'
+import localFont from 'next/font/local'
 import { Providers } from '@/components/providers'
 import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
@@ -14,11 +15,26 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 })
 
-const notoSansKr = Noto_Sans_KR({
+const notoSansKr = localFont({
   variable: '--font-noto-sans-kr',
-  subsets: ['latin'],
-  weight: ['400', '500', '700'],
   display: 'block',
+  src: [
+    {
+      path: '../../public/fonts/NotoSansKR-Regular.woff2',
+      weight: '400',
+      style: 'normal',
+    },
+    {
+      path: '../../public/fonts/NotoSansKR-Medium.woff2',
+      weight: '500',
+      style: 'normal',
+    },
+    {
+      path: '../../public/fonts/NotoSansKR-Bold.woff2',
+      weight: '700',
+      style: 'normal',
+    },
+  ],
 })
 
 export const metadata: Metadata = {
