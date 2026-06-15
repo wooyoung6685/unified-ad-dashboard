@@ -485,7 +485,11 @@ export function DailyShell() {
         <div className="space-y-6">
           {data.platform === 'meta' ? (
             <div className="rounded-lg border">
-              <MetaDailyTable rows={data.rows as MetaDailyStatFull[]} />
+              <MetaDailyTable
+                rows={data.rows as MetaDailyStatFull[]}
+                isAdmin={role === 'admin'}
+                onSaved={handleSearch}
+              />
             </div>
           ) : data.platform === 'tiktok' ? (
             <>
@@ -540,7 +544,11 @@ export function DailyShell() {
                     쇼핑몰
                   </p>
                   <div className="rounded-lg border">
-                    <ShopeeShoppingTable rows={data.shopping_rows} />
+                    <ShopeeShoppingTable
+                      rows={data.shopping_rows}
+                      isAdmin={role === 'admin'}
+                      onSaved={handleSearch}
+                    />
                   </div>
                 </div>
               )}

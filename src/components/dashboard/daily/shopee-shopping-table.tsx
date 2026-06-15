@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import {
   Table,
   TableBody,
@@ -8,11 +9,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Button } from '@/components/ui/button'
 import { fmtFx, fmtKRW, fmtNum, fmtPct } from '@/lib/format'
 import type { ShopeeShoppingStat } from '@/types/database'
+import { DailyEditDialog } from './daily-edit-dialog'
 
 interface ShopeeShoppingTableProps {
   rows: ShopeeShoppingStat[]
+  isAdmin?: boolean
+  onSaved?: () => void
 }
 
 type TotalRow = Omit<ShopeeShoppingStat, 'id' | 'shopee_account_id' | 'brand_id' | 'created_at'>
@@ -68,7 +73,9 @@ function calcTotal(rows: ShopeeShoppingStat[]): TotalRow {
   }
 }
 
-export function ShopeeShoppingTable({ rows }: ShopeeShoppingTableProps) {
+export function ShopeeShoppingTable({ rows, isAdmin, onSaved }: ShopeeShoppingTableProps) {
+  const [editingRow, setEditingRow] = useState<ShopeeShoppingStat | null>(null)
+
   if (rows.length === 0) {
     return (
       <div className="text-muted-foreground py-12 text-center text-sm">
@@ -83,6 +90,15 @@ export function ShopeeShoppingTable({ rows }: ShopeeShoppingTableProps) {
 
   return (
     <div>
+      {editingRow && (
+        <DailyEditDialog
+          target="shopee_shopping"
+          row={editingRow}
+          open={!!editingRow}
+          onOpenChange={(open) => { if (!open) setEditingRow(null) }}
+          onSaved={() => { setEditingRow(null); onSaved?.() }}
+        />
+      )}
       <Table
         className="min-w-390"
         containerClassName="overflow-auto max-h-[calc(100vh-280px)]"
@@ -102,6 +118,7 @@ export function ShopeeShoppingTable({ rows }: ShopeeShoppingTableProps) {
             <TableHead className="min-w-28 text-right">전환율(%)</TableHead>
             <TableHead className="min-w-32 text-right">객단가 ({currency})</TableHead>
             <TableHead className="min-w-32 text-right">객단가 (KRW)</TableHead>
+            {isAdmin && <TableHead className="w-16" />}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -147,6 +164,20 @@ export function ShopeeShoppingTable({ rows }: ShopeeShoppingTableProps) {
               <TableCell className="text-right">{fmtPct(row.order_conversion_rate)}</TableCell>
               <TableCell className="text-right">{fmtFx(row.sales_per_order)}</TableCell>
               <TableCell className="text-right">{fmtKRW(row.sales_per_order_krw)}</TableCell>
+              {isAdmin && (
+                <TableCell>
+                  {i !== 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => setEditingRow(row as ShopeeShoppingStat)}
+                    >
+                      수정
+                    </Button>
+                  )}
+                </TableCell>
+              )}
             </TableRow>
           ))}
         </TableBody>

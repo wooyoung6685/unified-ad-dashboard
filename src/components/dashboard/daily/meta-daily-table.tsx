@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import {
   Table,
   TableBody,
@@ -8,11 +9,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Button } from '@/components/ui/button'
 import { fmtDec, fmtKRW, fmtNum, fmtPct } from '@/lib/format'
 import type { MetaDailyStatFull } from '@/types/database'
+import { DailyEditDialog } from './daily-edit-dialog'
 
 interface MetaDailyTableProps {
   rows: MetaDailyStatFull[]
+  isAdmin?: boolean
+  onSaved?: () => void
 }
 
 function calcTotal(rows: MetaDailyStatFull[]): MetaDailyStatFull {
@@ -64,7 +69,9 @@ function calcTotal(rows: MetaDailyStatFull[]): MetaDailyStatFull {
   }
 }
 
-export function MetaDailyTable({ rows }: MetaDailyTableProps) {
+export function MetaDailyTable({ rows, isAdmin, onSaved }: MetaDailyTableProps) {
+  const [editingRow, setEditingRow] = useState<MetaDailyStatFull | null>(null)
+
   if (rows.length === 0) {
     return (
       <div className="text-muted-foreground py-12 text-center text-sm">
@@ -78,6 +85,15 @@ export function MetaDailyTable({ rows }: MetaDailyTableProps) {
 
   return (
     <div>
+      {editingRow && (
+        <DailyEditDialog
+          target="meta"
+          row={editingRow}
+          open={!!editingRow}
+          onOpenChange={(open) => { if (!open) setEditingRow(null) }}
+          onSaved={() => { setEditingRow(null); onSaved?.() }}
+        />
+      )}
       <Table
         className="min-w-800"
         containerClassName="overflow-auto max-h-[calc(100vh-280px)]"
@@ -121,6 +137,7 @@ export function MetaDailyTable({ rows }: MetaDailyTableProps) {
             <TableHead className="min-w-40 text-right">
               아웃바운드 클릭당 비용
             </TableHead>
+            {isAdmin && <TableHead className="w-16" />}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -190,6 +207,20 @@ export function MetaDailyTable({ rows }: MetaDailyTableProps) {
               <TableCell className="text-right">
                 {fmtKRW(row.cost_per_outbound_click)}
               </TableCell>
+              {isAdmin && (
+                <TableCell>
+                  {row.id !== '__total__' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => setEditingRow(row as MetaDailyStatFull)}
+                    >
+                      수정
+                    </Button>
+                  )}
+                </TableCell>
+              )}
             </TableRow>
           ))}
         </TableBody>
