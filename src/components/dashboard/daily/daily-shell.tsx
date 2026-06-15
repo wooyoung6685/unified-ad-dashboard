@@ -420,17 +420,33 @@ export function DailyShell() {
                 <Separator />
               )}
               {inappAccountForUpload && (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">인앱 데이터 (.csv)</p>
-                  <ShopeeUploadArea
-                    shopeeAccountId={inappAccountForUpload.id}
-                    accountExternalId={shopeeExternalAccountId}
-                    accountType="shopee_inapp"
-                    onUploadSuccess={() => {
-                      handleSearch()
-                    }}
-                  />
-                </div>
+                <>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">인앱데이터 샵광고 (.xlsx)</p>
+                    <ShopeeUploadArea
+                      shopeeAccountId={inappAccountForUpload.id}
+                      accountExternalId={shopeeExternalAccountId}
+                      accountType="shopee_inapp"
+                      inappKind="shop"
+                      onUploadSuccess={() => {
+                        handleSearch()
+                      }}
+                    />
+                  </div>
+                  <Separator />
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">인앱데이터 프로덕트광고 (.xlsx)</p>
+                    <ShopeeUploadArea
+                      shopeeAccountId={inappAccountForUpload.id}
+                      accountExternalId={shopeeExternalAccountId}
+                      accountType="shopee_inapp"
+                      inappKind="product"
+                      onUploadSuccess={() => {
+                        handleSearch()
+                      }}
+                    />
+                  </div>
+                </>
               )}
               {shoppingAccountForUpload && (
                 <>

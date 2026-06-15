@@ -42,27 +42,6 @@ function parseNumOrNull(raw: string | undefined): number | null {
   return isNaN(n) ? null : n
 }
 
-// ads_type 결정
-function determineAdsType(
-  adsTypeCol: string,
-  adNameCol: string,
-): 'product_ad' | 'shop_ad' | 'other' {
-  const type = adsTypeCol.trim().toLowerCase()
-  if (type) {
-    if (type.includes('product')) return 'product_ad'
-    if (type.includes('shop')) return 'shop_ad'
-    return 'other'
-  }
-
-  // ads_type 빈값이면 Ad Name으로 판단
-  const name = adNameCol.trim().toLowerCase()
-  if (name.includes('automatically select products') || name.includes('product_ad')) {
-    return 'product_ad'
-  }
-  if (name.includes('shop')) return 'shop_ad'
-  return 'other'
-}
-
 // RFC 4180 준수 CSV 행 파싱 (따옴표 안의 쉼표 처리)
 function parseCsvLine(line: string): string[] {
   const result: string[] = []
@@ -119,6 +98,7 @@ export async function parseInappStat(
   accountExternalId: string,
   brandId: string,
   country: string,
+  forcedAdsType: 'shop_ad' | 'product_ad',
 ): Promise<ParseResult> {
   try {
     // xlsx면 첫 시트를 CSV 텍스트로 변환, 아니면 CSV 원문 사용
@@ -232,7 +212,7 @@ export async function parseInappStat(
 
       const adsTypeRaw = get('adsType')
       const adNameRaw = get('adName')
-      const adsType = determineAdsType(adsTypeRaw, adNameRaw)
+      const adsType = forcedAdsType
 
       if (!accumByType[adsType]) {
         accumByType[adsType] = {

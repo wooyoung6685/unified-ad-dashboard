@@ -9,6 +9,7 @@ interface ShopeeUploadAreaProps {
   shopeeAccountId: string
   accountExternalId: string
   accountType: 'shopee_shopping' | 'shopee_inapp'
+  inappKind?: 'shop' | 'product'
   onUploadSuccess: () => void
 }
 
@@ -16,6 +17,7 @@ export function ShopeeUploadArea({
   shopeeAccountId,
   accountExternalId,
   accountType,
+  inappKind,
   onUploadSuccess,
 }: ShopeeUploadAreaProps) {
   const [file, setFile] = useState<File | null>(null)
@@ -25,10 +27,12 @@ export function ShopeeUploadArea({
   const inputRef = useRef<HTMLInputElement>(null)
 
   const isShopping = accountType === 'shopee_shopping'
-  const accept = isShopping ? '.xlsx' : '.csv'
+  const accept = '.xlsx'
   const hint = isShopping
     ? `파일명이 "${accountExternalId}"로 시작하는 xlsx 파일을 업로드하세요`
-    : `파일 내 User Name이 "${accountExternalId}"와 일치하는 csv 파일을 업로드하세요`
+    : inappKind === 'shop'
+      ? `파일명이 "Shop-Ads"로 시작하는 xlsx 파일을 업로드하세요`
+      : `파일명이 "Shopee-Ads"로 시작하는 xlsx 파일을 업로드하세요`
 
   function handleFileSelect(selected: File | null) {
     if (!selected) return
@@ -62,6 +66,9 @@ export function ShopeeUploadArea({
     formData.append('file', file)
     formData.append('shopee_account_id', shopeeAccountId)
     formData.append('account_type', isShopping ? 'shopping' : 'inapp')
+    if (!isShopping && inappKind) {
+      formData.append('ad_kind', inappKind)
+    }
 
     try {
       const res = await fetch('/api/dashboard/daily/shopee-upload', {
